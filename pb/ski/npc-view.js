@@ -159,13 +159,13 @@ export function createNpcView({ scene, height, level = 'medium' }) {
   // ---- the carriers lifts.js reports this frame (riders are placed in draw())
   const CAR_MAX = 260;
   const cars = [];
-  for (let i = 0; i < CAR_MAX; i++) cars.push({ m: new Float32Array(16), l: null, id: 0, d: 0, s: 0, kind: '' });
+  for (let i = 0; i < CAR_MAX; i++) cars.push({ m: new Float32Array(16), l: null, id: 0, d: 0, s: 0, kind: '', share: 1 });
   let nCars = 0, riderR = NPC.levels[level].riderRadius;
-  function addCarrier(l, m4, id, d, w) {
+  function addCarrier(l, m4, id, d, w, share = 1) {
     if (d > riderR || nCars >= CAR_MAX || l.kind === 'carpet') return;
     if (l.kind !== 'cable' && l.kind !== 'train' && l.site && (w.s < l.site.boardS || w.s > l.len - l.site.unloadS)) return;      // in the stations: empty
     const c = cars[nCars++];
-    c.m.set(m4.elements); c.l = l; c.id = id; c.d = d; c.s = w.s; c.kind = l.kind;
+    c.m.set(m4.elements); c.l = l; c.id = id; c.d = d; c.s = w.s; c.kind = l.kind; c.share = share;
   }
   // ---- per frame
   const m4 = new THREE.Matrix4(), mc = new THREE.Matrix4(), ml = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YZX');
@@ -243,7 +243,7 @@ export function createNpcView({ scene, height, level = 'medium' }) {
     for (const ci of order) {
       if (riders >= cfg.riders) break;
       const c = cars[ci], l = c.l;
-      const n = crowd.riders(l.index, c.id, l.kind, l.seats, l.sub, share);
+      const n = crowd.riders(l.index, c.id, l.kind, l.seats, l.sub, share * (c.share ?? 1));
       if (!n) continue;
       mc.fromArray(c.m);
       v3.setFromMatrixPosition(mc);

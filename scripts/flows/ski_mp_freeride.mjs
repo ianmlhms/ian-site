@@ -193,6 +193,24 @@ export const flow = {
         h.expect(mid.length === 0, `${rid}: never between the line and the top (${mid.length} in-between samples)`);
         R.skip = { epoch: (await F.emma.evaluate(() => window.__skiMp.epoch)) - epoch0, jumps: (await seenBy(F.host, "Emma")).jumps - jumps0 };
 
+        // ride down (Via Lattea Cesana round): emma rides the same lift DOWN: the host sees her in her carrier on the down lane
+        const liftId = await F.emma.evaluate((i) => { const l = window.__ski.modes.lifts.byIndex.get(i); return l && l.down ? l.id : null; }, hr.lift);
+        if (liftId) {
+          h.step(`${rid}: emma rides the lift down: the host sees her going down in her own carrier`);
+          await F.emma.evaluate((id) => window.__ski.goDown(id), liftId);
+          await F.emma.waitForFunction(() => window.__ski.game.phase === "running" && window.__ski.modes.liftDown, null, { timeout: 30000 });
+          await F.emma.evaluate(() => window.__ski.boardLift());
+          await F.emma.waitForFunction(() => window.__ski.ride && window.__ski.ride.down && window.__ski.ride.phase === "ride", null, { timeout: 20000 });
+          await sleep(1500);
+          const ed = await F.emma.evaluate(() => { const s = window.__ski.state; return { x: s.x, z: s.z, kind: s.rideKind, s: s.rideS }; });
+          const seenD = await seenBy(F.host, "Emma");
+          const kindSeen = await F.host.evaluate(() => { const r = window.__skiMp.remotes.all().find((x) => x.name === "Emma"); return r && r.state ? r.state.rideKind : null; });
+          R.down = { kind: ed.kind, seenKind: kindSeen, off: seenD ? +dist(seenD, ed).toFixed(1) : null, carrier: seenD && seenD.carrier };
+          h.expect(ed.kind > 10 && kindSeen === ed.kind && !!seenD && seenD.carrier && dist(seenD, ed) < 25, `${rid}: the host sees emma riding DOWN in her carrier (${JSON.stringify(R.down)})`);
+          await F.emma.evaluate(() => window.__ski.skipRide());
+          await F.emma.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 20000 });
+        }
+
         h.step(`${rid}: max fast-travels to another lift: the others see him appear there`);
         const other = await F.max.evaluate(() => { const L = window.__ski.modes.lifts.list, s = window.__ski.state; const far = L.filter((l) => !l.tunnel && l.kind !== "drag" && Math.hypot(l.bottom.x - s.x, l.bottom.z - s.z) > 800); return (far[0] || L[L.length - 1]).id; });
         await F.max.evaluate((id) => window.__ski.goFree(id), other);
@@ -271,7 +289,7 @@ export const flow = {
         R.net = await Promise.all(players.map((p) => F[p.label].evaluate(() => window.__skiMp.session.info().stats)));
         for (const p of players) h.eq(realErrors(p).filter((e) => !/WebGL|GPU stall|swiftshader|webkit-masked-url|cancel|due to access control checks/i.test(e)), [], `${rid}: no console errors (${p.label})`);
         for (const p of players) p.errors.length = 0;
-        console.log(`    ${rid}: ${JSON.stringify({ start: R.startS, sync: R.sync, lift: R.lift, skip: R.skip, teleport: R.teleport, tags: { shown: R.tags.shown, dots: R.tags.dots } })}`);
+        console.log(`    ${rid}: ${JSON.stringify({ start: R.startS, sync: R.sync, lift: R.lift, skip: R.skip, down: R.down, teleport: R.teleport, tags: { shown: R.tags.shown, dots: R.tags.dots } })}`);
       }
     } finally {
       if (process.env.SKI_MPF_REPORT) fs.writeFileSync(process.env.SKI_MPF_REPORT, JSON.stringify(report, null, 2));

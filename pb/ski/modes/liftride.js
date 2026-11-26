@@ -39,6 +39,8 @@ const FUNITEL_SEAT = -4.75;            // R8e: the rider's feet below the ropes 
 export const POSE_OF = Object.freeze({ chair: 'sit', gondola: 'carry', cable: 'carry', train: 'carry', drag: 'drag', carpet: 'belt' });
 export const KIND_CODE = Object.freeze({ chair: 1, gondola: 2, cable: 3, drag: 4, train: 5, carpet: 6 });
 export const KIND_OF_CODE = Object.freeze(Object.fromEntries(Object.entries(KIND_CODE).map(([k, v]) => [v, k])));
+/** Ride down on the wire: the kind code + DOWN_CODE (11 chair, 12 gondola, 13 cable car, 15 train; an old client ignores them). */
+export const DOWN_CODE = 10;
 const CARRY = new Set(['gondola', 'cable', 'train']);
 const ease = (k) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 const lerp = (a, b, k) => a + (b - a) * k;
@@ -62,9 +64,10 @@ export function rideSeconds(path, factor = RIDE.factor) {
 
 /** The carrier and the rider at s along the line (up lane): { cx, cy, cz (rope grip / rail top / belt), x, y, z (rider), heading, pitch,
  *  hip (drag: where the bar holds him) }. height(x, z) is the snow (drag lifts, belts and trains sit on it). */
-export function riderAt(path, s, height, out = {}) {
+export function riderAt(path, s, height, out = {}, down = false) {
   const k = path.kind;
-  const c = path.shuttle ? path.shuttleAt(s, 1, true, {}) : path.loopAt(path.upU(s), {});
+  // (ride down: the carrier on the down lane / the -1 track going down, heading down the line)
+  const c = down ? (path.shuttle ? path.shuttleAt(s, -1, false, {}) : path.loopAt(path.downU(s), {})) : path.shuttle ? path.shuttleAt(s, 1, true, {}) : path.loopAt(path.upU(s), {});
   const fx = Math.cos(c.heading), fz = Math.sin(c.heading);
   const rx = -fz, rz = fx;
   out.s = s; out.heading = c.heading; out.pitch = 0; out.roll = out.roll || 0;
@@ -87,7 +90,7 @@ export function riderAt(path, s, height, out = {}) {
     const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));     // a seat left of the middle (towards the line)
     out.x = c.x - fx * 0.05 - rx * slot; out.z = c.z - fz * 0.05 - rz * slot; out.y = c.y + RIDE.seat.chair;
   } else if (k === 'train') {
-    const f = path.shuttleAt(Math.min(path.len, s + 3), 1, true, {});      // 3 m ahead in the carriage, on the line (smooth in the curves)
+    const f = down ? path.shuttleAt(Math.max(0, s - 3), -1, false, {}) : path.shuttleAt(Math.min(path.len, s + 3), 1, true, {});      // 3 m ahead in the carriage, on the line (smooth in the curves)
     out.x = f.x; out.z = f.z; out.y = f.y + RIDE.seat.train;
   } else { out.x = c.x + fx * 0.35; out.z = c.z + fz * 0.35; out.y = c.y + (path.sub === 'funitel' ? FUNITEL_SEAT : RIDE.seat[k]); }
   return out;
@@ -179,6 +182,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     },
     /** The wire form (multiplayer): [kind code, lift index, s]. */
     wire: () => [KIND_CODE[k], lift.index, Math.round(s * 10) / 10],
+    down: false,
   };
   function beginAlight() {
     phase = 'alight';
@@ -356,6 +360,155 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     };
   }
   return ride;
+}
+
+/**
+ * Ride DOWN (Ian, Via Lattea "Cesana-Ski Lodge 1": "you can't go down with the gondola"): the same ride the other way round, for the
+ * lifts lift-path.js canRideDown() allows. He waits on the top station's descent mat (lift-site.js site.down), steps out of his skis
+ * (cabins) / skates (chairs) to the down lane, the next carrier coming round the top wheel picks him up (a cabin / train waits docked),
+ * down the line facing downhill, off at the bottom on the return side and out of the station to the bottom exit (exitAt()). Same API
+ * as createRide (main.js, the HUD, the wire), plus `down: true`.
+ */
+export function createDescent({ lift, path, site, height, factor = RIDE.factor, from = null, startU = null, exitAt = null }) {
+  const k = path.kind, D = site.down;
+  const sT = D.sTop, sB = Math.min(D.sBottom, sT - 1);
+  const speed = path.spec.speed * factor;
+  const carry = CARRY.has(k);
+  const start = from || D.wait, load = D.load;
+  const seatAt0 = riderAt(path, sT, height, {}, true);
+  const tStep = carry ? RIDE.stepOut : 0;
+  const moveD = Math.hypot(load.x - start.x, load.z - start.z);
+  const tMove = Math.max(0.8, moveD / (carry ? RIDE.walk : RIDE.glide));
+  const tIn = RIDE.getIn;
+  const uLoad = path.downU(sT);
+  const tNeed = tStep + tMove + tIn;
+  // the carrier: a loop's next one round the top wheel (at most RIDE.wait s late), a jig-back cabin / train waits docked at the top
+  const u0 = path.shuttle ? uLoad : startU === null || !Number.isFinite(startU) ? uLoad - path.spec.speed * tNeed : startU;
+  const approach = uLoad - u0;
+  const tArrive = path.shuttle ? tNeed : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));
+  let phase = 'board', t = 0, s = sT, skipped = false, tRide = 0, alight = null;
+  const pose = { roll: 0 };
+  const boardU = (tt) => u0 + approach * Math.min(1, tt / tArrive);
+  // lifts.js setRide: a loop carrier by its loop parameter; a jig-back pair by the metres travelled down (the counter cabin goes up)
+  const held = (u, sNow) => (path.shuttle ? Math.max(0, Math.min(path.docks[1] - path.docks[0], path.docks[1] - sNow)) : u);
+  const ride = {
+    lift, path, site, kind: k, pose: POSE_OF[k], speed, carry, down: true,
+    get phase() { return phase; },
+    get s() { return s; }, get t() { return t; },
+    get done() { return phase === 'done'; },
+    get share() { return phase === 'board' ? 0 : phase === 'ride' ? (sT - s) / (sT - sB) : 1; },
+    get left() { return phase === 'ride' ? Math.max(0, (s - sB) / speed) : phase === 'board' ? (sT - sB) / speed : 0; },
+    get carrierU() {
+      if (phase === 'board') return held(boardU(t), sT);
+      if (phase === 'ride') return held(path.downU(s), s);
+      return null;
+    },
+    get canSkip() { return phase === 'ride' && tRide > 0.6; },
+    get gate() { return 0; },
+    get chairPlan() { return null; },
+    get exit() { return alight ? alight.exit : null; },
+    step(dt) {
+      t += dt;
+      if (phase === 'board' && t >= tArrive) { phase = 'ride'; tRide = 0; }
+      else if (phase === 'ride') {
+        tRide += dt;
+        s = Math.max(sB, s - speed * dt);
+        if (s <= sB && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) beginAlight();
+      } else if (phase === 'alight') {
+        alight.t += dt;
+        if (alight.t >= alight.total) phase = 'done';
+      }
+      return ride.done;
+    },
+    skip() { if (phase !== 'ride') return false; skipped = true; s = sB; return true; },
+    where() { return place(); },
+    state(base) {
+      const w = place();
+      const moving = phase === 'ride' ? speed : 0;
+      const st = { ...base, x: w.x, y: w.y, z: w.z, heading: w.heading, vx: Math.cos(w.heading) * moving, vz: Math.sin(w.heading) * moving, vy: 0, speed: w.glide || 0,
+        grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
+      st.dragHand = null;
+      if (w.onCarrier) { st.rideLift = lift.index; st.rideS = s; st.rideKind = KIND_CODE[k] + DOWN_CODE; }
+      else { delete st.rideLift; delete st.rideS; delete st.rideKind; }
+      return st;
+    },
+    wire: () => [KIND_CODE[k] + DOWN_CODE, lift.index, Math.round(s * 10) / 10],
+  };
+  function beginAlight() {
+    phase = 'alight';
+    const inCar = riderAt(path, sB, height, {}, true);
+    const off = D.off;
+    const ex = (exitAt && exitAt()) || { x: off.x, z: off.z, heading: inCar.heading };
+    const way = [off, ...(ex.via || []), ex];
+    const cum = [0];
+    for (let n = 1; n < way.length; n++) cum.push(cum[n - 1] + Math.hypot(way[n].x - way[n - 1].x, way[n].z - way[n - 1].z));
+    const d = cum[cum.length - 1];
+    const tGo = Math.min(8, Math.max(0.6, d / (carry ? RIDE.walk * 1.4 : RIDE.out)));
+    alight = { t: 0, inCar, off, exit: ex, tOut: RIDE.getOut, tGo, way, cum, tClick: carry ? RIDE.clickIn : 0, total: RIDE.getOut + tGo + RIDE.turn + (carry ? RIDE.clickIn : 0) };
+  }
+  function setGround(w, x, z, heading) { w.x = x; w.z = z; w.y = height(x, z); w.heading = heading; }
+  function place() {
+    const w = pose;
+    w.onCarrier = false; w.walk = 0; w.glide = 0; w.boardCam = null; w.hand = null; w.hip = undefined;
+    if (phase === 'ride' || (phase === 'board' && t >= tArrive)) {
+      riderAt(path, s, height, w, true);
+      w.onCarrier = true; w.pose = POSE_OF[k];
+      w.barDown = k === 'chair' && sT - s > 9 && s - sB > 12;
+      return w;
+    }
+    if (phase === 'board') {
+      const c = path.shuttle ? path.shuttleAt(sT, -1, false, {}) : path.loopAt(boardU(t), {});
+      w.cx = c.x; w.cz = c.z; w.cy = c.y; w.heading = c.heading; w.pitch = k === 'train' ? Math.atan(path.slope(sT)) : 0; w.barDown = false;
+      const tm = t - tStep;
+      if (tm <= 0) { setGround(w, start.x, start.z, start.heading); w.pose = carry ? 'carry' : ''; return w; }
+      if (tm < tMove) {
+        const kk = ease(tm / tMove);
+        const hx = Math.atan2(load.z - start.z, load.x - start.x);
+        setGround(w, lerp(start.x, load.x, kk), lerp(start.z, load.z, kk), moveD > 0.3 ? angLerp(start.heading, hx, Math.min(1, tm / 0.4)) : start.heading);
+        w.pose = carry ? 'carry' : ''; w.walk = moveD * kk; w.glide = carry ? 0 : moveD / tMove;
+        if (tm > tMove - 0.4) w.heading = angLerp(w.heading, load.heading, (tm - (tMove - 0.4)) / 0.4);
+        return w;
+      }
+      const tin = t - (tArrive - tIn);
+      setGround(w, load.x, load.z, load.heading);
+      w.pose = carry ? 'carry' : '';
+      if (tin > 0) {
+        const kk = ease(tin / tIn);
+        w.x = lerp(load.x, seatAt0.x, kk); w.z = lerp(load.z, seatAt0.z, kk); w.y = lerp(w.y, seatAt0.y, kk);
+        if (kk > 0.5) w.pose = POSE_OF[k];
+      }
+      return w;
+    }
+    const a = alight, ex = a.exit;
+    w.cx = a.inCar.cx; w.cy = a.inCar.cy; w.cz = a.inCar.cz;
+    if (phase === 'done') { setGround(w, ex.x, ex.z, ex.heading); w.pose = ''; return w; }
+    if (a.t < a.tOut) {
+      const kk = ease(a.t / a.tOut);
+      w.x = lerp(a.inCar.x, a.off.x, kk); w.z = lerp(a.inCar.z, a.off.z, kk); w.y = lerp(a.inCar.y, height(a.off.x, a.off.z), kk); w.heading = a.inCar.heading;
+      w.pose = carry ? 'carry' : kk < 0.5 && k === 'chair' ? 'sit' : '';
+      return w;
+    }
+    const tg = a.t - a.tOut, total = a.cum[a.cum.length - 1], last = a.way.length - 1;
+    const hx = Math.atan2(ex.z - a.way[last - 1].z, ex.x - a.way[last - 1].x);
+    if (tg < a.tGo) {
+      const m = ease(tg / a.tGo) * total;
+      let n = 1;
+      while (n < last && a.cum[n] < m) n++;
+      const A = a.way[n - 1], B = a.way[n], f = (m - a.cum[n - 1]) / ((a.cum[n] - a.cum[n - 1]) || 1);
+      setGround(w, lerp(A.x, B.x, f), lerp(A.z, B.z, f), angLerp(a.inCar.heading, Math.atan2(B.z - A.z, B.x - A.x), Math.min(1, tg / 0.5)));
+      w.pose = carry ? 'carry' : ''; w.walk = m; w.glide = carry ? 0 : total / a.tGo;
+      return w;
+    }
+    const tt = tg - a.tGo;
+    setGround(w, ex.x, ex.z, angLerp(hx, ex.heading, ease(tt / RIDE.turn)));
+    w.pose = carry && tt < RIDE.turn ? 'carry' : carry && tt < RIDE.turn + a.tClick * 0.35 ? 'skisdown' : carry && tt < RIDE.turn + a.tClick ? 'clickin' : '';
+    return w;
+  }
+  return ride;
+}
+/** Seconds a ride down takes on the carrier at the game's speed. */
+export function descentSeconds(path, site, factor = RIDE.factor) {
+  return site && site.down ? Math.max(0, site.down.sTop - site.down.sBottom) / (path.spec.speed * factor) : 0;
 }
 
 /** The ride cameras. mode 'chase' | 'window'; w = ride.where(); returns { x, y, z, tx, ty, tz, fov, inside? } (the caller smooths

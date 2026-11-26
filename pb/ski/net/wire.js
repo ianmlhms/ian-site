@@ -11,6 +11,8 @@ export const wrapAngle = (a) => { const r = a % TAU; return r >= Math.PI ? r - T
 export const RIDE_FLAG = 4;
 const MAX_FIELDS = 19;
 const POSE_OF_CODE = { 1: 'sit', 2: 'carry', 3: 'carry', 4: 'drag', 5: 'carry', 6: 'belt' };      // R7-B: skis on the shoulder in cabins; 6 = carpet
+// ride down: the kind code + 10 (liftride.js DOWN_CODE; drag lifts / carpets never go down)
+POSE_OF_CODE[11] = 'sit'; POSE_OF_CODE[12] = 'carry'; POSE_OF_CODE[13] = 'carry'; POSE_OF_CODE[15] = 'carry';
 
 export function packState(st, progress, finished) {
   const riding = !!st.ride && Number.isInteger(st.rideLift);

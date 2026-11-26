@@ -33,7 +33,7 @@ const { createScatter, BLOCK } = await imp('scatter.js');
 const { createPisteSet } = await imp('pistes.js');
 const { createLiftPath, liftClass } = await imp('lift-path.js');
 const { createLiftSite, createLiftWorld, liftTreeGuard, frames, TREE_TOP, standingParts, wheelHeld } = await imp('lift-site.js');
-const { createRide } = await imp('modes/liftride.js');
+const { createRide, createDescent } = await imp('modes/liftride.js');
 const { createLiftNet } = await imp('modes/freeride.js');
 const { createParkLayout } = await imp('modes/park.js');
 const { unpackResort } = await imp('linepack.js');
@@ -347,6 +347,74 @@ for (const rid of resorts) {
     let crashed = false, vmax = 0;
     for (let i = 0; i < 6 / SKI.dt; i++) { st = stepSkier(st, i < 1 / SKI.dt ? { ...none, push: 1 } : { ...none, brake: 0.4 }, W); crashed = crashed || st.crash > 0; vmax = Math.max(vmax, st.speed); }
     ok(!crashed && vmax < 16, `${name}: off from the exit (push, then a light brake, 6 s): ${crashed ? 'CRASH' : 'no crash'}, top ${(vmax * 3.6).toFixed(0)} km/h`);
+    // ride down (Ian, Via Lattea Cesana): chairs, gondolas, cable cars, trains: the top's descent mat, the ride down, the bottom exit
+    const canDown = kind === 'chair' || kind === 'gondola' || kind === 'cable' || kind === 'train';
+    ok(!!vis.down === canDown && !!site.down === canDown, `${name}: ride down ${canDown ? 'offered' : 'never'} (site.down ${!!vis.down})`);
+    if (canDown && vis.down && site.down) {
+      k.downs = (k.downs || 0) + 1;
+      const D = site.down;
+      ok(vis.top.parts.some((q) => q.downMark && !q.cut), `${name}: the descent mat at the top is marked`);
+      ok(D.inZone(D.wait.x, D.wait.z) && world.descentAt(D.wait.x, D.wait.z) === index, `${name}: the descent spot is on its own mat (found ${world.descentAt(D.wait.x, D.wait.z)})`);
+      ok(world.boardingAt(D.wait.x, D.wait.z) === null, `${name}: the descent mat is no bottom boarding zone`);
+      ok(!world.hit(D.wait.x, D.wait.z, SKIER_R, H(D.wait.x, D.wait.z), H) && !world.inBuilding(D.wait.x, D.wait.z, 0.3) && !tree(D.wait.x, D.wait.z), `${name}: the descent spot is clear (no part, building or tree)`);
+      // not on the arrivals' way out (the exit of the up ride starts on the other side of the line)
+      const off = site.off, lo = vis.top.toLocal(off.x, off.z, {}), lw = vis.top.toLocal(D.wait.x, D.wait.z, {});
+      ok(Math.sign(lo.b) !== Math.sign(lw.b), `${name}: the descent mat is on the return side, the arrivals get off on the other (b ${lw.b.toFixed(1)} vs ${lo.b.toFixed(1)})`);
+      let way = false;
+      for (let k2 = 0; k2 < 24 && !way; k2++) {
+        const h = (k2 / 24) * Math.PI * 2;
+        let clear = true;
+        for (let m = 1; m <= 12 && clear; m += 0.5) {
+          const x = D.wait.x + Math.cos(h) * m, z = D.wait.z + Math.sin(h) * m;
+          if (world.hit(x, z, SKIER_R, H(x, z), H) || world.inBuilding(x, z, 0.3) || tree(x, z)) clear = false;
+        }
+        const ex = D.wait.x + Math.cos(h) * 12, ez = D.wait.z + Math.sin(h) * 12;
+        const sl = Math.hypot(H(ex + 2, ez) - H(ex - 2, ez), H(ex, ez + 2) - H(ex, ez - 2)) / 4;
+        if (clear && sl < 0.7) way = true;
+      }
+      ok(way, `${name}: the descent mat can be reached over the snow`);
+      const dr = createDescent({ lift, path: p, site: vis, height: H, exitAt: () => world.exitOf(index, H, tree, null, null, 'bottom') });
+      ok(dr.skip() === false, `${name}: no skip while boarding the descent`);
+      let prevD = null, worstD = 0, worstDAt = '', stepsD = 0, minPD = Infinity, minSD = Infinity, minTD = Infinity, y0 = null, y1 = null, upHead = 0, nHead = 0;
+      const phasesD = [];
+      while (!dr.done && stepsD < 400000) {
+        dr.step(1 / 60); stepsD++;
+        if (phasesD[phasesD.length - 1] !== dr.phase) phasesD.push(dr.phase);
+        const w = dr.where();
+        if (prevD) { const j = Math.hypot(w.x - prevD.x, w.z - prevD.z); if (j > worstD) { worstD = j; worstDAt = `${dr.phase} s ${dr.s.toFixed(0)} pose ${w.pose}`; } }
+        prevD = { x: w.x, z: w.z };
+        if (w.onCarrier && dr.phase === 'ride') {
+          if (y0 === null) y0 = w.cy;
+          y1 = w.cy;
+          const q = p.at(dr.s, {});
+          nHead++; if (Math.cos(w.heading) * q.dx + Math.sin(w.heading) * q.dz > 0.5) upHead++;       // facing up the line = wrong
+        }
+        if (stepsD % 3) continue;
+        envelope.ctx = `down ${dr.phase} pose ${w.pose}`;
+        if (!w.onCarrier) {
+          const e = envelope(w.x, w.z, w.heading, SKIER_R, SKIER_R, w.y, w.y + 1.8);
+          minPD = Math.min(minPD, e.pyl); minSD = Math.min(minSD, e.st); minTD = Math.min(minTD, e.tr);
+        } else if (kind !== 'train' || !p.tunnel) {
+          const cb = p.carrier;
+          const e = envelope(w.cx, w.cz, w.heading, cb.hw + cb.drop * 0.035, cb.hl, kind === 'train' ? w.cy : w.cy - cb.drop, kind === 'train' ? w.cy + cb.top : w.cy + cb.top * 0.5);
+          minPD = Math.min(minPD, e.pyl); minSD = Math.min(minSD, e.st); minTD = Math.min(minTD, e.tr);
+        }
+      }
+      ok(dr.done && phasesD.join() === 'board,ride,alight,done', `${name}: down: one boarding at the top, one ride, off at the bottom (${phasesD.join(' > ')})`);
+      ok(worstD < 1.2, `${name}: down: no jump (worst ${worstD.toFixed(2)} m per frame, ${worstDAt})`);
+      ok(y0 !== null && y1 < y0 - 0.5 * (lift.top.y - lift.bottom.y) && upHead === 0, `${name}: down: the carrier goes DOWN (${y0 === null ? '-' : (y0 - y1).toFixed(0)} m), facing downhill (${upHead} of ${nHead} frames facing up)`);
+      ok(minPD > 0 && minSD > 0 && minTD > 0, `${name}: down: never touches a pylon (${minPD.toFixed(2)} m), a station part (${minSD === Infinity ? 'none near' : minSD.toFixed(2)}), a tree (${minTD === Infinity ? 'none near' : minTD.toFixed(2)} m)`);
+      const ex = dr.exit;
+      const exB = vis.bottom.toLocal(ex.x, ex.z, {});
+      const slD = Math.hypot(H(ex.x + 2, ex.z) - H(ex.x - 2, ex.z), H(ex.x, ex.z + 2) - H(ex.x, ex.z - 2)) / 4;
+      const goodD = !ex.fallback && !world.inStation(ex.x, ex.z, 1.0) && !world.inBuilding(ex.x, ex.z, 1.0) && !world.inLowLane(ex.x, ex.z, H, 3) && !tree(ex.x, ex.z) && slD <= 0.6 && Math.hypot(exB.a, exB.b) < 140;
+      if (ok(goodD, `${name}: down: bottom exit ${ex.dist.toFixed(0)} m out, outside stations / buildings / lanes, slope ${slD.toFixed(2)}, ${Math.hypot(exB.a, exB.b).toFixed(0)} m from the bottom station${ex.fallback ? ', FALLBACK' : ''}`)) k.downExits = (k.downExits || 0) + 1;
+      let stD = createSkierState(ex.x, ex.z, ex.heading, H(ex.x, ex.z));
+      const none = { steer: 0, tuck: 0, brake: 0, push: 0, jump: false };
+      const W = { height: H, normal: (x, z, o) => surface.normal(x, z, o), snow: () => 1, hit: () => null };
+      for (let i = 0; i < 5 / SKI.dt; i++) stD = stepSkier(stD, none, W);
+      ok(stD.speed < 0.05 && stD.crash === 0, `${name}: down: 5 s at the bottom exit with no input: ${(stD.speed * 3.6).toFixed(1)} km/h`);
+    }
   }
   for (const [kk, v] of Object.entries(per)) table.push({ rid, kind: kk, ...v });
   console.log(`${rid}: ${world.sites.size} lifts drawn, ${net.list.length} ridden, ${kept} of ${buildings.length} buildings kept, ${fails - failsBefore} fails (${((Date.now() - t0) / 1000).toFixed(0)} s)`);

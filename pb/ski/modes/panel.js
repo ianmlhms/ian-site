@@ -28,7 +28,7 @@ export function starGoals(c, mask) {
 }
 
 /** Mode tabs + the park / free ride panes inside the piste map screen. Returns the controller. */
-export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPickLift }) {
+export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPickLift, onFreeDown = null }) {
   const side = mapEl.querySelector('.side');
   const pick = mapEl.querySelector('.pick');
   const tabs = el(`<div class="seg modetabs" role="tablist">${MODE_TABS.map(([id, label]) => `<button type="button" role="tab" data-mode="${id}">${label}</button>`).join('')}</div>`);
@@ -86,17 +86,19 @@ export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPic
       });
       pane.innerHTML = `<h2><span class="chip lift"></span>${selected ? esc(selected.name) : 'Fräi fueren'}</h2>
         <div class="facts">${selected ? `${kindName(selected.kind, selected.sub)} · ënnen ${Math.round(selected.bottom.y)} m · uewen ${Math.round(selected.top.y)} m · ${Math.round(selected.len)} m laang` : 'Tipp op e Lift op der Kaart oder an der Lëscht.'}</div>
-        <div class="how">Keng Auer: fuer vu Pist zu Pist an och nieft de Pisten. Ënnen um Lift: <b>Astegen</b> (L / Enter). Op der Pist: e Startpaart = eng Challenge.</div>
+        <div class="how">Keng Auer: fuer vu Pist zu Pist an och nieft de Pisten. Ënnen um Lift: <b>Astegen</b> (L / Enter). Och uewen: <b>Erof</b> (net bei all Lift). Op der Pist: e Startpaart = eng Challenge.</div>
         <div class="status" id="freeStatus">${selected ? (ready ? 'Prett.' : 'Gëtt gelueden …') : ''}</div>
-        <button type="button" class="btn primary big" id="freeStart" ${selected && ready ? '' : 'disabled'}>Bei de Lift</button>`;
+        <div class="acts freeacts"><button type="button" class="btn primary big" id="freeStart" ${selected && ready ? '' : 'disabled'}>Bei de Lift</button>${selected && selected.down && onFreeDown ? `<button type="button" class="btn big" id="freeDown" ${ready ? '' : 'disabled'} title="Uewen op d'Statioun, fir erof ze fueren">⬇ Erof</button>` : ''}</div>`;
       pane.querySelector('#freeStart').addEventListener('click', (e) => { if (!e.currentTarget.disabled) onFreeStart(); });
+      const down = pane.querySelector('#freeDown');            // ride down: to the top station's descent mat
+      if (down) down.addEventListener('click', (e) => { if (!e.currentTarget.disabled) onFreeDown(); });
     },
     /** Round 6: the ski types (the Skier tab). */
     showSkis(opts) {
       pane.innerHTML = `<h2>Skier</h2>${skiCardsHtml(opts)}`;
       bindSkiCards(pane, opts);
     },
-    freeReady(ready) { const b = pane.querySelector('#freeStart'); const st = pane.querySelector('#freeStatus'); if (b && st && st.textContent) { b.disabled = !ready; st.textContent = ready ? 'Prett.' : 'Gëtt gelueden …'; } },
+    freeReady(ready) { const b = pane.querySelector('#freeStart'); const d = pane.querySelector('#freeDown'); const st = pane.querySelector('#freeStatus'); if (b && st && st.textContent) { b.disabled = !ready; if (d) d.disabled = !ready; st.textContent = ready ? 'Prett.' : 'Gëtt gelueden …'; } },
   };
 }
 
@@ -144,7 +146,11 @@ export function createFreeHud(hudEl, { onLift, onSkis = null }) {
       box.querySelector('#fDay').textContent = `${fixedTime ? '' : '🕘 '}${formatHour(hour)}`;
       box.querySelector('#fStats').textContent = `${(stats.distance / 1000).toFixed(1)} km · ↓ ${Math.round(stats.vertical)} m · ${stats.lifts} Lift${stats.lifts === 1 ? '' : 'en'}`;
     },
-    lift(liftObj) { lift.hidden = !liftObj; if (liftObj) lift.querySelector('span').textContent = `Astegen: ${liftObj.name}`; skiBtn.hidden = !liftObj; },
+    lift(liftObj, down = false) {
+      lift.hidden = !liftObj; lift.classList.toggle('down', !!(liftObj && down));
+      if (liftObj) { lift.firstChild.textContent = down ? '⬇ ' : '⬆ '; lift.querySelector('span').textContent = down ? `Erof: ${liftObj.name}` : `Astegen: ${liftObj.name}`; }
+      skiBtn.hidden = !liftObj;
+    },
   };
 }
 
@@ -206,9 +212,9 @@ export function createRideHud(hudEl, { onSkip, onView }) {
   box.querySelector('#rView').addEventListener('click', (e) => { e.currentTarget.blur(); onView(); });
   return {
     show(lift) { box.hidden = !lift; if (lift) box.querySelector('#rName').textContent = `${kindName(lift.kind, lift.sub)} ${lift.name}`; },
-    set({ left, share, view }) {
+    set({ left, share, view, down = false }) {
       const m = Math.floor(left / 60), sec = Math.ceil(left % 60);
-      box.querySelector('#rLeft').textContent = left > 0.5 ? `nach ${m ? `${m} min ` : ''}${sec} s bis uewen · ${view === 'window' ? 'Fënster' : 'Vu baussen'}` : 'Uewen!';
+      box.querySelector('#rLeft').textContent = left > 0.5 ? `nach ${m ? `${m} min ` : ''}${sec} s bis ${down ? 'ënnen' : 'uewen'} · ${view === 'window' ? 'Fënster' : 'Vu baussen'}` : down ? 'Ënnen!' : 'Uewen!';
       box.querySelector('#rBar').style.transform = `scaleX(${Math.max(0, Math.min(1, share)).toFixed(3)})`;
     },
   };

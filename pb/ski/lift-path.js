@@ -75,6 +75,10 @@ export function carrierBox(kind, seats = 4, sub = '') {
 /** A chair's width by its seat count (carriers.js builds the same width). */
 export const chairWidth = (seats) => Math.max(1.6, Math.min(4.2, (seats || 4) * 0.52));
 const SHUTTLE = new Set(['cable', 'train', 'carpet']);
+/** Ride down (Ian, Via Lattea Cesana: "you can't go down with the gondola"): like the real ones, chairs, gondolas (funitels), cable
+ *  cars and trains can be boarded at the top to ride DOWN; drag lifts and carpets never. */
+export const DESCENT_CLASSES = new Set(['chair', 'gondola', 'cable', 'train']);
+export const canRideDown = (path) => !!path && DESCENT_CLASSES.has(path.kind);
 /** m along the up lane from the bottom end where the rider is picked up, and before the top end where he gets off (per station key:
  *  the class, rope tows their own); a jig-back cabin / train docks with its middle there. */
 export const BOARD = Object.freeze({ chair: 3.2, gondola: 6, cable: 7, drag: 3, rope: 2, carpet: 0.8, train: 9 });
@@ -252,9 +256,11 @@ export function createLiftPath(src, height) {
   }
   /** The loop parameter of a point on the up lane at s (s < 0: still on the bottom wheel, behind the station end). */
   const upU = (s) => (shuttle ? Math.max(0, s - d0) : s >= 0 ? s : loopLen + s);
+  /** Ride down: the loop parameter of a point on the DOWN lane at s (a jig-back cabin / train: on the -1 track going down). */
+  const downU = (s) => (shuttle ? travel + Math.max(0, Math.min(travel, d1 - s)) : 2 * len + Math.PI * R - Math.max(0, Math.min(len, s)));
   return {
     src, kind, sub, spec, side, back, len, at, cableY, slope, supports, cx, cz, radius: len / 2, seats, carrier: cb, tunnel,
-    loopLen, loopAt, shuttleAt, shuttle, upU, wheelR: R, wheelC: C, sign, key, docks: [d0, d1],
+    loopLen, loopAt, shuttleAt, shuttle, upU, downU, wheelR: R, wheelC: C, sign, key, docks: [d0, d1],
     /** The ground under the line at s (the far grid before the 5 m tiles arrive). */
     ground,
   };

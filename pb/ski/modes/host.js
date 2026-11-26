@@ -8,7 +8,7 @@ import { MODES, SKI } from '../config.js';
 import { stepSkier } from '../skier.js';
 import { starKey, challengeFor, createTracker, addStars, resortStars, totalStars, lockState, pisteStars, migrateStars, outfitOpen, thresholds } from './challenges.js';
 import { createParkLayout, stepPark, createTrickJudge, parkBoardId, parkBoardName, parkScoreOf, validParkPoints } from './park.js';
-import { createLiftNet, createFreeRun, createDayClock, startHourFor, DAY } from './freeride.js';
+import { createLiftNet, createFreeRun, createDayClock, startHourFor, DAY, downPhrase } from './freeride.js';
 import { createFlagsView, createParkView } from './views.js';
 import { createMinimap } from './minimap.js';
 import { createCloudSave, mergeCloud, cloudGain } from './cloud.js';
@@ -25,6 +25,7 @@ export function createModeHost(ctx) {
   const challenges = new Map();
   const challengeOf = (p) => { if (!p || p.id === 'park') return null; let c = challenges.get(p.id); if (!c) { c = challengeFor(p, field.farHeight); challenges.set(p.id, c); } return c; };
   const lifts = createLiftNet(resort, field.farHeight, pistes);
+  let liftDown = false;
   let tracker = null, flags = null, judge = null, parkView = null, freeRun = null, clock = null, minimap = null, liftAt = null, parkBest0 = 0, clock0 = null;
   let parkHintT = 0;
   const freeHud = createFreeHud(hud.el, { onLift: () => ctx.onRideUp(), onSkis: () => ctx.onSkis && ctx.onSkis() });
@@ -114,7 +115,7 @@ export function createModeHost(ctx) {
       if (!freeRun) return;
       if (clock) clock.addMinutes(lift.seconds / 60);
       freeRun.stats.lifts += 1;
-      liftAt = null; freeHud.lift(null);
+      liftAt = null; liftDown = false; freeHud.lift(null);
     },
     /** Round 6: the newly opened ski types between two progress states (for the toasts and the finish card). */
     newSkis(before, after) {
@@ -125,7 +126,7 @@ export function createModeHost(ctx) {
     /** Leaving a run (map, another run): tear down the mode parts. */
     end() {
       if (flags) { flags.dispose(); flags = null; }
-      tracker = null; judge = null; freeRun = null; liftAt = null;
+      tracker = null; judge = null; freeRun = null; liftAt = null; liftDown = false;
       if (parkHintT > 0) { parkHintT = 0; hud.hint(''); }
       world.tricks = false;
       input.setTrick(false);
@@ -163,7 +164,10 @@ export function createModeHost(ctx) {
     /** A free run event (main.js run.update loop). */
     freeEvent(ev) {
       if (ev.type === 'lift' && ev.near) { if (!liftAt) hud.toast(`${ev.near.name}: op déi giel Plaz fueren fir anzesteigen`, 2600); return; }
-      if (ev.type === 'lift') { liftAt = ev.lift; freeHud.lift(ev.lift); if (ev.lift) hud.toast(`Lift: ${ev.lift.name}`, 1200); }
+      if (ev.type === 'lift') {
+        liftAt = ev.lift; liftDown = !!(ev.lift && ev.down); freeHud.lift(ev.lift, liftDown);
+        if (ev.lift) hud.toast(liftDown ? `${downPhrase(ev.lift)}: ${ev.lift.name}` : `Lift: ${ev.lift.name}`, liftDown ? 2000 : 1200);
+      }
     },
     /** HUD tick (10 Hz): the park score / the free ride block and minimap and light. */
     hudTick(game) {
@@ -178,6 +182,8 @@ export function createModeHost(ctx) {
 
     /* ---------------- lifts ---------------- */
     get liftAt() { return liftAt; },
+    /** Ride down: the lift at hand is boarded at its top, to ride down. */
+    get liftDown() { return liftDown; },
     /** Ride the lift at hand: the day clock moves on by its ride time; returns the start spot at its top (or null). */
     rideUp() {
       if (!freeRun || !liftAt) return null;                     // round 6: the lifts never close (free ride is the main game)

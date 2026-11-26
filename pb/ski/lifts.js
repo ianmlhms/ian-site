@@ -16,6 +16,7 @@ import { carrierGeometry, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 import { gpuOnly } from './gpu-mem.js';
 import { carrierId } from './npc.js';
+const DOWN_RIDERS = 1e6, DOWN_SHARE = 0.3;       // ride down: rider ids of the down lane, and how full it is against the up lane
 
 const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
 const TRACK_R = 900;                   // R8d: m to a drag track cell's box within which its worn tracks are drawn (a 1.25 m strip)
@@ -406,7 +407,9 @@ export function createLifts({ scene, resort, height }) {
     m4.compose(v3.set(w.x, w.y, w.z), q4, s3);
     if (far) { if (pool.nf < pool.cap) pool.far.setMatrixAt(pool.nf++, m4); }
     else if (pool.n < pool.cap) { pool.near.setMatrixAt(pool.n, m4); if (pool.glass) pool.glass.setMatrixAt(pool.n, m4); pool.n++; }
+    // (ride down: a lift that goes down carries a few others down too: their own ids, so nobody rides the loop round and round)
     if (riderSink && id !== null && !w.turn && (w.up || l.shuttle)) riderSink(l, m4, id, dc, w);
+    else if (riderSink && id !== null && !w.turn && l.site && l.site.down) riderSink(l, m4, DOWN_RIDERS + id, dc, w, DOWN_SHARE);
   }
   /** Where a jig-back pair is at time t (s along the line of the cabin on the up track; the other is at len - s). */
   function shuttleS(l, t) {
@@ -539,7 +542,8 @@ export function createLifts({ scene, resort, height }) {
       if (!pool) continue;
       if (l.shuttle) {
         const [d0, d1] = l.docks;
-        if (l.rideU !== null) put(pool, l, l.shuttleAt(d1 - Math.min(d1 - d0, l.rideU), -1, false, w0), 1, t, camX, camZ, 1);
+        if (l.rideU !== null && l.rideDown) put(pool, l, l.shuttleAt(d0 + Math.min(d1 - d0, l.rideU), 1, true, w0), 0, t, camX, camZ, 0);      // ride down: the counter cabin goes up
+        else if (l.rideU !== null) put(pool, l, l.shuttleAt(d1 - Math.min(d1 - d0, l.rideU), -1, false, w0), 1, t, camX, camZ, 1);
         else {
           const a = shuttleS(l, t);
           put(pool, l, l.shuttleAt(a.s, 1, a.up, w0), 0, t, camX, camZ, 0);
@@ -563,9 +567,10 @@ export function createLifts({ scene, resort, height }) {
     }
   }
   /** Hold one carrier of lift `index` at the loop parameter u (the player's own), or let it go again (null). */
-  function setRide(index, u) {
+  function setRide(index, u, down = false) {
     const l = byIndex.get(index);
     if (!l) return;
+    l.rideDown = !!down && u !== null && u !== undefined;           // ride down (liftride.js createDescent): a jig-back pair mirrored
     if (u === null || u === undefined) {
       if (l.rideU !== null) {
         if (l.shuttle) {             // the pair goes on from where it stands (at a station: the dwell there)

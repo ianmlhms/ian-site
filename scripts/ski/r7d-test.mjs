@@ -86,6 +86,12 @@ const { unpackState, packState } = await import("../../pb/ski/net/wire.js");
 const st = { x: 100, y: 10, z: 200, heading: 0, speed: 3, edge: 0, tuck: 0, brake: 0, grounded: true, vx: 3, vz: 0, vy: 0, ride: "sit", rideLift: 4, rideS: 120.5, rideKind: 1 };
 const back = unpackState(packState(st, 0, false));
 ok(back.rideLift === 4 && back.rideS === 120.5 && back.ride === "sit", "riding lift X at s survives the wire");
+// ride down (deadend round): the direction rides on the kind code (+10); a gondola rider going down carries his skis
+for (const [code, pose] of [[11, "sit"], [12, "carry"], [13, "carry"], [15, "carry"]]) {
+  const b2 = unpackState(packState({ ...st, ride: pose, rideKind: code }, 0, false));
+  ok(b2 && b2.rideKind === code && b2.ride === pose && b2.rideLift === 4, `riding DOWN (code ${code}) survives the wire`);
+}
+ok(!unpackState(packState({ ...st, rideKind: 14 }, 0, false)).ride, "no drag lift rides down on the wire (code 14 is dropped)");
 
 // 4b. the send schedule (cleanup round): 15 states / s on the wall clock at any frame rate >= 15 (with jitter), never a burst
 {

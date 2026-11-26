@@ -2012,3 +2012,39 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
 - Laax picker picture re-rendered (pose 11200,10700,420,9300,6000,-350,44; blurred 1.6 px before encoding, else > 80 KB), `IMG_VERSION` bumped. The other
   resorts' pictures are older renders (their far woods look greyer there than in the game).
 - The printed map title counts lifts without carpets (Laax 34), the picker counts all (37).
+
+## Ride down + dead-end check (26 Nov 2026; Ian, Via Lattea: "you can't go down with the gondola Cesana Ski Lodge 1, but there is no other way to come down")
+- **Which lifts**: `lift-path.js canRideDown` = chairs, gondolas (funitels, mixed), cable cars, trains / funiculars; drag lifts and carpets never.
+  `path.downU(s)` = the loop parameter on the DOWN lane (a jig-back cabin / train: the -1 track going down).
+- **Stations** (`lift-site.js site.down`): a yellow descent mat (`downMark`, a deck like the bottom's zone mat) on the TOP's RETURN side
+  (-b, beside the down lane; the arrivals still get off on the +b side, round7b checks the sides differ), per class: chair a -6.7 on the
+  deck strip (clear of the operator hut), gondola a -12.2 in the hall's open front, cable car / train at the down cabin's dock.
+  `wait` (fast travel lands here, facing down the line), `load` (down lane), `off` (the bottom's return side), `inZone`; the walks are
+  probes in `pruneCrossings`, the spots key points for the buildings. `world.descentAt(x, z)`; `exitOf(..., 'bottom')` = the way out
+  of the BOTTOM station from the return side (walks keep a crown's width from trunks, parts tested at the frame's ground).
+  Nothing was moved: the bottom zone, the top `off` / exit and the NPC queues are where they were.
+- **Ride** (`modes/liftride.js createDescent`, same API as createRide + `down: true`; `riderAt(..., down)`): walk / skate from the mat to
+  the down lane, the next carrier round the top wheel (a cabin waits docked), down facing downhill, off on the return side at the bottom,
+  out to the bottom exit, standing still (`game.hold`). Skip / Vue as usual, the HUD "nach … s bis ënnen", the day clock + the ride
+  time, the minimap arrow points down the line (the state's velocity). lifts.js `setRide(i, u, down)` mirrors a jig-back pair (the
+  counter cabin goes up).
+- **UI**: on the mat the button "⬇ Erof: <lift>" (L / Enter) and the toast "Mat der Gondel erof" (freeride.js `downPhrase`); the map's
+  lift pane has "⬇ Erof" next to "Bei de Lift" and the map tap card "⬇ Erof" (both = fast travel onto the mat; `__ski.goDown(id)`).
+- **Online**: the wire's kind code + 10 (`DOWN_CODE`: 11 chair, 12 gondola, 13 cable, 15 train); remotes draw a friend on the down lane;
+  an old client ignores the code (sees no carrier). «Bei e Frënd» on a friend riding down waits at the bottom.
+- **The others**: a descent lift carries a few riders down too (`DOWN_RIDERS` ids, 30 % of the up lane's share: nobody rides the loop
+  round); the bot never rides lifts.
+- **Dead-end check** `node scripts/ski/deadend-check.mjs [rid] [--verbose]` (in `r8c-node-all.sh`): lift bottom -> top, top -> bottom
+  where it rides down, along every piste (25 m points), skating / walking 250 m (90 m piste to piste) with at most 4 m + 18 % of the
+  distance up, off piste down to anything within 250 m (>= 8 m lower, <= 40 deg); start = FIRST_LIFT + BUS_AREAS. Fails on: a pocket you
+  reach but cannot leave, a lift with no way back down to its own bottom (the Cesana case), a lift top with no way on; Cesana-Ski Lodge 1
+  checked by name. Valley runs ending in a village / suburb without a lift = info (bus / map teleport). Data fixed: `BUS_AREAS.livigno`
+  (Carosello 3000 I, Livigno-Tagliede, Cassana: 28 lifts on the Carosello side were only reachable by teleport). **Known (OSM data, the
+  map teleport)**, listed in `KNOWN`: Killy Col Pers, Génépy (Blo), Golf, Leisse (Schwaarz); 3V Plan du Vah; Zermatt Moos (Blo),
+  Verbindung → Theodulo - Plan Maison; Arlberg Vorderes Maroital, Rendl Talabfahrt, Erzberg, Gamshang; Kronplatz Ried (Rout), Lumen;
+  Via Lattea 46 bassa; Obertauern Verbindung → Kehrkopf (Variante), → Monte Flu-Bahn; Davos Müli; Laax Flims Oberdorf. Islands (teleport
+  only, info): Killy Snowtubing, Arlberg Walchlift / Angerlift, Livigno's 5 nursery drags, Davos Schatzalp / Strela + 4 small lifts.
+- **Tests**: round7b-test per descent lift (mat marked, spot on its own mat + clear + reachable, return side, board > ride > alight > done,
+  no jump, goes down facing downhill, never touches a pylon / part / tree, bottom exit outside stations / buildings / lanes / trees,
+  slope <= 0.6, 5 s still); r7d-test (wire codes); flow `ski-ride-down` (Via Lattea: list Erof, the mat, L, the cabin down, wire 12,
+  HUD, clock, no map on the lift, off at Cesana standing still; a chair down with Iwwersprangen). Shots ~/Library/Caches/ski-work/ride-down/.

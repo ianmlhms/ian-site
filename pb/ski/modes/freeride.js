@@ -41,7 +41,8 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     // the lift's own direction at the top (bottom -> top): the start spot is ahead of the top station and a little to the side
     const ux = (top.x - bottom.x) / (Math.hypot(top.x - bottom.x, top.z - bottom.z) || 1), uz = (top.z - bottom.z) / (Math.hypot(top.x - bottom.x, top.z - bottom.z) || 1);
     // round 6: the line's own start is its bottom in the baked data (bake.py orients every lift uphill); `reversed` if not
-    list.push({ id: `l${i}`, index: i, name: l.name || kindName(cls), kind: cls, bottom, top, len, seconds: len / LIFT_SPEC[cls].speed, ux, uz, reversed: a.y > b.y, seats: l.seats || 0, tunnel: !!l.tunnel, sub: paths.get(i).sub });
+    list.push({ id: `l${i}`, index: i, name: l.name || kindName(cls), kind: cls, bottom, top, len, seconds: len / LIFT_SPEC[cls].speed, ux, uz, reversed: a.y > b.y, seats: l.seats || 0, tunnel: !!l.tunnel, sub: paths.get(i).sub,
+      down: !!(world.sites.get(i) && world.sites.get(i).down) });      // ride down: boarded at the top too (lift-site.js site.down)
   }
   // R8 (early QA: 3 x "Plan Maison", 2 x "Kumme" in the lift list): lifts sharing a name get a number, bottom (lowest) first;
   // `baseName` keeps the data's name (a first-lift lookup by name still finds it)
@@ -59,6 +60,21 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   function boardAt(lift) {
     const site = world.sites.get(lift.index);
     return { ...site.wait };
+  }
+  /** Ride down: where a skier waits at the TOP to ride down (the descent mat), facing down the line; null if the lift never goes down. */
+  function downAt(lift) {
+    const site = world.sites.get(lift.index);
+    return site && site.down ? { ...site.down.wait } : null;
+  }
+  /** Ride down: the lift whose top descent mat holds (x, z), or null. */
+  function descentAt(x, z) {
+    const i = world.descentAt(x, z);
+    return i === null ? null : byIndex.get(i) || null;
+  }
+  /** Ride down: the way out of the bottom station after a descent (lift-site.js exitOf at the bottom end). */
+  function bottomExit(lift, height = heightAt, tree = null) {
+    const e = world.exitOf(lift.index, height, tree, null, null, 'bottom');
+    return e ? { x: e.x, z: e.z, heading: e.heading } : null;
   }
   /** The lift whose boarding zone holds (x, z) (round 7-B: only there the "Astegen" button shows), or null. */
   function boardingAt(x, z) {
@@ -83,7 +99,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   }
   const byIndex = new Map(list.map((l) => [l.index, l]));
   return {
-    list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, nearZone, nearestBottom, nearestTop, paths,
+    list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, downAt, descentAt, bottomExit, nearZone, nearestBottom, nearestTop, paths,
     get world() { return world; },
     setBuildings(rows) { world = createLiftWorld(paths, { buildings: rows, cutsFrom: world }); return world; },
   };
@@ -92,6 +108,12 @@ export function createLiftNet(resort, heightAt, pistes = null) {
 export function kindName(kind, sub = '') {
   if (sub === 'funitel') return 'Funitel';                                 // R8e: the twin-rope lifts (lift-path.js isFunitel)
   return kind === 'chair' ? 'Sesselbunn' : kind === 'gondola' ? 'Gondel' : kind === 'cable' ? 'Seelbunn' : kind === 'drag' ? 'Schlepplift' : kind === 'train' ? 'Zuch' : kind === 'carpet' ? 'Zauberteppech' : 'Lift';
+}
+
+/** Ride down: the prompt at a top station's descent mat ("Mat der Gondel erof", "Mam Zuch erof"). */
+export function downPhrase(lift) {
+  const k = kindName(lift.kind, lift.sub);
+  return lift.kind === 'train' || lift.sub === 'funitel' ? `Mam ${k} erof` : `Mat der ${k} erof`;
 }
 
 /** Round 6: where a resort's free ride starts: the bottom station of a lift in a village (chairs, cabins and trains before drag lifts and
@@ -113,11 +135,12 @@ export function spawnLift(lifts, places, near = null) {
 /** The run of a whole-area free ride. pistes = createPisteSet, lifts = createLiftNet. */
 export function createFreeRun({ resort, pistes, lifts, start, stats: shared = null }) {
   const stats = shared || { distance: 0, vertical: 0, lifts: 0, top: 0, time: 0, off: 0 };       // off: metres skied off the piste (round 6: the Powder ski)
-  let safe = { x: start.x, z: start.z, heading: start.heading }, safeT = 0, lastX = start.x, lastY = null, lastZ = start.z, atLift = null, atNear = null, current = null, nearT = 99;
+  let safe = { x: start.x, z: start.z, heading: start.heading }, safeT = 0, lastX = start.x, lastY = null, lastZ = start.z, atLift = null, atDown = null, atNear = null, current = null, nearT = 99;
   const run = {
     mode: 'freeride', timed: false, gates: [], checkpoints: [], stats,
     get piste() { return current; }, get progress() { return 0; }, get elapsed() { return stats.time; }, get finished() { return null; }, get penalty() { return 0; }, get ms() { return 0; },
     get atLift() { return atLift; },
+    get atDown() { return atDown; },
     samples: () => [],
     proj: {},
     /** After a physics step: counters, the lift at hand, the box edge. */
@@ -134,7 +157,9 @@ export function createFreeRun({ resort, pistes, lifts, start, stats: shared = nu
       safeT += dt;
       if (safeT > SAFE_EVERY && state.grounded && state.crash === 0 && state.speed > 1) { safeT = 0; safe = { x: state.x, z: state.z, heading: Math.atan2(state.vz, state.vx) }; }
       const lift = state.speed < 6 && !state.ride ? lifts.boardingAt(state.x, state.z) : null;      // round 7-B: only in the zone
-      if (lift !== atLift) { atLift = lift; events.push({ type: 'lift', lift }); }
+      // ride down: on a top station's descent mat
+      const downLift = !lift && state.speed < 6 && !state.ride && lifts.descentAt ? lifts.descentAt(state.x, state.z) : null;
+      if (lift !== atLift || downLift !== atDown) { atLift = lift; atDown = downLift; events.push({ type: 'lift', lift: lift || downLift, down: !!downLift }); }
       // launch fix (Ian stood beside a lift and found no way on): slow near a bottom station but not in its zone: say where it is
       const near = !lift && state.speed < 3 && !state.ride ? lifts.nearZone(state.x, state.z, NEAR_ZONE) : null;
       if (near !== atNear) { atNear = near; if (near) events.push({ type: 'lift', lift: null, near }); }
@@ -156,7 +181,7 @@ export function createFreeRun({ resort, pistes, lifts, start, stats: shared = nu
     rideUp(lift, height) {
       stats.lifts += 1;
       const s = lifts.startAt(lift, height);
-      safe = { ...s }; lastX = s.x; lastZ = s.z; lastY = null; atLift = null;
+      safe = { ...s }; lastX = s.x; lastZ = s.z; lastY = null; atLift = null; atDown = null;
       return s;
     },
     /** Round 6: the skier was moved (fast travel, the end of a challenge): no distance across the jump, a safe spot here. */

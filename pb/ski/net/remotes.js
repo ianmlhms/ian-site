@@ -5,7 +5,7 @@
 import { NET } from './config.js';
 import { createSkierModel, OUTFITS } from '../skier-model.js';
 import { packState, unpackState, wrapAngle } from './wire.js';
-import { riderAt, KIND_OF_CODE } from '../modes/liftride.js';
+import { riderAt, KIND_OF_CODE, DOWN_CODE } from '../modes/liftride.js';
 import { createCarrier } from '../modes/carriers.js';
 import { layoutTags, tagWidth, distText } from './tags.js';
 
@@ -149,9 +149,10 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
       // round 6: riding a lift: in his own chair / cabin on the real line (the figure sits where the carrier holds him)
       const path = st.ride ? liftPath(st.rideLift) : null;
       if (path) {
-        const kind = KIND_OF_CODE[st.rideKind] || path.kind;
+        const down = st.rideKind > DOWN_CODE;                                // ride down: on the down lane, facing downhill
+        const kind = KIND_OF_CODE[down ? st.rideKind - DOWN_CODE : st.rideKind] || path.kind;
         if (!r.carrier || r.carrier.kind !== kind) { if (r.carrier) r.carrier.dispose(); r.carrier = createCarrier({ scene, kind, seats: path.seats, sub: path.sub }); }
-        const w = riderAt(path, st.rideS, (x, z) => surface.height(x, z));
+        const w = riderAt(path, st.rideS, (x, z) => surface.height(x, z), {}, down);
         r.carrier.place(w); r.carrier.setVisible(true);
         st.x = w.x; st.y = w.y; st.z = w.z; st.heading = w.heading;
       } else if (r.carrier) r.carrier.setVisible(false);

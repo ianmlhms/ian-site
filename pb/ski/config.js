@@ -218,6 +218,9 @@ export const BUS_AREAS = Object.freeze({
   arlberg: ['Sonnenkopfbahn'],
   // Davos Klosters: Jakobshorn (Davos Platz), Rinerhorn (Glaris) and Madrisa (Klosters Dorf) are reached by bus / Rhaetian Railway
   davos: ['Jakobshornbahn Sektion 1', 'Rinerhornbahn', 'Madrisabahn'],
+  // Livigno (deadend-check): the Carosello 3000 side (San Rocco, Livigno centre Tagliede, Cassana) is across the valley from the
+  // Mottolino: the free ski bus links them (no piste / lift does)
+  livigno: ['Carosello 3000 I', 'Livigno-Tagliede', 'Cassana'],
 });
 export const DISCOVERY = Object.freeze({
   cell: 100,                // m: the discovery grid

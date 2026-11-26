@@ -167,8 +167,9 @@ export function createFreeMp({ ctx, host }) {
     const list = friendsToJoin();
     if (!list.length || !game.state) return false;
     const r = list[local.follow++ % list.length], s = r.state;
-    const top = s.ride ? host.liftTop(s.rideLift) : null;
-    if (top) { host.startFree(top); hud.toast(`${r.name} ass um Lift: du waars uewen op hien`, 1800); return true; }
+    const down = !!s.ride && s.rideKind > 10;                   // ride down (liftride.js DOWN_CODE): wait for him at the bottom
+    const top = s.ride ? (down && host.liftBottom ? host.liftBottom(s.rideLift) : host.liftTop(s.rideLift)) : null;
+    if (top) { host.startFree(top); hud.toast(down ? `${r.name} ass um Lift: du waars ënnen op hien` : `${r.name} ass um Lift: du waars uewen op hien`, 1800); return true; }
     const h = Math.hypot(s.vx, s.vz) > 1 ? Math.atan2(s.vz, s.vx) : s.heading;
     const spot = { x: s.x - Math.cos(h) * 6 + Math.sin(h) * 3, z: s.z - Math.sin(h) * 6 - Math.cos(h) * 3, heading: h };
     host.startFree(spot);

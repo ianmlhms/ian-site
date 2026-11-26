@@ -94,7 +94,7 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
         <div class="mcinfo" id="tpInfo" hidden><h3><span class="chip" id="mcChip"></span><span id="mcName"></span></h3><div class="mcfacts" id="mcFacts"></div></div>
         <div class="mcnote" id="tpNote" hidden></div>
         <div class="tpconfirm" id="tpConfirm" hidden><b>Hei hin teleportéieren?</b><span id="tpWhere"></span>
-          <div class="acts"><button type="button" class="btn primary" id="tpYes">Jo</button><button type="button" class="btn" id="tpNo">Nee</button></div></div>
+          <div class="acts"><button type="button" class="btn primary" id="tpYes">Jo</button><button type="button" class="btn" id="tpDown" hidden>⬇ Erof</button><button type="button" class="btn" id="tpNo">Nee</button></div></div>
       </div>`;
     box.appendChild(ui);
     const $ = (s) => ui.querySelector(s);
@@ -112,7 +112,8 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
       if (where !== null) $('#tpWhere').textContent = where;
       $('#mapCard').hidden = !info && !note && where === null;
     };
-    const close = () => { pending = null; card({}); pisteMap.setPin(null); document.documentElement.dataset.skiTeleport = ''; };
+    let pendingDown = null;                              // ride down: the tapped lift's top descent mat ("Erof")
+    const close = () => { pending = null; pendingDown = null; $('#tpDown').hidden = true; card({}); pisteMap.setPin(null); document.documentElement.dataset.skiTeleport = ''; };
     pisteMap.setFog(disc);
     /** The lift drawn under a tap (its bottom dot or its line, LIFT_TAP CSS px), discovered or not. */
     const liftTapped = (x, z) => {
@@ -133,6 +134,9 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
         pending = { x: w.x, z: w.z, heading: w.heading, kind: 'lift', lift: tl.id };
         pisteMap.setPin({ x: w.x, z: w.z, ok: true, spot: pending });
         card({ info: liftInfo(tl), where: `Beim Lift ${tl.name}` });
+        const d = tl.down && lifts.downAt ? lifts.downAt(tl) : null;
+        pendingDown = d ? { x: d.x, z: d.z, heading: d.heading, kind: 'liftdown', lift: tl.id } : null;
+        $('#tpDown').hidden = !pendingDown;
         document.documentElement.dataset.skiTeleport = 'confirm';
         return;
       }
@@ -144,6 +148,7 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
         setTimeout(() => { if (!pending) pisteMap.setPin(null); }, 1200);
         return;
       }
+      pendingDown = null; $('#tpDown').hidden = true;
       const spot = safeSpot(x, z, { obs, pistes, lifts, height, isOpen: disc.has });
       if (!spot) { close(); toast('Hei ass keng sécher Plaz'); if (under) card({ info: pisteInfo(under) }); document.documentElement.dataset.skiTeleport = 'nospot'; return; }
       pending = spot;
@@ -155,6 +160,7 @@ export function createExplore({ rid, resort, store, cloud, field, scatter, densi
       document.documentElement.dataset.skiTeleport = 'confirm';
     });
     $('#tpYes').addEventListener('click', () => { const s = pending; close(); if (s) { document.documentElement.dataset.skiTeleport = 'go'; onTeleport(s); } });
+    $('#tpDown').addEventListener('click', () => { const s = pendingDown; close(); if (s) { document.documentElement.dataset.skiTeleport = 'go'; onTeleport(s); } });
     $('#tpNo').addEventListener('click', close);
     $('#mcClose').addEventListener('click', close);
     $('#tpFirst').addEventListener('click', () => { close(); onFirstLift(); });
