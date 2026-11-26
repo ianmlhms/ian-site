@@ -4,8 +4,8 @@
  * lays them out), stays inside the end's footprint and touches a standing part (nothing floats). The part LIST never depends on the
  * heights (lift-site.js repeats a resort's cuts on later worlds by part index): heights only move parts. Small things are flagged
  * `near` (lifts.js draws them only within ~250 m); panes and lamps glow warm in the evening (`glow`, lifts.js / station-mesh.js).
- *   chair    fascia boards round the canopy, lamps under it, a lamp over the name sign, snow on the drive house, the operator's hut
- *            with a stone plinth, framed windows, a door and its lamp
+ *   chair    (chairs round) detachable: the station rail, tyre conveyor, hangers, lit strips, downlights, the glass cabin; fixed
+ *            grip: lamps under the beam, the timber hut; both: the sign lamp, at the top a wind fence and the ramp's edge boards
  *   gondola  a glazed gable front (mullions), a lit window in the back gable, the sign lamp
  *   cable    the machine building: plinth, window bands, a door; the dock: a glazed clerestory on the return side, glass over the front
  *   train    a glazed clerestory on the return side, a fascia with the lift's name, lamps over the platform, the platform's white edge
@@ -80,30 +80,68 @@ function clerestory(c, roof, a0, a1) {
 /** The gable roof part of an end (the timber one under the snow). */
 const gableOf = (c) => c.parts.find((p) => p.shape && p.shape.startsWith('gable') && p.col === c.COL.roofWood) || null;
 
+/* Chairs round (26 Nov 2026; Ian: "redo the chairs"): the chair terminals' detail. Detachable (lift-site.js shell): the station rail the
+ * chairs roll along slowly (straight under both lanes, bent round the bull-wheel), the tyre conveyor on it, its hangers from the shell,
+ * a lit strip under the shell's edges and downlights over the platform, the operator's glass cabin. Fixed grip (frame + bonnet): lamps
+ * under the outer beam, the timber hut. Both: the sign's lamp, at the top a timber wind fence behind the hut and the ramp's edge boards. */
+const RAIL = 0x6f7884, TYRE = 0x1d2025, HANGER = 0x3a4048, FENCE = 0x7a5536;
+
 function dressChair(c) {
   const { COL } = c;
-  const roof = c.parts.find((p) => p.roof);
-  if (roof) {
-    // fascia boards round the canopy (the outer side has the red one); over the lanes only 0.2 m deep (the chairs pass under it)
-    c.det(roof.a0, roof.a1, roof.b0 - 0.1, roof.b0, roof.y0 - 0.35, roof.y1, COL.fascia);
-    c.det(roof.a0 - 0.1, roof.a0, roof.b0 - 0.1, roof.b1 + 0.1, roof.y0 - 0.2, roof.y1, COL.fascia);
-    c.det(roof.a1, roof.a1 + 0.1, roof.b0 - 0.1, roof.b1 + 0.1, roof.y0 - 0.2, roof.y1, COL.fascia);
-    c.det(roof.a0 - 0.12, roof.a0 - 0.1, roof.b0 - 0.1, roof.b1 + 0.1, roof.y1 - 0.12, roof.y1 - 0.04, TRIM, NEAR);      // a light trim line
-    // lamps under the canopy over the outer platform (out of the chairs' lane)
-    for (let a = roof.a0 + 0.9; a < roof.a1 - 0.5; a += 2.8) c.det(a - 0.3, a + 0.3, c.bOut + 0.2, c.bOut + 0.5, roof.y0 - 0.1, roof.y0, COL.light, NEAR);
+  const shell = c.parts.find((p) => p.shell);
+  const hut = c.parts.find((p) => p.hut);
+  if (shell) {
+    const roof = shell.y0, hz = (shell.b1 - shell.b0) / 2;
+    // the station rail just over the grips (never in the chairs' own path: lifts.js / station-diag), hung from the shell
+    const aR = shell.a0 + 0.55, yR = c.ropeTop(aR, 0) + 0.05, Rw = c.R;
+    for (const b of [c.side, -c.back]) {
+      c.det(aR, 0, b - 0.08, b + 0.08, yR, yR + 0.14, RAIL, NEAR);
+      c.det(aR + 0.25, -0.15, b - 0.11, b + 0.11, yR + 0.14, yR + 0.28, TYRE, NEAR);                   // the tyre conveyor
+      for (const a of [aR + 0.35, aR / 2, -0.35]) c.det(a - 0.05, a + 0.05, b - 0.05, b + 0.05, yR + 0.28, roof - 0.07, HANGER, NEAR);
+    }
+    c.det(0, Rw + 0.08, c.C - Rw - 0.08, c.C + Rw + 0.08, yR, yR + 0.14, RAIL, { near: true, shape: 'halfRing', form: { t: 0.16, segs: 8 } });
+    c.det(Rw - 0.05, Rw + 0.05, c.C - 0.05, c.C + 0.05, yR + 0.14, roof - 0.07, HANGER, NEAR);
+    // lit strips under the shell's two long edges (seen from afar in the evening) and downlights over the outer platform
+    const a1 = Math.max(shell.a0 + 2, shell.a1 - hz);
+    c.det(shell.a0 + 0.5, a1, shell.b1 - 0.3, shell.b1 - 0.12, roof - 0.13, roof - 0.07, COL.light, { glow: 1.3 });
+    c.det(shell.a0 + 0.5, a1, shell.b0 + 0.12, shell.b0 + 0.3, roof - 0.13, roof - 0.07, COL.light, { glow: 1.3 });
+    for (let k = 0; k < 3; k++) {            // (always three: the part list never depends on the heights, shell.a0 does)
+      const a = shell.a0 + 1.2 + (a1 - shell.a0 - 1.6) * k / 2;
+      c.det(a - 0.22, a + 0.22, c.bOut + 0.22, c.bOut + 0.5, roof - 0.15, roof - 0.07, COL.light, { near: true, glow: 1.6 });
+    }
+  }
+  const frame = c.parts.find((p) => p.bonnet);
+  if (frame) {       // fixed grip: two lamps under the outer beam
+    for (const a of [-3.2, -0.6]) c.det(a - 0.25, a + 0.25, c.bOut + 0.38, c.bOut + 0.62, frame.y1 - 0.1, frame.y1, COL.light, { near: true, glow: 1.5 });
   }
   signLamp(c);
-  // snow on the drive house
-  const hd = c.parts.filter((p) => p.col === COL.housingDark).sort((p, q) => q.y1 - p.y1)[0];
-  if (hd) c.det(hd.a0 - 0.12, hd.a1 + 0.12, hd.b0 - 0.12, hd.b1 + 0.12, hd.y1, hd.y1 + 0.5, COL.snow, { shape: 'gableA' });
-  // the operator's hut: plinth, the window towards the lane framed (its pane is the type model's), one towards the line, a door
-  const hut = c.parts.find((p) => p.hut);
   if (hut) {
     plinth(c, hut);
-    windowOn(c, hut, '+b', hut.a0 + 0.1, hut.a1 - 0.1, 1.2, 2.1, { pane: false, mullions: 2 });
     const bm = (hut.b0 + hut.b1) / 2;
-    windowOn(c, hut, '-a', bm - 0.55, bm + 0.55, 1.2, 2.0);
-    doorOn(c, hut, '-b', hut.a1 - 1.25, hut.a1 - 0.35);
+    if (shell) {       // the glass cabin: wide panes on three sides, the one towards the lane is the type model's
+      windowOn(c, hut, '+b', hut.a0 + 0.12, hut.a1 - 0.12, 0.95, 2.35, { pane: false, mullions: 2, col: 0x2b2f36 });
+      windowOn(c, hut, '-a', hut.b0 + 0.2, hut.b1 - 0.2, 0.95, 2.35, { mullions: 1, col: 0x2b2f36, glow: 0.8 });
+      windowOn(c, hut, '+a', hut.b0 + 0.9, hut.b1 - 0.2, 0.95, 2.35, { mullions: 1, col: 0x2b2f36, glow: 0.8 });
+      doorOn(c, hut, '-b', hut.a1 - 1.25, hut.a1 - 0.35, 2.1);
+    } else {
+      windowOn(c, hut, '+b', hut.a0 + 0.1, hut.a1 - 0.1, 1.2, 2.1, { pane: false, mullions: 2 });
+      windowOn(c, hut, '-a', bm - 0.55, bm + 0.55, 1.2, 2.0);
+      doorOn(c, hut, '-b', hut.a1 - 1.25, hut.a1 - 0.35);
+    }
+  }
+  if (c.which && hut) {
+    // the top: a timber wind fence behind the hut (posts, four boards), the unloading ramp's edge boards
+    const b = hut.b0 + 0.25, f0 = hut.a1 + 0.5, f1 = c.aBack + 1.3;
+    if (f1 - f0 > 2) {
+      const n = Math.max(1, Math.round((f1 - f0) / 2.2));
+      for (let k = 0; k <= n; k++) { const a = f0 + (f1 - f0) * k / n; c.det(a - 0.06, a + 0.06, b - 0.06, b + 0.06, 0, 1.75, FENCE, NEAR); }
+      for (const y of [0.35, 0.75, 1.15, 1.55]) c.det(f0, f1, b + 0.06, b + 0.1, y, y + 0.17, FENCE, NEAR);
+    }
+    const ramp = c.parts.find((p) => p.ramp);
+    if (ramp) {
+      const h = ramp.y1 + 0.12 - ramp.y0;
+      for (const a of [ramp.a0, ramp.a1 - 0.12]) c.det(a, a + 0.12, ramp.b0, ramp.b1, ramp.y0, ramp.y1 + 0.12, FENCE, { near: true, shape: 'wedge', form: { lip: h - ramp.ramp } });
+    }
   }
 }
 

@@ -151,7 +151,7 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
       if (path) {
         const down = st.rideKind > DOWN_CODE;                                // ride down: on the down lane, facing downhill
         const kind = KIND_OF_CODE[down ? st.rideKind - DOWN_CODE : st.rideKind] || path.kind;
-        if (!r.carrier || r.carrier.kind !== kind) { if (r.carrier) r.carrier.dispose(); r.carrier = createCarrier({ scene, kind, seats: path.seats, sub: path.sub }); }
+        if (!r.carrier || r.carrier.kind !== kind) { if (r.carrier) r.carrier.dispose(); r.carrier = createCarrier({ scene, kind, seats: path.seats, sub: path.sub, src: path.src }); }
         const w = riderAt(path, st.rideS, (x, z) => surface.height(x, z), {}, down);
         r.carrier.place(w); r.carrier.setVisible(true);
         st.x = w.x; st.y = w.y; st.z = w.z; st.heading = w.heading;

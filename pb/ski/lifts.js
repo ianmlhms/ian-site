@@ -10,9 +10,9 @@
  * underground funiculars run in a lit tunnel tube. */
 const THREE = window.THREE;
 
-import { createLiftPath } from './lift-path.js';
+import { createLiftPath, chairWidth } from './lift-path.js';
 import { createLiftWorld, frames, SITE_COLOURS } from './lift-site.js';
-import { carrierGeometry, GLASS } from './modes/carriers.js';
+import { carrierGeometry, bubbleGeometry, BUBBLE, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 import { gpuOnly } from './gpu-mem.js';
 import { carrierId } from './npc.js';
@@ -24,6 +24,9 @@ const DOWN_RIDERS = 1e6, DOWN_SHARE = 0.3;       // ride down: rider ids of the 
  * loading point (a cabin is where the loop puts it when it picks a rider up). A lift the player rides eases back to the plain loop in
  * `blend` s (his own cabin is drawn by the ride at its plain place: its neighbours keep their spacing to it, never closer than in a hall). */
 const HALL_SLOW = Object.freeze({ speed: 0.34, ramp: 10, stretch: 1.12, blend: 0.9 });
+// chairs round (26 Nov 2026): a detachable chair lets go of the rope under the terminal's shell and rolls slowly along the station rail
+// round the bull-wheel (the loading / unloading line included), then speeds up again: the same map with the shell's length
+const CHAIR_SLOW = Object.freeze({ speed: 0.24, ramp: 8, stretch: 1.12, blend: 0.9 });
 
 const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
 // Station look (26 Nov 2026): the stations' near detail (window frames, doors, lamps, mullions, trims: parts flagged `near`) per NEAR_DETAIL.cell
@@ -69,7 +72,7 @@ export function createLifts({ scene, resort, height, env = null }) {
   const fine = [];
   const nearParts = [];                 // station look: the near detail (NEAR_DETAIL)
   const bin = (w, h, d, near = false) => (near ? nearParts : Math.max(w, h, d) < FINE.size ? fine : parts);
-  const boxAt = (w, h, d, x, y, z, fx, fz, colour, glow = 0, near = false, shape = null, inset = 0.4) => bin(w, h, d, near).push([shape ? shapeGeometry(shape, w, h, d, inset) : new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z), glow]);
+  const boxAt = (w, h, d, x, y, z, fx, fz, colour, glow = 0, near = false, shape = null, inset = 0.4, form = null) => bin(w, h, d, near).push([shape ? shapeGeometry(shape, w, h, d, inset, form) : new THREE.BoxGeometry(w, h, d), colour, rot(fx, fz).setPosition(x, y, z), glow]);
   const cylAt = (r0, r1, h, x, y, z, colour, n = 8, glow = 0, near = false) => bin(2 * Math.max(r0, r1), h, 2 * Math.max(r0, r1), near).push([new THREE.CylinderGeometry(r0, r1, h, n), colour, new THREE.Matrix4().makeTranslation(x, y, z), glow]);
   const tmpW = {};
   const signSpots = [];                 // R8: { x, y, z, nx, nz, w, h, text } of every uncut name sign
@@ -77,7 +80,7 @@ export function createLifts({ scene, resort, height, env = null }) {
   function addFrame(f, l = null) {
     const g0 = height(f.x, f.z);
     for (const p of f.parts) {
-      if (p.cut) continue;
+      if (p.cut || p.hide) continue;                                              // (chairs round: hide = a collider drawn by other parts)
       if (p.gateLeaf) { leaves.push({ l, f, p, g0 }); continue; }                // after launch: the chair gates (instanced, they swing)
       if (p.belt) { beltQuad(f, p, g0); continue; }                                  // after launch: a chair's loading belt (it runs)
       if (p.sign && l) {
@@ -103,7 +106,7 @@ export function createLifts({ scene, resort, height, env = null }) {
       if (h <= 0.005) continue;
       const glow = glowOf(p);
       if (p.post && Math.abs(p.a1 - p.a0 - (p.b1 - p.b0)) < 1e-3) cylAt((p.a1 - p.a0) / 2, (p.a1 - p.a0) / 2, h, tmpW.x, y0 + h / 2, tmpW.z, p.col, 8, glow, !!p.near);
-      else boxAt(p.a1 - p.a0, h, p.b1 - p.b0, tmpW.x, y0 + h / 2, tmpW.z, f.fx, f.fz, p.col, glow, !!p.near, p.shape || null, p.inset);
+      else boxAt(p.a1 - p.a0, h, p.b1 - p.b0, tmpW.x, y0 + h / 2, tmpW.z, f.fx, f.fz, p.col, glow, !!p.near, p.shape || null, p.inset, p.form || null);
     }
   }
   /** Station look: a deck standing above the snow (a summit on a slope) sits on a dressed stone foundation down to the lowest ground under
@@ -185,9 +188,11 @@ export function createLifts({ scene, resort, height, env = null }) {
         const f = l.site.ends[which];
         const c = f.toWorld(0, l.wheelC, {});
         const y = l.cableY(which ? l.len : 0);
-        cylAt(l.wheelR + 0.12, l.wheelR + 0.12, 0.22, c.x, y + 0.08, c.z, 0x3e4249, 20);
+        // chairs round: an open rim (the rope runs in it) with spokes to the hub, the wheel visible from below
+        const rw = l.wheelR + 0.12;
+        boxAt(2 * rw, 0.26, 2 * rw, c.x, y + 0.08, c.z, 1, 0, 0x3e4249, 0, false, 'rim', 0.4, { t: Math.min(0.32, rw * 0.3), segs: 12 });
         cylAt(0.35, 0.35, 0.5, c.x, y + 0.35, c.z, 0xc8332a, 10);
-        if (l.wheelR > 0.8) cylAt(l.wheelR * 0.78, l.wheelR * 0.78, 0.26, c.x, y + 0.08, c.z, 0x737b86, 16, 0, true);   // station look: the rim (near)
+        for (let k = 0; k < 3; k++) { const t = k * Math.PI / 3; boxAt(2 * rw - 0.3, 0.1, 0.16, c.x, y + 0.08, c.z, Math.cos(t), Math.sin(t), 0x737b86, 0, true); }
       }
     }
     // a drag lift's worn track: a packed, darker strip under the up rope
@@ -416,7 +421,9 @@ export function createLifts({ scene, resort, height, env = null }) {
   const pools = new Map();               // key -> { near, far, glass, count }
   const glassMat = new THREE.MeshLambertMaterial({ color: GLASS.color, transparent: true, opacity: GLASS.opacity, depthWrite: false, side: THREE.DoubleSide });   // R8c
   disposables.push(glassMat);
-  const variantOf = (l) => (l.kind === 'chair' ? `chair:${l.seats}` : l.kind === 'drag' || l.sub === 'funitel' ? `${l.kind}:${l.sub}` : l.kind);      // R8e: funitel cabins
+  const lookOf = (l) => (l.kind === 'chair' && l.site && l.site.chair ? l.site.chair.look : null);
+  // (chairs round: a detachable and a fixed-grip chair of the same size are two models: carriage + pads vs clamp + slats)
+  const variantOf = (l) => (l.kind === 'chair' ? `chair:${l.seats}:${lookOf(l) && !lookOf(l).detach ? 'f' : 'd'}` : l.kind === 'drag' || l.sub === 'funitel' ? `${l.kind}:${l.sub}` : l.kind);      // R8e: funitel cabins
   const need = new Map();
   for (const l of lifts) {
     if (l.kind === 'carpet' || (l.kind === 'drag' && l.sub === 'rope')) continue;
@@ -424,8 +431,8 @@ export function createLifts({ scene, resort, height, env = null }) {
     need.set(variantOf(l), (need.get(variantOf(l)) || 0) + n);
   }
   for (const [key, n] of need) {
-    const [kind, v] = key.split(':');
-    const opts = { seats: kind === 'chair' ? Number(v) : 4, sub: kind === 'drag' || v === 'funitel' ? v : '', barUp: true };
+    const [kind, v, grip] = key.split(':');
+    const opts = { seats: kind === 'chair' ? Number(v) : 4, sub: kind === 'drag' || v === 'funitel' ? v : '', barUp: true, fixed: grip === 'f' };
     const cap = Math.min(n, 2400);
     const mk = (geo, mat, shadow) => { const m = new THREE.InstancedMesh(geo, mat, cap); m.count = 0; m.frustumCulled = false; m.castShadow = shadow; m.visible = false; group.add(m); disposables.push(geo); return m; };
     const near = carrierGeometry(kind, { ...opts, lod: 'near' });
@@ -433,6 +440,36 @@ export function createLifts({ scene, resort, height, env = null }) {
     if (pool.glass) pool.glass.renderOrder = 4;
     if (kind !== 'drag') pool.far = mk(carrierGeometry(kind, { ...opts, lod: 'far' }).frame, vmat, true);
     pools.set(key, pool);
+  }
+  // chairs round: the bubbles of the bubble chairs, ONE instanced tinted hood for every bubble lift (scaled to the chair's width, the
+  // lift's tint as instance colour), within BUBBLE.radius m; down over the riders on the line, raised in the stations
+  let bubbles = null;
+  {
+    let n = 0;
+    for (const l of lifts) if (lookOf(l) && lookOf(l).bubble) n += Math.ceil(l.loopLen / l.spec.gap) + 1;
+    if (n) {
+      const geo = bubbleGeometry(), mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: BUBBLE.opacity, depthWrite: false, side: THREE.DoubleSide });
+      const cap = Math.min(n, BUBBLE.max);
+      const mesh = new THREE.InstancedMesh(geo, mat, cap);
+      mesh.count = 0; mesh.frustumCulled = false; mesh.castShadow = false; mesh.visible = false; mesh.renderOrder = 4; mesh.name = 'ski-lift-bubbles';
+      mesh.setColorAt(0, new THREE.Color(1, 1, 1));
+      group.add(mesh); disposables.push(geo, mat);
+      bubbles = { mesh, cap, n: 0, tint: new Map() };
+      const white = new THREE.Color(1, 1, 1);
+      for (const l of lifts) if (lookOf(l) && lookOf(l).bubble) bubbles.tint.set(l.index, new THREE.Color(BUBBLE.tints[lookOf(l).band % BUBBLE.tints.length]).lerp(white, 0.25));
+    }
+  }
+  const bm4 = new THREE.Matrix4(), bPiv = new THREE.Matrix4(), bRot = new THREE.Matrix4(), bBack = new THREE.Matrix4(), bScale = new THREE.Matrix4();
+  function putBubble(l, w, m) {
+    const B = bubbles;
+    if (B.n >= B.cap) return;
+    const ds = w.turn ? 0 : Math.min(w.s, l.len - w.s);
+    const k = 1 - Math.max(0, Math.min(1, (ds - BUBBLE.open[0]) / (BUBBLE.open[1] - BUBBLE.open[0])));      // 1 raised .. 0 down
+    const kk = k * k * (3 - 2 * k);
+    bPiv.makeTranslation(BUBBLE.pivot[0], BUBBLE.pivot[1], 0); bRot.makeRotationZ(BUBBLE.lift * kk); bBack.makeTranslation(-BUBBLE.pivot[0], -BUBBLE.pivot[1], 0);
+    bScale.makeScale(1, 1, chairWidth(l.seats) / 2 + 0.16);
+    bm4.copy(m).multiply(bPiv).multiply(bRot).multiply(bBack).multiply(bScale);
+    B.mesh.setMatrixAt(B.n, bm4); B.mesh.setColorAt(B.n, B.tint.get(l.index)); B.n++;
   }
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(1, 1, 1);
   const eul = new THREE.Euler(0, 0, 0, 'YZX');
@@ -452,6 +489,7 @@ export function createLifts({ scene, resort, height, env = null }) {
     m4.compose(v3.set(w.x, w.y, w.z), q4, s3);
     if (far) { if (pool.nf < pool.cap) pool.far.setMatrixAt(pool.nf++, m4); }
     else if (pool.n < pool.cap) { pool.near.setMatrixAt(pool.n, m4); if (pool.glass) pool.glass.setMatrixAt(pool.n, m4); pool.n++; }
+    if (bubbles && dc < BUBBLE.radius && bubbles.tint.has(l.index)) putBubble(l, w, m4);
     // (ride down: a lift that goes down carries a few others down too: their own ids, so nobody rides the loop round and round)
     if (riderSink && id !== null && !w.turn && (w.up || l.shuttle)) riderSink(l, m4, id, dc, w);
     else if (riderSink && id !== null && !w.turn && l.site && l.site.down) riderSink(l, m4, DOWN_RIDERS + id, dc, w, DOWN_SHARE);
@@ -565,20 +603,22 @@ export function createLifts({ scene, resort, height, env = null }) {
   function hallWarp(l) {
     if (l.warp !== undefined) return l.warp;
     l.warp = null;
-    const roof = l.site && l.site.bottom.parts.find((p) => p.roof);
-    if (l.kind !== 'gondola' || l.shuttle || !roof || !(l.loopLen > 60)) return null;
+    const chair = l.kind === 'chair' && l.site && l.site.chair && l.site.chair.look.detach;
+    const roof = l.site && l.site.bottom.parts.find((p) => (chair ? p.shell && !p.cut : p.roof));
+    if (!(l.kind === 'gondola' || chair) || l.shuttle || !roof || !(l.loopLen > 60)) return null;
+    const SLOW = chair ? CHAIR_SLOW : HALL_SLOW;
     const H = Math.min(-roof.a0, l.len * 0.3), L = l.loopLen, n = Math.ceil(L), w = {}, dist = new Float32Array(n + 1);
     for (let k = 0; k <= n; k++) { l.loopAt((k / n) * L, w); dist[k] = Math.min(w.s, l.len - w.s); }
     const smooth = (e0, e1, x) => { const v = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return v * v * (3 - 2 * v); };
     // time (in line metres) to each sample; the slowest hall speed that keeps the line within `stretch` of its own speed
     const tau = new Float64Array(n + 1);
-    let vs = HALL_SLOW.speed;
+    let vs = SLOW.speed;
     for (;;) {
       for (let k = 1; k <= n; k++) {
-        const v = (d) => 1 - (1 - vs) * smooth(H + HALL_SLOW.ramp, H, d);
+        const v = (d) => 1 - (1 - vs) * smooth(H + SLOW.ramp, H, d);
         tau[k] = tau[k - 1] + (L / n) * 0.5 * (1 / v(dist[k - 1]) + 1 / v(dist[k]));
       }
-      if (tau[n] / L <= HALL_SLOW.stretch || vs > 0.9) break;
+      if (tau[n] / L <= SLOW.stretch || vs > 0.9) break;
       vs += 0.06;
     }
     if (vs > 0.9) return null;
@@ -628,6 +668,7 @@ export function createLifts({ scene, resort, height, env = null }) {
       c.mesh.visible = Math.hypot(dx, dz) < Math.min(NEAR_DETAIL.radius, radius);
     }
     for (const p of pools.values()) { p.n = 0; p.nf = 0; }
+    if (bubbles) bubbles.n = 0;
     beltTex.offset.y = -(t * 1.4) / 2;
     for (const l of lifts) {
       if (l.kind === 'carpet' || (l.kind === 'drag' && l.sub === 'rope')) continue;
@@ -661,6 +702,11 @@ export function createLifts({ scene, resort, height, env = null }) {
       p.near.count = p.n; p.near.visible = p.n > 0; p.near.instanceMatrix.needsUpdate = true;
       if (p.glass) { p.glass.count = p.n; p.glass.visible = p.n > 0; p.glass.instanceMatrix.needsUpdate = true; }
       if (p.far) { p.far.count = p.nf; p.far.visible = p.nf > 0; p.far.instanceMatrix.needsUpdate = true; }
+    }
+    if (bubbles) {
+      const b = bubbles.mesh;
+      b.count = bubbles.n; b.visible = bubbles.n > 0;
+      if (bubbles.n) { b.instanceMatrix.needsUpdate = true; b.instanceColor.needsUpdate = true; }
     }
   }
   /** Hold one carrier of lift `index` at the loop parameter u (the player's own), or let it go again (null). */

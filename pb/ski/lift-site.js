@@ -26,11 +26,31 @@ export const AISLE = Object.freeze({ chair: 8, gondola: 9, cable: 12, drag: 7, r
 export const AISLE_HIGH = 15;                   // m between the carriers' lowest point and the treetops where the forest may stay
 export const TREE_TOP = 17;                     // m: the tallest tree of scatter-view.js (10 m x scale 1.65 + margin)
 const PYLON_R = 0.45;                           // m: a pylon column (collider and checks)
-const COL = Object.freeze({ concrete: 0xaeaba3, stone: 0x78706a, timber: 0x80563a, glass: 0x33424f, steel: 0x6b7585, wheel: 0x3e4249, snow: 0xf3f5fb, accent: 0xc8332a, deck: 0x8d8478, gate: 0xf2b21c, dark: 0x2b2f36, rubber: 0x23262b, light: 0xfff2c6, batten: 0x5b3d28, plinth: 0x8f8b84, housing: 0xd9dde2, housingDark: 0x5d6570, fascia: 0x23272e, roofWood: 0x5a3c27, roofSteel: 0x87909b, larch: 0x9a7452 });
+const COL = Object.freeze({ concrete: 0xaeaba3, stone: 0x78706a, timber: 0x80563a, glass: 0x33424f, steel: 0x6b7585, wheel: 0x3e4249, snow: 0xf3f5fb, accent: 0xc8332a, deck: 0x8d8478, gate: 0xf2b21c, dark: 0x2b2f36, rubber: 0x23262b, light: 0xfff2c6, batten: 0x5b3d28, plinth: 0x8f8b84, housing: 0xd9dde2, housingDark: 0x5d6570, fascia: 0x23272e, roofWood: 0x5a3c27, roofSteel: 0x87909b, larch: 0x9a7452, cabin: 0xd3d6da, column: 0x5b636e });
 export { COL as SITE_COLOURS };
 
 /** The station key of a path: the class, but rope tows have their own (smaller) layout. */
 export const siteKey = (path) => (path.kind === 'drag' && path.sub === 'rope' ? 'rope' : path.kind);
+
+/* Chairs round (26 Nov 2026; Ian: "redo the chairs"): what a chairlift's stations and chairs look like, from the data (OSM
+ * aerialway:detachable / bubble / heating), else the name (French TSD = detachable, TSF = fixed grip; "Express" / "Jet" = detachable),
+ * else 4+ seats = detachable. Our own painted type models (no maker's design): a detachable terminal = a long rounded shell over the
+ * station rail (light, a bubble lift's dark), a fixed-grip one = a steel frame with a round bonnet over the bull-wheel; the band colour
+ * by the lift's name. */
+const BANDS = [0xc8332a, 0x2f6db5, 0x2d8a5a, 0xe0a21a, 0x1f8a96];
+const RAMP = 0.5;                               // m the top station's unloading ramp falls over the deck's outer strip
+export function chairLook(src = {}, seats = 4) {
+  const name = String((src && src.name) || '');
+  let detach = (Number(seats) || 4) >= 4;
+  if (/\bTSF\d?\b/i.test(name)) detach = false;
+  else if (/\bTSDB?\d?\b|express|\bjet\b/i.test(name)) detach = true;
+  if (src && src.bubble === true) detach = true;
+  if (src && typeof src.detachable === 'boolean') detach = src.detachable;
+  let h = 7;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const bubble = detach && !!src && src.bubble === true;
+  return { detach, bubble, heated: !!src && src.heated === true, band: BANDS[h % BANDS.length], body: bubble ? 0x3d434c : 0xdfe3e8 };
+}
 
 /** One lift's stations (path = createLiftPath). */
 export function createLiftSite(path) {
@@ -52,7 +72,7 @@ export function createLiftSite(path) {
     const slot = Math.min(0.45, 0.25 * Math.max(1, (path.seats || 4) / 2 - 0.5));
     const aLoad = -boardS, bRider = side - slot * path.sign;
     const aEntry = detach ? aLoad + Math.min(2.0, Math.max(0.8, boardS * 0.6)) : aLoad;
-    return { detach, aLoad, bRider, aEntry, aGate: aEntry, bGate: side + cb.hw + 0.6 + 0.6, gateHalf: 0.75, belt: detach ? { a0: aLoad - 0.6, a1: aEntry + 0.6, b0: bRider - 0.55, b1: bRider + 0.55 } : null };
+    return { detach, aLoad, bRider, aEntry, aGate: aEntry, bGate: side + cb.hw + 0.6 + 0.6, gateHalf: 0.75, belt: detach ? { a0: aLoad - 0.6, a1: aEntry + 0.6, b0: bRider - 0.55, b1: bRider + 0.55 } : null, look: chairLook(path.src, path.seats) };
   })() : null;
   const ends = [makeEnd(0), makeEnd(1)];
 
@@ -76,15 +96,6 @@ export function createLiftSite(path) {
     // R8 detail (coordinator review: 'plain grey box' stations): drawn only, never a collider, cut with a neighbour's carrier path like
     // the caps; all of it lands in the same merged station chunk (no extra draw call)
     const det = (a0, a1, b0, b1, y0, y1, col, extra = {}) => add(a0, a1, b0, b1, y0, y1, col, false, { cap: true, detail: true, ...extra });
-    /** The drive housing over a bull-wheel (centre a = 0, b = C) sitting on a roof at y: the motor house, its darker base, vents. */
-    const housing = (y, len, wid, high) => {
-      const ha0 = -Math.min(len, Math.max(1.6, R + 0.6)), ha1 = Math.min(len, Math.max(1.6, R + 0.6));
-      det(ha0, ha1, C - wid, C + wid, y, y + 0.35, COL.housingDark);
-      det(ha0 + 0.1, ha1 - 0.1, C - wid + 0.1, C + wid - 0.1, y + 0.35, y + high, COL.housing);
-      det(ha0 + 0.05, ha1 - 0.05, C - wid + 0.05, C + wid - 0.05, y + high, y + high + 0.18, COL.housingDark);
-      det(ha0 + 0.05, ha1 - 0.05, C - wid + 0.05, C + wid - 0.05, y + high * 0.72, y + high * 0.86, COL.accent);       // the lift company's red band
-      for (const db of [-wid + 0.6, wid - 0.6]) det(ha0 + 0.6, ha1 - 0.6, C + db - 0.25, C + db + 0.25, y + high * 0.55, y + high * 0.8, COL.dark);
-    };
     /** A lift-name sign board (lifts.js writes the name on it): face = +1 / -1 along b, the board's centre a, its y. */
     const nameSign = (a, b, y, w, h, face) => det(a - w / 2, a + w / 2, b - 0.06, b + 0.06, y - h / 2, y + h / 2, COL.fascia, { sign: { face, w, h } });
     const at = (board) => (which ? -unloadS : -boardS) + (board ? 0 : 0);
@@ -92,21 +103,66 @@ export function createLiftSite(path) {
     let type = 'hut';
     if (key === 'chair') {
       type = 'platform';
-      const roof = wheel + 0.9;
-      add(-9, aBack + 1.5, bIn - 1.6, bOut + 4.4, -0.35, 0.04, COL.deck, false, { deck: true });
-      add(-5, aBack + 1.2, bIn - 0.9, bOut + 0.9, roof, roof + 0.4, COL.steel, true, { roof: true });
-      // station look: the canopy is a low gable over the bull-wheel (steel, snow on it), the drive house sits on its ridge
-      const hw = (bOut - bIn + 2.3) / 2, rise = Math.min(1.1, hw * 0.2), bm = (bIn + bOut) / 2;
-      add(-5.25, aBack + 1.45, bIn - 1.15, bOut + 1.15, roof + 0.4, roof + 0.4 + rise, COL.roofSteel, false, { cap: true, shape: 'gableA' });
-      add(-5.2, aBack + 1.4, bIn - 1.1, bOut + 1.1, roof + 0.52, roof + 0.52 + rise, COL.snow, false, { cap: true, shape: 'gableA' });
-      for (const a of [-4.6, aBack + 0.8]) for (const b of [bIn - 0.5, bOut + 0.5]) post(a, b, roof);
-      housing(roof + 0.52 + rise * (1 - Math.min(1, (Math.abs(C - bm) + 1.25) / (hw - 0.05))), aBack + 0.6, 1.25, 1.35);     // R8: the drive on the canopy
-      det(-5, aBack + 1.2, bOut + 0.9, bOut + 1.0, roof - 0.35, roof + 0.4, COL.accent);                 // R8: a red fascia
-      nameSign(-0.6, bOut + 1.08, roof + 0.02, Math.min(4.6, aBack + 3.6), 0.62, 1);
-      add(-4.4, -1.2, bIn - 4.4, bIn - 1.6, 0, 2.6, COL.timber, true, { hut: true });
-      add(-4.68, -0.92, bIn - 4.68, bIn - 1.32, 2.6, 3.42, COL.roofWood, false, { cap: true, shape: 'gableA' });    // station look: a gable roof
-      add(-4.64, -0.96, bIn - 4.64, bIn - 1.36, 2.72, 3.54, COL.snow, false, { cap: true, shape: 'gableA' });
-      add(-4.3, -1.3, bIn - 1.58, bIn - 1.56, 1.2, 2.1, COL.glass, false);
+      const roof = wheel + 0.9, L = chair.look;
+      // chairs round: the deck; at the top its outer strip is the unloading ramp (falling RAMP m away from the lane, stood on: deckTop)
+      if (which) {
+        add(-9, aBack + 1.5, bIn - 1.6, bOut + 0.9, -0.35, 0.04, COL.deck, false, { deck: true });
+        add(-9, aBack + 1.5, bOut + 0.9, bOut + 4.4, -0.35 - RAMP, 0.04, COL.snow, false, { deck: true, ramp: RAMP, shape: 'wedge', form: { lip: 0.39 } });
+      } else add(-9, aBack + 1.5, bIn - 1.6, bOut + 4.4, -0.35, 0.04, COL.deck, false, { deck: true });
+      // the old canopy slab stays the collider and the bull-wheel's holder; the terminal below is what is drawn (hide: not drawn)
+      add(-5, aBack + 1.2, bIn - 0.9, bOut + 0.9, roof, roof + 0.4, COL.steel, true, { roof: true, hide: true });
+      for (const a of [-4.6, aBack + 0.8]) {
+        for (const b of [bIn - 0.5, bOut + 0.5]) {
+          if (!L.detach) { post(a, b, roof); continue; }
+          // (a detachable terminal stands on square steel columns: the same collider, drawn as a box column)
+          add(a - 0.2, a + 0.2, b - 0.2, b + 0.2, 0, roof, COL.steel, true, { post: true, hide: true });
+          det(a - 0.26, a + 0.26, b - 0.26, b + 0.26, 0, roof, COL.column);
+        }
+      }
+      if (L.detach) {
+        // a detachable terminal: one long shell over the bull-wheel and the station rail, its back rounded round the wheel, the front
+        // nose sloped where the chairs come in (as far out as the rope stays under it), a colour band, the dark underside, snow on top
+        let aF = -5;
+        for (let a = -8.6; a < -5; a += 0.4) if (ropeTop(a, -5) < roof - 0.12) { aF = a; break; }
+        const aE = aBack + 1.4, s0 = bIn - 1.0, s1 = bOut + 1.0, H = 1.9, ch = 0.75, nose = 1.9;
+        det(aF, aE, s0, s1, roof, roof + H, L.body, { shape: 'shell', form: { round: 1, segs: 5, chamfer: ch, nose }, shell: true });
+        det(aF - 0.04, aE + 0.04, s0 - 0.04, s1 + 0.04, roof + 0.1, roof + 0.42, L.band, { shape: 'shell', form: { round: 1, segs: 5, open: true } });
+        det(aF + 0.12, aE - 0.12, s0 + 0.12, s1 - 0.12, roof - 0.07, roof, 0x3a3f47, { shape: 'shell', form: { round: 1, segs: 5, chamfer: 0 }, glow: 0.28 });
+        det(aF + ch + nose - 0.05, aE - ch + 0.05, s0 + ch - 0.05, s1 - ch + 0.05, roof + H, roof + H + 0.3, COL.snow, { shape: 'shell', form: { round: 1, segs: 5, chamfer: 0.24, top: true } });
+        const hz = (s1 - s0) / 2, flat = Math.max(1.5, aE - hz - aF - 0.4);
+        nameSign(aF + 0.2 + flat / 2, s1 + 0.07, roof + 0.8, Math.min(5.2, flat * 0.82), 0.5, 1);
+        det(-0.32, 0.32, C - 0.32, C + 0.32, wheel + 0.2, roof, COL.housingDark);            // the wheel's shaft up into the shell
+      } else {
+        // a fixed-grip terminal: a steel frame on the four columns, the round bonnet over the bull-wheel under it, the drive house on
+        // the frame at the bottom (a snowy grating at the top), the name board hung from the outer beam
+        const fa0 = -4.8, fa1 = aBack + 1.0, y1 = roof + 0.5;
+        for (const b of [bIn - 0.5, bOut + 0.5]) { det(fa0, fa1, b - 0.16, b + 0.16, roof, y1, COL.column); det(fa0 + 0.05, fa1 - 0.05, b - 0.19, b + 0.19, y1, y1 + 0.14, COL.snow, { shape: "bevel", inset: 0.06 }); }
+        for (const a of [-4.6, aBack + 0.8]) det(a - 0.16, a + 0.16, bIn - 0.66, bOut + 0.66, roof, y1, COL.column);
+        det(-0.14, 0.14, bIn - 0.36, bOut + 0.36, roof, y1, COL.column);
+        const rb = R + 0.5;
+        det(-rb, rb, C - rb, C + rb, wheel + cb.top + 0.1, roof, L.band, { shape: 'shell', form: { round: 2, segs: 4, chamfer: 0.28 }, bonnet: true });
+        if (!which) {          // the drive: a larch-clad machine house on the frame, snow on its gable roof, a lit window
+          const ha = Math.max(1.6, R + 0.6);
+          det(-ha, ha, C - 1.3, C + 1.3, y1, y1 + 1.5, COL.larch);
+          det(-ha - 0.28, ha + 0.28, C - 1.58, C + 1.58, y1 + 1.5, y1 + 2.15, COL.roofWood, { shape: 'gableA' });
+          det(-ha - 0.24, ha + 0.24, C - 1.54, C + 1.54, y1 + 1.62, y1 + 2.27, COL.snow, { shape: 'gableA' });
+          det(-0.65, 0.65, C + 1.3, C + 1.34, y1 + 0.55, y1 + 1.2, COL.glass, { glow: 0.75 });
+        }
+        else {
+          det(-1.9, 1.9, C - 1.9, C + 1.9, y1, y1 + 0.1, COL.steel);
+          det(-1.85, 1.85, C - 1.85, C + 1.85, y1 + 0.1, y1 + 0.34, COL.snow, { shape: 'bevel' });
+        }
+        nameSign(-0.6, bOut + 0.72, roof - 0.18, Math.min(4.2, aBack + 3.2), 0.5, 1);
+      }
+      add(-4.4, -1.2, bIn - 4.4, bIn - 1.6, 0, 2.6, L.detach ? COL.cabin : COL.timber, true, { hut: true });
+      if (L.detach) {       // the operator's glass cabin (stations.js glazes it): a flat roof with an overhang, snow on it
+        add(-4.7, -0.9, bIn - 4.7, bIn - 1.3, 2.6, 2.86, COL.fascia, false, { cap: true });
+        add(-4.66, -0.94, bIn - 4.66, bIn - 1.34, 2.86, 3.1, COL.snow, false, { cap: true, shape: 'bevel', inset: 0.18 });
+      } else {
+        add(-4.68, -0.92, bIn - 4.68, bIn - 1.32, 2.6, 3.42, COL.roofWood, false, { cap: true, shape: 'gableA' });    // station look: a gable roof
+        add(-4.64, -0.96, bIn - 4.64, bIn - 1.36, 2.72, 3.54, COL.snow, false, { cap: true, shape: 'gableA' });
+      }
+      add(-4.3, -1.3, bIn - 1.58, bIn - 1.56, L.detach ? 0.95 : 1.2, L.detach ? 2.35 : 2.1, COL.glass, false);
       if (!which) {           // the boarding fence: posts, yellow bars, a gate (two leaves, lifts.js swings them open) where he passes
         const g = chair.aGate, h = chair.gateHalf, bg = chair.bGate;
         for (const a of [g - h - 1.7, g - h, g + h, g + h + 1.7]) post(a, bg, 1.05, 0.06, COL.dark);
@@ -770,7 +826,7 @@ export function createLiftWorld(paths, opts = {}) {
       for (const p of f.parts) {
         if (!p.deck || p.cut || l.a < p.a0 || l.a > p.a1 || l.b < p.b0 || l.b > p.b1) continue;
         if (g0 === null) g0 = ground(f.x, f.z);
-        top = Math.max(top, g0 + p.y1);
+        top = Math.max(top, g0 + p.y1 - (p.ramp ? p.ramp * (l.b - p.b0) / Math.max(0.1, p.b1 - p.b0) : 0));      // (chairs round: a top's ramp)
       }
     }
     return top;

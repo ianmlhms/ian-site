@@ -8,6 +8,7 @@
  *   createCarrier({ scene, kind, seats, sub })                      the player's carrier: place(w) with liftride.js riderAt() */
 import { mergeParts } from './views.js';
 import { chairWidth } from '../lift-path.js';
+import { chairLook } from '../lift-site.js';
 
 const THREE = window.THREE;
 const COL = Object.freeze({ frame: 0x3a3f48, steel: 0x8e96a3, grip: 0x5d6570, cushion: 0x2a66d0, cushion2: 0x1f4fa8, bar: 0xf2b21c, cabin: 0xc8372e, cabinDark: 0x8f2620, roof: 0xe8eaee, floor: 0x2b2f36, train: 0xb8322b, trainDark: 0x6f1d18, rubber: 0x1b1d22, spring: 0x2f343c, platter: 0xd8402e });
@@ -24,19 +25,27 @@ function grip(P, z = 0, long = 0.5) {
   P.push([box(0.14, 0.14, 0.26), COL.steel, at(0, 0.1, z)]);                   // its spring housing
 }
 
-function chairParts(seats, lod, barUp) {
+/* Chairs round (26 Nov 2026): a detachable chair (lift-site.js chairLook) has the long grip carriage with its running wheels (it rolls
+ * along the station rail) and padded seats; a fixed-grip chair a small clamp and bare slatted seats. */
+const SLAT = 0xb9a27c;
+function chairParts(seats, lod, barUp, fixed = false) {
   const W = chairWidth(seats);
   const P = [];
   if (lod === 'far') {
     // R8d (Niddreg budget): a far chair (130-750 m, a few pixels) = grip, one hanger, the seat (cushion colour) and the backrest:
     // 4 boxes / 48 triangles (was 10 / 120)
-    P.push([box(0.42, 0.22, 0.22), COL.grip, at(0, 0, 0)]);
+    P.push([box(fixed ? 0.3 : 0.62, 0.22, 0.22), COL.grip, at(0, 0, 0)]);
     P.push([box(0.09, 2.0, 0.09), COL.frame, at(-0.2, -1.05, 0)]);
-    P.push([box(0.62, 0.14, W), COL.cushion, at(-0.02, -2.08, 0)]);
+    P.push([box(0.62, 0.14, W), fixed ? SLAT : COL.cushion, at(-0.02, -2.08, 0)]);
     P.push([box(0.1, 0.72, W), COL.frame, at(-0.36, -1.66, 0)]);
     return { parts: P, glass: [] };
   }
-  grip(P, 0, 0.42);
+  if (fixed) P.push([box(0.3, 0.17, 0.17), COL.grip, at(0, -0.02, 0)]);          // the fixed clamp
+  else {
+    grip(P, 0, 0.42);
+    P.push([box(0.72, 0.07, 0.3), COL.grip, at(0, 0.2, 0)]);                     // the carriage over the grip, its running wheels
+    for (const x of [-0.27, 0.27]) P.push([box(0.15, 0.15, 0.34), COL.rubber, at(x, 0.27, 0)]);
+  }
   P.push([box(0.08, 1.45, 0.08), COL.frame, at(-0.3, -0.78, 0)]);               // hanger arm, bent back over the seat
   P.push([box(0.32, 0.08, 0.08), COL.frame, at(-0.15, -0.08, 0)]);
   P.push([box(0.08, 0.08, W + 0.1), COL.frame, at(-0.3, -1.45, 0)]);            // the yoke over the back
@@ -44,10 +53,15 @@ function chairParts(seats, lod, barUp) {
   P.push([box(0.62, 0.1, W), COL.frame, at(-0.02, -2.1, 0)]);                   // seat pan
   P.push([box(0.08, 0.7, W), COL.frame, at(-0.36, -1.62, 0)]);                  // backrest
   const n = Math.max(2, Math.min(8, seats));
-  for (let i = 0; i < n; i++) {
-    const z = -W / 2 + (i + 0.5) * (W / n), c = i % 2 ? COL.cushion : COL.cushion2;
-    P.push([box(0.5, 0.07, W / n - 0.06), c, at(0.0, -2.02, z)]);
-    P.push([box(0.06, 0.5, W / n - 0.06), c, at(-0.31, -1.66, z)]);
+  if (fixed) {                     // bare slats along the seat and the back
+    for (const x of [-0.18, 0.02, 0.22]) P.push([box(0.13, 0.05, W - 0.06), SLAT, at(x, -2.03, 0)]);
+    for (const y of [-1.86, -1.62, -1.4]) P.push([box(0.05, 0.12, W - 0.06), SLAT, at(-0.31, y, 0)]);
+  } else {
+    for (let i = 0; i < n; i++) {
+      const z = -W / 2 + (i + 0.5) * (W / n), c = i % 2 ? COL.cushion : COL.cushion2;
+      P.push([box(0.5, 0.07, W / n - 0.06), c, at(0.0, -2.02, z)]);
+      P.push([box(0.06, 0.5, W / n - 0.06), c, at(-0.31, -1.66, z)]);
+    }
   }
   if (barUp === 'none') return { parts: P, glass: [] };          // (the player's chair: the bar is its own part, it swings)
   if (barUp) {                     // the safety bar raised over the riders' heads, the footrest with it
@@ -208,8 +222,8 @@ function dragEnd(sub, y) {
 }
 
 /** The parts of one carrier. */
-export function carrierParts(kind, { seats = 4, sub = '', lod = 'near', barUp = true, door = null } = {}) {
-  if (kind === 'chair') return chairParts(seats, lod, barUp);
+export function carrierParts(kind, { seats = 4, sub = '', lod = 'near', barUp = true, door = null, fixed = false } = {}) {
+  if (kind === 'chair') return chairParts(seats, lod, barUp, fixed);
   // R8e: a funitel cabin: big and wide (across the travel), hung from the two haul ropes 3.2 m apart by two grips (lift-path.js carrierBox)
   // (door: lift lines round, the player's cabin: { side } -> a gap + door.leaf parts; the width by the cabin)
   if (kind === 'gondola' && sub === 'funitel') return cabinParts(2.6, 3.4, 2.3, -4.8, COL.cabin, COL.cabinDark, [-1.6, 1.6], lod, door && { ...door, w: 1.2 });
@@ -219,6 +233,18 @@ export function carrierParts(kind, { seats = 4, sub = '', lod = 'near', barUp = 
   if (kind === 'drag') return dragParts(sub);
   return { parts: [[box(0.3, 0.3, 0.3), COL.steel, at(0, -0.15, 0)]], glass: [] };
 }
+/* Chairs round: a bubble chair's tinted hood. Unit width (z radius 1: lifts.js scales it to the chair, W / 2 + 0.16), its top at the
+ * pivot over the riders' heads; down: it reaches round the riders to the footrest; raised: turned `lift` rad about the pivot, up and
+ * back over the chair. Tints (lifts.js picks one per lift by its band colour). */
+export const BUBBLE = Object.freeze({ pivot: [-0.36, -0.86], lift: 1.9, opacity: 0.42, radius: 170, max: 700, open: [9, 22],
+  tints: [0xff9a3c, 0x6fa8e0, 0x7fc8a0, 0xffc04a, 0x5fc0c8] });
+export function bubbleGeometry() {
+  const g = new THREE.SphereGeometry(1, 8, 4, Math.PI / 2, Math.PI, 0, 1.95);
+  g.scale(1.15, 1.0, 1);
+  g.translate(BUBBLE.pivot[0], BUBBLE.pivot[1] - 1.0, 0);
+  return g;
+}
+
 /** The merged geometries (frame: vertex colours; glass: see-through, or null). */
 export function carrierGeometry(kind, opts) {
   const p = carrierParts(kind, opts);
@@ -228,7 +254,7 @@ export function carrierGeometry(kind, opts) {
 /** kind = lift-path.js class; seats / sub from the data. place(w) with w = liftride.js riderAt(): { cx, cy, cz, heading, pitch, roll,
  *  barDown, hip (drag: the rider's hip height, the pole reaches down to it) }. */
 const DOWN = new THREE.Vector3(0, -1, 0), rodV = new THREE.Vector3(), rodD = new THREE.Vector3();
-export function createCarrier({ scene, kind, seats = 4, sub = '', doorSide = 1 }) {
+export function createCarrier({ scene, kind, seats = 4, sub = '', doorSide = 1, src = null }) {
   const group = new THREE.Group();
   group.name = `ski-ride-${kind}`;
   group.rotation.order = 'YZX';
@@ -239,7 +265,17 @@ export function createCarrier({ scene, kind, seats = 4, sub = '', doorSide = 1 }
   let bar = null, pole = null, end = null, leaves = null;
   if (kind === 'chair') {
     // lift lines round: the chair, and its bar on a pivot (swung down after the station, up before the top: w.barK 1 = up .. 0 = down)
-    mesh(carrierGeometry('chair', { seats, barUp: 'none' }).frame);
+    // (chairs round: the lift's own chair model, detachable or fixed grip; a bubble chair's hood stays raised while he rides)
+    const look = src ? chairLook(src, seats) : null;
+    mesh(carrierGeometry('chair', { seats, barUp: 'none', fixed: !!look && !look.detach }).frame);
+    if (look && look.bubble) {
+      const bg = bubbleGeometry().translate(-BUBBLE.pivot[0], -BUBBLE.pivot[1], 0).rotateZ(BUBBLE.lift).translate(BUBBLE.pivot[0], BUBBLE.pivot[1], 0);
+      bg.scale(1, 1, chairWidth(seats) / 2 + 0.16);
+      const tint = new THREE.Color(BUBBLE.tints[look.band % BUBBLE.tints.length]).lerp(new THREE.Color(1, 1, 1), 0.25);
+      const bmat = new THREE.MeshLambertMaterial({ color: tint, transparent: true, opacity: BUBBLE.opacity, depthWrite: false, side: THREE.DoubleSide });
+      const hood = new THREE.Mesh(bg, bmat); hood.renderOrder = 4; hood.frustumCulled = false;
+      group.add(hood); disposables.push(bg, bmat);
+    }
     bar = new THREE.Group();
     bar.position.set(BAR.pivot[0], BAR.pivot[1], 0);
     const bg = mergeParts(barDownParts(chairWidth(seats))).translate(-BAR.pivot[0], -BAR.pivot[1], 0);
