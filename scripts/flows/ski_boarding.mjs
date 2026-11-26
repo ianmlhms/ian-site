@@ -88,11 +88,9 @@ export const flow = {
           // skip: a second press during the walk goes straight to the spot; fast: no boarding
           await page.evaluate((s) => window.__ski.placeHold(s.x, s.z, s.heading), spot);
           await page.waitForFunction(() => !document.getElementById("liftBtn").hidden, null, { timeout: 8000 });
-          await page.keyboard.press("l");
-          await page.waitForFunction(() => window.__ski.game.phase === "approach", null, { timeout: 3000 });
-          await page.keyboard.press("l");
-          await page.waitForFunction(() => window.__ski.game.phase === "lift", null, { timeout: 1500 });
-          h.expect(true, `${rid} chair: a second press skips the walk in`);
+          // (the walk lasts ~1.5 s at the test's x2: the second press goes in straight from the page, the first starts the walk)
+          const skip = await page.evaluate(() => { const S = window.__ski; S.boardLift(); const a = S.game.phase; S.boardLift(); return { first: a, second: S.game.phase }; });
+          h.expect(skip.first === "approach" && skip.second === "lift", `${rid} chair: a second press skips the walk in (${skip.first} -> ${skip.second})`);
           await page.evaluate(() => window.__ski.goFree());
           await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 30000 });
           const fast = await page.evaluate((s) => {
