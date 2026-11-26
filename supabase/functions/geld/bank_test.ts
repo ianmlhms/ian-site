@@ -3,7 +3,7 @@ import { createEbClient, EbError, fetchAllTransactions } from "./bank_api.ts";
 import { jwtParts, pemToDer, signJwt, JWT_TTL_SECONDS } from "./bank_jwt.ts";
 import {
   bankNotes, consentValidUntil, isStateFresh, mapBankTxs, planAccounts, sha256Hex, STATE_MAX_AGE_MS,
-  syncWindow, txRef, type MapContext,
+  dropSuppressed, syncWindow, txRef, type MapContext,
 } from "./bank_logic.ts";
 import {
   parseBankAuth, parseBankSession, parseBankTx, parseSessionResponse, pickAspsp, pickBalance, type BankTx,
@@ -50,7 +50,8 @@ Deno.test("PEM with escaped newlines works, other key formats are refused", asyn
 
 Deno.test("bank_auth and bank_session inputs are validated", () => {
   assertEquals(parseBankAuth({ bank: "bcee" }), { value: { bank: "bcee" } });
-  assert("error" in parseBankAuth({ bank: "tr" }));
+  assertEquals(parseBankAuth({ bank: "tr" }), { value: { bank: "tr" } });
+  assert("error" in parseBankAuth({ bank: "n26" }));
   const state = "ab".repeat(32);
   assertEquals(parseBankSession({ code: " c0de ", state }), { value: { code: "c0de", state } });
   assert("error" in parseBankSession({ code: "", state }));
@@ -282,4 +283,58 @@ Deno.test("parents paying back the canteen card is tagged parents", async () => 
   const tx = parsed({ credit_debit_indicator: "CRDT", creditor: undefined, debtor: { name: "M. ET/OU MME RAOUL MULHEIMS" }, remittance_information: ["cantineskaart"] });
   const [row] = await mapBankTxs([tx], await ctx());
   assertEquals(row.cat, "parents");
+});
+
+// ---- Trade Republic via Enable Banking -------------------------------
+
+Deno.test("Trade Republic: ASPSP pick is exact, consent is 90 days", () => {
+  const list = { aspsps: [
+    { name: "Trade Republic Bank GmbH Business", maximum_consent_validity: 1 },
+    { name: "Trade Republic", maximum_consent_validity: 7_776_000, psu_types: ["personal"] },
+  ] };
+  assertEquals(pickAspsp(list, "tr"), { name: "Trade Republic", maxConsentSeconds: 7_776_000 });
+  assertEquals(pickAspsp({ aspsps: [{ name: "Trade Republic Bank" }] }, "tr"), null);
+  assertEquals(consentValidUntil(7_776_000, NOW), new Date(NOW + 90 * 86_400_000).toISOString());
+});
+
+Deno.test("Trade Republic: main account label is exactly 'Trade Republic'", async () => {
+  const [row] = await planAccounts("tr", [{ uid: "x", iban: "LU110000000000000009", name: "", currency: "EUR", cashType: "CACC" }], [], null);
+  assertEquals(row.label, "Trade Republic");
+  assertEquals(row.bank, "tr");
+});
+
+const inFrom = (name: string, memo: string[] = []) =>
+  parsed({ credit_debit_indicator: "CRDT", debtor: { name }, creditor: undefined, remittance_information: memo });
+
+Deno.test("own-money rule: Raoul / Einzahlung into TR is a transfer, on Spuerkeess and BDL it is not", async () => {
+  const tr = await ctx({ label: "Trade Republic" });
+  for (const name of ["M. RAOUL MULHEIMS", "Raoul Mulheims"]) {
+    const [r] = await mapBankTxs([inFrom(name)], tr);
+    assertEquals([r.is_transfer, r.cat, r.type], [true, "transfer", "transfer_in"]);
+  }
+  const [topup] = await mapBankTxs([inFrom("", ["Einzahlung"])], tr);
+  assertEquals([topup.is_transfer, topup.cat], [true, "transfer"]);
+  const [other] = await mapBankTxs([inFrom("Employer SA", ["Salaire"])], tr);
+  assertEquals(other.is_transfer, false);
+  for (const label of ["Spuerkeess", "BDL"]) {
+    const [r] = await mapBankTxs([inFrom("Raoul Mulheims")], await ctx({ label }));
+    assertEquals(r.is_transfer, false);
+    assert(r.cat !== "transfer");
+  }
+});
+
+Deno.test("TR merchant: shop name, never the generic card word", async () => {
+  const tr = await ctx({ label: "Trade Republic" });
+  const [a] = await mapBankTxs([parsed({ creditor: { name: "Kartenzahlung" }, remittance_information: ["Kartenzahlung Bäckerei Paul"] })], tr);
+  assertEquals(a.merchant, "Bäckerei Paul");
+  const [b] = await mapBankTxs([parsed({ creditor: { name: "Cactus" }, remittance_information: ["Kartenzahlung"] })], tr);
+  assertEquals(b.merchant, "Cactus");
+  const [c] = await mapBankTxs([parsed({ creditor: undefined, remittance_information: ["Card payment"] })], tr);
+  assertEquals(c.merchant, "");
+});
+
+Deno.test("suppressed ids are filtered before the upsert", async () => {
+  const rows = await mapBankTxs([parsed({ entry_reference: "A" }), parsed({ entry_reference: "B" })], await ctx({ label: "Trade Republic" }));
+  const kept = dropSuppressed(rows, new Set([rows[0].id]));
+  assertEquals(kept.map((r) => r.id), [rows[1].id]);
 });

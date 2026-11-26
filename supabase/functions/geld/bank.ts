@@ -6,7 +6,7 @@ import {
   type EbClient, EbError, fetchAllTransactions, type Psu, createEbClient,
 } from "./bank_api.ts";
 import {
-  accountKey, type AccountRow, BANK_LABEL, bankNotes, consentValidUntil, isStateFresh, type KnownAccount,
+  accountKey, type AccountRow, BANK_LABEL, bankNotes, consentValidUntil, dropSuppressed, isStateFresh, type KnownAccount,
   mapBankTxs, type NoteAccount, planAccounts, syncWindow,
 } from "./bank_logic.ts";
 import {
@@ -20,6 +20,7 @@ export const OWNER_ID = "a40ba59a-3460-4ef2-a8e8-3db0c91eac66";
 const REDIRECT_URL = "https://ian.lu/geld.html";
 const COUNTRY = "LU";
 const STATE_BYTES = 32;
+const LOOKUP_CHUNK = 200;
 const STALE_AUTH_DAYS = 2;
 const ACCOUNT_COLUMNS =
   "uid, bank, label, iban_last4, iban_hash, name, currency, balance, balance_at, valid_until, last_sync_at, last_error, active";
@@ -127,7 +128,25 @@ async function ownIbanHashes(): Promise<Set<string>> {
   return new Set(rows.map((r) => r.iban_hash).filter((h): h is string => !!h));
 }
 
-async function storeRows(rows: TxRow[]): Promise<{ inserted: number; updated: number }> {
+async function loadSuppressed(ids: string[]): Promise<Set<string>> {
+  const found = new Set<string>();
+  for (const part of chunk(ids, LOOKUP_CHUNK)) {
+    const hit = must<{ id: string }[]>(await admin.from("geld_tx_suppressed").select("id").in("id", part), "suppressed read");
+    for (const r of hit) found.add(r.id);
+  }
+  return found;
+}
+
+/** Pair bank copies of Trade Republic movements with pytr rows (SQL does it).
+ * Never fatal. Also called after the pytr sync. */
+export async function dedupeTrBank(): Promise<number> {
+  const { data, error } = await admin.rpc("geld_dedupe_tr_bank");
+  if (error) { console.error("geld: TR bank dedupe failed", error.message); return 0; }
+  return typeof data === "number" ? data : 0;
+}
+
+async function storeRows(all: TxRow[]): Promise<{ inserted: number; updated: number }> {
+  const rows = dropSuppressed(all, await loadSuppressed(all.map((r) => r.id)));
   const existing = await loadExisting(rows.map((r) => r.id));
   const merged = rows.map((r) => mergeRow(r, existing.get(r.id)) as TxRow);
   for (const part of chunk(merged, UPSERT_CHUNK)) {
@@ -211,6 +230,7 @@ export async function syncAccounts(uids: string[] | null, psu?: Psu) {
   }
   const { error: pairError } = await admin.rpc("geld_pair_tr_topups");
   if (pairError) console.error("geld bank: TR top-up pairing failed", pairError.message);
+  await dedupeTrBank();
   const categorised = summaries.some((s) => s.inserted > 0) ? await categorisePending() : 0;
   return {
     ok: summaries.every((s) => !s.error), accounts: summaries, categorised,

@@ -156,6 +156,18 @@ export const flow = {
     h.expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no horizontal overflow with the Konten card");
     await h.shot("konten");
 
+    h.step("Trade Republic bank account: connect button, listed, not counted twice");
+    const withoutTr = accounts;
+    accounts = [...accounts, acct("u3", "tr", "Trade Republic", "0003", 99, 60)];
+    await h.goto("/geld.html");
+    await page.waitForSelector("#accounts .g-row");
+    h.eq(await page.$$eval("#accounts .g-row", (e) => e.length), 3, "three accounts listed");
+    h.expect(await page.$('#accounts [data-connect="tr"]') !== null, "Trade Republic verbannen button");
+    h.expect(/1\.262,34\s*€/.test(await page.textContent("#cashAll")), "TR feed not added on top of the pytr cash");
+    accounts = withoutTr;
+    await h.goto("/geld.html");
+    await page.waitForSelector("#accounts .g-row");
+
     h.step("connect: button calls bank_auth, callback calls bank_session and cleans the URL");
     await page.click('#accounts [data-connect="bcee"]');
     await page.waitForFunction(() => /verbonnen ✓/.test(document.body.textContent), null, { timeout: 15000 });

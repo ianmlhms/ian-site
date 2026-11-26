@@ -23,7 +23,7 @@ const CHART = { w: 640, h: 220, padL: 8, padR: 8, padT: 14, padB: 22 };
 const MONTHS = ["Januar", "Februar", "Mäerz", "Abrëll", "Mee", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 const MONTHS_SHORT = ["Jan", "Feb", "Mäe", "Abr", "Mee", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 const BANK_FUNCTION = "geld";
-const BANKS = { bcee: "Spuerkeess", bdl: "BDL" };
+const BANKS = { bcee: "Spuerkeess", bdl: "BDL", tr: "Trade Republic" };
 const EXPIRY_WARNING_DAYS = 14;
 const DAY_MS = 86400000;
 const TR_ACCOUNT = "Trade Republic";
@@ -288,8 +288,11 @@ function headerCards() {
   const depot = state.positions.length ? positionsValue : Number(lastDaily?.depot_value) || 0;
   const gain = state.positions.length ? positionsValue - cost : 0;
   const gainPct = cost > 0 ? (gain / cost) * 100 : null;
-  const cash = lastDaily?.cash;
-  const bankTotal = state.accounts.reduce((s, a) => s + (Number(a.balance) || 0), 0);
+  /* The Trade Republic bank feed is the same money as the pytr cash: use it
+   * only while pytr has no cash figure, and never add both. */
+  const trFeed = state.accounts.find((a) => a.bank === "tr" && a.balance !== null && a.balance !== undefined);
+  const cash = lastDaily?.cash ?? (trFeed ? Number(trFeed.balance) : lastDaily?.cash);
+  const bankTotal = state.accounts.filter((a) => a.bank !== "tr").reduce((s, a) => s + (Number(a.balance) || 0), 0);
   const cashAll = state.accounts.length ? bankTotal + (Number(cash) || 0) : null;
   return `<div class="g-cards">
     <div class="g-metric"><span>Ausginn ${esc(monthLabel(state.month))}</span><b>${euro(total)}</b>

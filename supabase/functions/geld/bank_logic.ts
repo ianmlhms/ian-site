@@ -4,7 +4,7 @@ import { type BankId, type BankTx, isMainCandidate, type SessionAccount } from "
 import { clean } from "./validate.ts";
 import { merchantKey, parentsPay, type TxRow } from "./logic.ts";
 
-export const BANK_LABEL: Record<BankId, string> = { bcee: "Spuerkeess", bdl: "BDL" };
+export const BANK_LABEL: Record<BankId, string> = { bcee: "Spuerkeess", bdl: "BDL", tr: "Trade Republic" };
 export const BANK_ACCOUNT_SOURCE = "bank";
 export const STATE_MAX_AGE_MS = 30 * 60_000;
 const CLOCK_SKEW_MS = 2 * 60_000;
@@ -22,6 +22,14 @@ const NOON_UTC = "T12:00:00.000Z";
 /* Raoul is NOT listed: his transfers to Ian are pocket money (income), and
  * Ian paying him is spending unless it lands on TR (geld_pair_tr_topups). */
 const OWN_NAME = /trade republic|\bian\b/i;
+/* Trade Republic is in Raoul's name but all Ian's money, and Ian can only reach
+ * it through Raoul: money IN there from Raoul, a card top-up ("Einzahlung") or
+ * Ian himself is always an own transfer. Applies to the TR account only; on
+ * Spuerkeess/BDL Raoul stays income/spending (see OWN_NAME above). */
+export const TR_LABEL = "Trade Republic";
+const TR_OWN_IN = /raoul|mulheims|\bian\b|einzahlung|top[- ]?up/i;
+const TR_GENERIC = /^(kartenzahlung|karte|card payment|card|zahlung|payment|paiement|purchase|kauf)$/i;
+const TR_GENERIC_PREFIX = /^(kartenzahlung|card payment|paiement par carte|zahlung)\s*[-:·]?\s*/i;
 const CARD_HINT = /\b(carte|card|visa|mastercard|maestro|debit ?card|apple ?pay|google ?pay|v ?pay|paiement|pos)\b/i;
 const CARD_CODES = /^(CCRD|POS|CARD|PMNT-CCRD)/i;
 
@@ -66,6 +74,23 @@ export async function txRef(tx: BankTx): Promise<string> {
 export const counterpartyName = (tx: BankTx) => (tx.kind === "out" ? tx.creditor : tx.debtor);
 export const counterpartyIban = (tx: BankTx) => (tx.kind === "out" ? tx.creditorIban : tx.debtorIban);
 
+/** TR's PSD2 lines: the shop is in creditor.name or the remittance text, often
+ * behind a generic word ("Kartenzahlung"). Skip generic words, strip prefixes. */
+export function trMerchantOf(tx: BankTx): string {
+  const name = counterpartyName(tx);
+  const lines = tx.remittance.map((l) => l.replace(TR_GENERIC_PREFIX, "").trim()).filter((l) => l && !TR_GENERIC.test(l));
+  const named = name && !TR_GENERIC.test(name) ? name : "";
+  const text = tx.kind === "in" && named && lines.length ? `${named} · ${lines.join(" ")}` : named || lines.join(" ");
+  return clean(text.replace(/\s+/g, " "), MAX_MERCHANT);
+}
+
+export const isTrAccount = (label: string) => label === TR_LABEL;
+
+/** Own money on the TR account: in from Raoul / Einzahlung / Ian. */
+export function isTrOwnIn(tx: BankTx): boolean {
+  return tx.kind === "in" && TR_OWN_IN.test(`${tx.debtor} ${tx.remittance.join(" ")}`);
+}
+
 export function merchantOf(tx: BankTx): string {
   const name = counterpartyName(tx);
   const memo = tx.remittance.join(" ");
@@ -92,8 +117,9 @@ export async function isOwnTransfer(tx: BankTx, ownIbanHashes: ReadonlySet<strin
 const unnamedIncome = (merchant: string, kind: string) => merchant === "" && kind === "in";
 
 export async function mapBankTx(tx: BankTx, ctx: MapContext, id: string): Promise<TxRow> {
-  const own = await isOwnTransfer(tx, ctx.ownIbanHashes);
-  const merchant = merchantOf(tx);
+  const onTr = isTrAccount(ctx.label);
+  const own = (onTr && isTrOwnIn(tx)) || await isOwnTransfer(tx, ctx.ownIbanHashes);
+  const merchant = onTr ? trMerchantOf(tx) : merchantOf(tx);
   const type = own
     ? (tx.kind === "out" ? "transfer_out" : "transfer_in")
     : looksLikeCard(tx) ? (tx.kind === "out" ? "card" : "card_refund") : "other";
@@ -105,6 +131,11 @@ export async function mapBankTx(tx: BankTx, ctx: MapContext, id: string): Promis
     updated_at: ctx.nowISO,
   };
 }
+
+/** Rows whose id was suppressed (a pytr row replaced the bank copy) must not
+ * come back with the next sync. */
+export const dropSuppressed = (rows: TxRow[], suppressed: ReadonlySet<string>): TxRow[] =>
+  rows.filter((r) => !suppressed.has(r.id));
 
 /** Rows for a list of transactions. Ids are stable across syncs; two movements
  * that share an id inside one response are kept apart with a counter. */

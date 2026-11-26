@@ -3,8 +3,8 @@
  * {error}; nothing is trusted because it came from a bank. Pure. */
 import { clean } from "./validate.ts";
 
-export type BankId = "bcee" | "bdl";
-export const BANK_IDS: readonly BankId[] = ["bcee", "bdl"];
+export type BankId = "bcee" | "bdl" | "tr";
+export const BANK_IDS: readonly BankId[] = ["bcee", "bdl", "tr"];
 const STATE_RE = /^[0-9a-f]{64}$/;
 const MAX_CODE = 2000;
 const MAX_ABS_AMOUNT = 1e12;
@@ -21,7 +21,7 @@ const str = (v: unknown, max = 200) => clean(v, max);
 export function parseBankAuth(body: Obj): Result<{ bank: BankId }> {
   return BANK_IDS.includes(body.bank as BankId)
     ? { value: { bank: body.bank as BankId } }
-    : { error: "bank must be bcee or bdl" };
+    : { error: "bank must be bcee, bdl or tr" };
 }
 
 export function parseBankSession(body: Obj): Result<{ code: string; state: string }> {
@@ -37,6 +37,7 @@ export type Aspsp = { name: string; maxConsentSeconds: number | null };
 const BANK_MATCH: Record<BankId, RegExp> = {
   bcee: /caisse d.?[ée]pargne|spuerkeess/i,
   bdl: /^banque de luxembourg$/i,
+  tr: /^trade republic$/i,
 };
 
 /** The ASPSP of a bank, resolved by name from EB's list (never hardcoded). */

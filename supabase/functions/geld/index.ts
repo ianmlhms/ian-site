@@ -13,7 +13,7 @@
 //   status  {ok:bool, error?:string, needs_login?:bool}   -> {ok:true}
 //   report  {date:"YYYY-MM-DD"}                            -> numbers for the morning summary
 //   alerts  {}                                             -> {alerts:[{cat,level,spent,limit}]}
-//   bank_auth    (owner login) {bank:"bcee"|"bdl"}  -> {url}   start a bank login (Enable Banking)
+//   bank_auth    (owner login) {bank:"bcee"|"bdl"|"tr"}  -> {url}   start a bank login (Enable Banking)
 //   bank_session (owner login) {code,state}         -> {accounts,inserted}   finish it, full-history sync
 //   bank_sync    (x-sync-secret from cron, or owner login) {} -> {ok,accounts,inserted,categorised}
 //   report also returns bank_notes: [{label, problem:"expires"|"expired"|"error", days_left?, error?}]
@@ -27,7 +27,7 @@
 // EB_APP_ID + EB_PRIVATE_KEY (Enable Banking application id + PKCS#8 PEM key);
 // SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 import { secretsMatch } from "../_shared/secrets.ts";
-import { handleBankAuth, handleBankSession, handleBankSync, loadBankNotes, OWNER_ID } from "./bank.ts";
+import { dedupeTrBank, handleBankAuth, handleBankSession, handleBankSync, loadBankNotes, OWNER_ID } from "./bank.ts";
 import type { Psu } from "./bank_api.ts";
 import { admin, categorisePending, loadExisting, loadRules, must, selectAll, UPSERT_CHUNK } from "./store.ts";
 import {
@@ -106,6 +106,7 @@ async function handleSync(body: Record<string, unknown>) {
   const counts = await upsertEvents(input, nowISO);
   if (input.positions) await replacePositions(input.positions, nowISO);
   await writeDaily(input, now.getTime());
+  await dedupeTrBank();
   const categorised = await categorisePending();
   await markSyncOk(nowISO);
   return json({ ok: true, ...counts, categorised });
