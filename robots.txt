@@ -4,6 +4,14 @@ Allow: /
 # Game iframe payloads, not pages — nothing to index.
 Disallow: /pb/
 
+# Map data of the trail pages (GeoJSON tracks, GPX downloads): files, not pages.
+# Google listed 13 of them as "Gecrawlt – zurzeit nicht indexiert" (26 Nov 2026).
+# The trail pages carry all their text in the HTML, so their indexing does not depend on these.
+Disallow: /trails/geo/
+Disallow: /trails/gpx/
+Disallow: /mtb/geo/
+Disallow: /mtb/gpx/
+
 # NOTE: the private / sign-in-only pages (admin, factory, homework, hotel,
 # karts, kart, messenger, friends, exams, profile, health, money, countdowns,
 # me) are deliberately NOT disallowed here any more.
