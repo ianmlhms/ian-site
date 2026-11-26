@@ -834,7 +834,9 @@ class Fr(Text):
                 where = f"de la {nm}"
             s.append(f"Sur environ {self.n(w['along_km'])} km, le chemin longe les abords {where}.")
         if f["cross"]:
-            s.append(f"Il franchit aussi {join(['le cours d’eau ' + self.water(w) for w in f['cross']], 'fr')}.")
+            names = join([self.water(w) for w in f["cross"]], "fr")
+            noun = "le cours d'eau" if len(f["cross"]) == 1 else "les cours d'eau"
+            s.append(f"Le chemin franchit aussi {noun} {names}.")
         if f["steps"]:
             s.append("Le parcours comporte un escalier." if f["steps"] == 1 else f"Le parcours comporte {f['steps']} escaliers.")
         pr = f["profile"]
