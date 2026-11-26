@@ -4,7 +4,7 @@
  *                   (the only place the "Astegen" button shows), the exit at the top outside every station / building / low lane,
  *                   on snow, facing downhill, 15 m clear (with the page's own buildings and trees)
  *   every lift      standing still at the exit: 0 km/h for 3 s of game time with no input, not a centimetre of drift (hold)
- *   one per kind    a real ride with the keys: L 10 m outside the zone does nothing; in the zone L boards ONCE (a second L at once
+ *   one per kind    a real ride with the keys: L 31 m from the zone (out of its catchment) does not board it; in the zone L boards ONCE (a second L at once
  *                   neither skips nor boards again), the carrier comes to the station, the rider is on it, Iwwersprangen -> off at
  *                   the top station, out to the exit spot, then 0 km/h for 3 s; drag lifts: skis on the snow beside the pylons
  * Zero page errors.  FLOW_SKI_RESORTS=killy,zermatt limits the resorts. */
@@ -107,13 +107,14 @@ export const flow = {
         await page.evaluate((id) => window.__ski.goFree(id), l.id);
         await page.waitForFunction((id) => window.__ski.game.phase === "running" && window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id, l.id, { timeout: 30000 });
         const zone = await page.evaluate(() => !document.getElementById("liftBtn").hidden);
-        // 10 m out of the zone: no button, L does nothing
-        await page.evaluate(() => { const S = window.__ski, s = S.state; S.placeHold(s.x - Math.sin(s.heading) * 10 - Math.cos(s.heading) * 10, s.z + Math.cos(s.heading) * 10 - Math.sin(s.heading) * 10, s.heading); });
+        // out of this lift's boarding catchment (easier boarding, 26 Nov: 18 m round the boarding spot; ski-boarding tests inside it):
+        // no button for this lift, L does not board it
+        await page.evaluate(() => { const S = window.__ski, s = S.state; S.placeHold(s.x - Math.sin(s.heading) * 22 - Math.cos(s.heading) * 22, s.z + Math.cos(s.heading) * 22 - Math.sin(s.heading) * 22, s.heading); });
         await h.pause(350);
-        const outBtn = await page.evaluate(() => !document.getElementById("liftBtn").hidden);
+        const outBtn = await page.evaluate((id) => !document.getElementById("liftBtn").hidden && !!window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id, l.id);
         await page.keyboard.press("l");
         await h.pause(250);
-        const outRide = await page.evaluate(() => !!window.__ski.ride);
+        const outRide = await page.evaluate((id) => !!window.__ski.ride && window.__ski.ride.lift.id === id, l.id);
         await page.evaluate((id) => window.__ski.goFree(id), l.id);
         await page.waitForFunction((id) => window.__ski.game.phase === "running" && window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id, l.id, { timeout: 30000 });
         await page.keyboard.press("l");

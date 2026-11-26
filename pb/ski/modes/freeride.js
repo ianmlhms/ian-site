@@ -11,6 +11,10 @@ import { createLiftWorld } from '../lift-site.js';
 
 export const DAY = Object.freeze({ start: 9, end: 16.5, hoursPerSecond: 1 / 240 });     // one game hour = 4 real minutes
 const NEAR_ZONE = 18;          // m from a boarding zone's waiting spot: the hint where to stand (outside the zone)
+/** Easier boarding (Ian, 26 Nov: "not just that little yellow square"): within CATCH m of a lift's boarding spot (bottom; the top's
+ *  descent mat: CATCH_DOWN, so a press right after getting off up there does not send him back down) the Astegen / Erof button shows
+ *  and one press walks / slides him in (main.js approach); faster than FAST m/s (25 km/h) the button shows, a press only says slow down. */
+export const BOARDING = Object.freeze({ CATCH: 18, CATCH_DOWN: 9, FAST: 7, WALK: 4.2, MAX_S: 4 });
 const BOTTOM_RADIUS = 30;      // m from a bottom station: "the lift nearest here" for the map (round 7-B: boarding = lift-site.js zones)
 const MIN_RISE_DRAG = 2;       // m: launch fix ("every lift rideable"): the nursery rope tows (Fontany, Replat, Balmengrat: 4-5 m) ride too
 const MIN_RISE = 8;            // m: lower lifts (flat links) are not ridden (round 7-B: was 25; magic carpets ride from 15 m long)
@@ -87,6 +91,53 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     for (const l of list) { const s = world.sites.get(l.index); if (!s) continue; const d = Math.hypot(s.wait.x - x, s.wait.z - z); if (d < bd) { bd = d; best = l; } }
     return best;
   }
+  /** Easier boarding: the lift whose boarding spot (bottom) or descent mat (top) is nearest (x, z) within the catchment, as
+   *  { lift, down, d }, or null. The skier's own zone always wins (boardingAt / descentAt). */
+  function catchAt(x, z) {
+    const inB = world.boardingAt(x, z);
+    if (inB !== null && byIndex.get(inB)) return { lift: byIndex.get(inB), down: false, d: 0 };
+    const inD = world.descentAt(x, z);
+    if (inD !== null && byIndex.get(inD)) return { lift: byIndex.get(inD), down: true, d: 0 };
+    let best = null;
+    for (const l of list) {
+      const s = world.sites.get(l.index);
+      if (!s) continue;
+      if (Math.abs(s.wait.x - x) < BOARDING.CATCH && Math.abs(s.wait.z - z) < BOARDING.CATCH) {
+        const d = Math.hypot(s.wait.x - x, s.wait.z - z);
+        if (d < BOARDING.CATCH && (!best || d < best.d)) best = { lift: l, down: false, d };
+      }
+      if (s.down) {
+        const d = Math.hypot(s.down.wait.x - x, s.down.wait.z - z);
+        if (d < BOARDING.CATCH_DOWN && (!best || d < best.d)) best = { lift: l, down: true, d };
+      }
+    }
+    return best;
+  }
+  /** Easier boarding: the way from (x, z) to the lift's boarding spot (bottom) / descent mat (top): straight, or round one corner
+   *  (points 4-12 m from the spot), every 0.5 m clear of station parts, pylons, buildings and trees (tree(x, z), optional).
+   *  Returns [{ x, z }, ..., spot] or null. height(x, z) = the snow. */
+  function guideWay(lift, down, from, height = heightAt, tree = null, ground = height) {      // (ground: the stations' own, as main.js world.hit)
+    const site = world.sites.get(lift.index);
+    if (!site || (down && !site.down)) return null;
+    const to = down ? site.down.wait : site.wait;
+    const clear = (A, B) => {
+      const d = Math.hypot(B.x - A.x, B.z - A.z), n = Math.max(1, Math.ceil(d / 0.15));      // (posts are 12 cm thick)
+      for (let k = 1; k <= n; k++) {
+        const x = A.x + (B.x - A.x) * k / n, z = A.z + (B.z - A.z) * k / n;
+        if (world.hit(x, z, 0.3, height(x, z), ground) || world.inBuilding(x, z, 0.2) || (tree && tree(x, z))) return false;
+      }
+      return true;
+    };
+    if (clear(from, to)) return [{ x: from.x, z: from.z }, { ...to }];
+    let best = null, bl = Infinity;
+    for (const r of [4, 7, 10, 13]) for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2, P = { x: to.x + Math.cos(a) * r, z: to.z + Math.sin(a) * r };
+      const L = Math.hypot(P.x - from.x, P.z - from.z) + r;
+      if (L >= bl || world.hit(P.x, P.z, 0.3, height(P.x, P.z), ground) || world.inBuilding(P.x, P.z, 0.2) || (tree && tree(P.x, P.z))) continue;
+      if (clear(from, P) && clear(P, to)) { best = [{ x: from.x, z: from.z }, P, { ...to }]; bl = L; }
+    }
+    return best;
+  }
   function nearestBottom(x, z, radius = BOTTOM_RADIUS) {
     let best = null, bd = radius;
     for (const l of list) { const d = Math.hypot(l.bottom.x - x, l.bottom.z - z); if (d < bd) { bd = d; best = l; } }
@@ -99,7 +150,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
   }
   const byIndex = new Map(list.map((l) => [l.index, l]));
   return {
-    list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, downAt, descentAt, bottomExit, nearZone, nearestBottom, nearestTop, paths,
+    list, byId: new Map(list.map((l) => [l.id, l])), byIndex, startAt, boardAt, boardingAt, downAt, descentAt, bottomExit, catchAt, guideWay, nearZone, nearestBottom, nearestTop, paths,
     get world() { return world; },
     setBuildings(rows) { world = createLiftWorld(paths, { buildings: rows, cutsFrom: world }); return world; },
   };
@@ -135,7 +186,7 @@ export function spawnLift(lifts, places, near = null) {
 /** The run of a whole-area free ride. pistes = createPisteSet, lifts = createLiftNet. */
 export function createFreeRun({ resort, pistes, lifts, start, stats: shared = null }) {
   const stats = shared || { distance: 0, vertical: 0, lifts: 0, top: 0, time: 0, off: 0 };       // off: metres skied off the piste (round 6: the Powder ski)
-  let safe = { x: start.x, z: start.z, heading: start.heading }, safeT = 0, lastX = start.x, lastY = null, lastZ = start.z, atLift = null, atDown = null, atNear = null, current = null, nearT = 99;
+  let safe = { x: start.x, z: start.z, heading: start.heading }, safeT = 0, lastX = start.x, lastY = null, lastZ = start.z, atLift = null, atDown = null, atFast = false, atNear = null, current = null, nearT = 99;
   const run = {
     mode: 'freeride', timed: false, gates: [], checkpoints: [], stats,
     get piste() { return current; }, get progress() { return 0; }, get elapsed() { return stats.time; }, get finished() { return null; }, get penalty() { return 0; }, get ms() { return 0; },
@@ -156,10 +207,12 @@ export function createFreeRun({ resort, pistes, lifts, start, stats: shared = nu
       lastX = state.x; lastZ = state.z; lastY = state.grounded ? state.y : lastY;
       safeT += dt;
       if (safeT > SAFE_EVERY && state.grounded && state.crash === 0 && state.speed > 1) { safeT = 0; safe = { x: state.x, z: state.z, heading: Math.atan2(state.vz, state.vx) }; }
-      const lift = state.speed < 6 && !state.ride ? lifts.boardingAt(state.x, state.z) : null;      // round 7-B: only in the zone
-      // ride down: on a top station's descent mat
-      const downLift = !lift && state.speed < 6 && !state.ride && lifts.descentAt ? lifts.descentAt(state.x, state.z) : null;
-      if (lift !== atLift || downLift !== atDown) { atLift = lift; atDown = downLift; events.push({ type: 'lift', lift: lift || downLift, down: !!downLift }); }
+      // easier boarding (26 Nov): within the catchment of a lift's boarding spot / descent mat the button shows (a press guides him
+      // in); faster than BOARDING.FAST it shows too, the press only asks him to slow down. (Was: only inside the zone, < 6 m/s.)
+      const c = !state.ride && lifts.catchAt ? lifts.catchAt(state.x, state.z) : null;
+      const lift = c && !c.down ? c.lift : null, downLift = c && c.down ? c.lift : null;
+      const fast = !!c && state.speed > BOARDING.FAST, guided = !!c && c.d > 0;
+      if (lift !== atLift || downLift !== atDown || fast !== atFast) { atLift = lift; atDown = downLift; atFast = fast; events.push({ type: 'lift', lift: lift || downLift, down: !!downLift, fast, guided }); }
       // launch fix (Ian stood beside a lift and found no way on): slow near a bottom station but not in its zone: say where it is
       const near = !lift && state.speed < 3 && !state.ride ? lifts.nearZone(state.x, state.z, NEAR_ZONE) : null;
       if (near !== atNear) { atNear = near; if (near) events.push({ type: 'lift', lift: null, near }); }

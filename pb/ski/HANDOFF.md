@@ -2048,3 +2048,20 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
   no jump, goes down facing downhill, never touches a pylon / part / tree, bottom exit outside stations / buildings / lanes / trees,
   slope <= 0.6, 5 s still); r7d-test (wire codes); flow `ski-ride-down` (Via Lattea: list Erof, the mat, L, the cabin down, wire 12,
   HUD, clock, no map on the lift, off at Cesana standing still; a chair down with Iwwersprangen). Shots ~/Library/Caches/ski-work/ride-down/.
+
+## Easier boarding (26 Nov 2026, phase 2 of the ride-down round; Ian: "make climbing in lifts easier, not just that little yellow square")
+- **Catchment** (`freeride.js BOARDING`, `lifts.catchAt(x, z)`): within 18 m of a lift's bottom boarding spot (9 m of a top's descent mat,
+  so a press right after getting off up there does not send him back down) the button "⬆ Astegen: <lift>" / "⬇ Erof: <lift>" shows
+  (the zone itself always wins); the free run's lift event carries `fast` / `guided`. Faster than 7 m/s (25 km/h) the button shows, a
+  press only says "Ze séier: brems fir anzesteigen" (no boarding while skiing past).
+- **Walked in** (main.js `startApproach` / `stepApproach`, phase `approach`): one press = the game slides him along `lifts.guideWay`
+  (straight, or round one corner 4-13 m from the spot; every 15 cm clear of station parts / pylons / houses at the stations' own ground,
+  round the trees if it can) to the zone's waiting spot in <= 4 s (`BOARDING.WALK` 4.2 m/s), then boards as before (chair gates, belt,
+  cabin walk-in unchanged). A second press during the walk skips to the spot. Fast travel / a map / a teleport during the walk end it.
+  No precise steering on the iPad any more; the zones, exits and queue spots did NOT move (the station agent's footprint is untouched).
+- **Tests**: flow `ski-boarding` (SKI_BOARDING_RESORTS, default killy,vialattea,arlberg: chair / cabin / drag from 12 m out, the game's
+  own way sampled every 5 cm against the parts, the second press, 31 km/h = no boarding, 31 m out = no button, next to a descent mat);
+  `ski-lifts-all` now places the "outside" test 31 m out (out of the catchment). Shots ~/Library/Caches/ski-work/boarding/.
+- **Not done yet (phase 2 leftovers, for the next agent)**: the queue MAZE (rope posts / lanes merging to the gate, npc.js queue spots on
+  the lanes, shuffling forward, boarding in groups by seats; the player led through the lanes by guideWay = a way through the maze);
+  boarding animations polish (cabin doors closing, T-bar grab readability); evening lights / station look are the station agent's.

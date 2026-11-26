@@ -25,7 +25,7 @@ export function createModeHost(ctx) {
   const challenges = new Map();
   const challengeOf = (p) => { if (!p || p.id === 'park') return null; let c = challenges.get(p.id); if (!c) { c = challengeFor(p, field.farHeight); challenges.set(p.id, c); } return c; };
   const lifts = createLiftNet(resort, field.farHeight, pistes);
-  let liftDown = false;
+  let liftDown = false, liftFast = false;
   let tracker = null, flags = null, judge = null, parkView = null, freeRun = null, clock = null, minimap = null, liftAt = null, parkBest0 = 0, clock0 = null;
   let parkHintT = 0;
   const freeHud = createFreeHud(hud.el, { onLift: () => ctx.onRideUp(), onSkis: () => ctx.onSkis && ctx.onSkis() });
@@ -165,8 +165,9 @@ export function createModeHost(ctx) {
     freeEvent(ev) {
       if (ev.type === 'lift' && ev.near) { if (!liftAt) hud.toast(`${ev.near.name}: op déi giel Plaz fueren fir anzesteigen`, 2600); return; }
       if (ev.type === 'lift') {
-        liftAt = ev.lift; liftDown = !!(ev.lift && ev.down); freeHud.lift(ev.lift, liftDown);
-        if (ev.lift) hud.toast(liftDown ? `${downPhrase(ev.lift)}: ${ev.lift.name}` : `Lift: ${ev.lift.name}`, liftDown ? 2000 : 1200);
+        const was = liftAt;
+        liftAt = ev.lift; liftDown = !!(ev.lift && ev.down); liftFast = !!ev.fast; freeHud.lift(ev.lift, liftDown);
+        if (ev.lift && ev.lift !== was) hud.toast(liftDown ? `${downPhrase(ev.lift)}: ${ev.lift.name}` : `Lift: ${ev.lift.name} (L / Enter)`, liftDown ? 2000 : 1400);
       }
     },
     /** HUD tick (10 Hz): the park score / the free ride block and minimap and light. */
@@ -184,6 +185,8 @@ export function createModeHost(ctx) {
     get liftAt() { return liftAt; },
     /** Ride down: the lift at hand is boarded at its top, to ride down. */
     get liftDown() { return liftDown; },
+    /** Easier boarding: the skier is in the catchment but faster than BOARDING.FAST (the press only asks him to slow down). */
+    get liftFast() { return liftFast; },
     /** Ride the lift at hand: the day clock moves on by its ride time; returns the start spot at its top (or null). */
     rideUp() {
       if (!freeRun || !liftAt) return null;                     // round 6: the lifts never close (free ride is the main game)

@@ -50,7 +50,7 @@ import { createRide, createDescent, rideCamera, RIDE } from './modes/liftride.js
 import { createCarrier } from './modes/carriers.js';
 import { createMarkers, markerList, MARKER, promptable } from './modes/markers.js';
 import { SKI_BY_ID, DEFAULT_SKI, skiParams, addSkiStats, skiOpen } from './modes/skis.js';
-import { spawnLift, startHourFor } from './modes/freeride.js';
+import { spawnLift, startHourFor, BOARDING } from './modes/freeride.js';
 import { createLook, applyLook, createCameraGuard, buildingBoxes, createBoxIndex } from './look.js';      // R7-A: free look + camera collision
 import { pisteStars, specialText } from './modes/challenges.js';
 // R7-C: map teleport to discovered places + the first-lift spawn, first person, snow spray, avalanches, the challenge course
@@ -555,6 +555,7 @@ async function boot() {
   }
   // ---- round 6: lift rides ----
   let ride = null, carrier = null, rideView = 'chase', rideCam = null, skipping = false;
+  let approach = null;                                                       // easier boarding: being walked in (startApproach)
   const rideHud = createRideHud(hud.el, { onSkip: () => skipRide(), onView: () => toggleRideView() });
   const outfitOpen = (o) => modes.outfitOpen(o);
   const starsText = (p) => { const m = modes.pisteInfo(p).mask; return [1, 2, 4].map((b) => (m & b ? '★' : '☆')).join(''); };
@@ -638,6 +639,7 @@ async function boot() {
     location.reload();
   }
   function showMap() {
+    if (approach) return;                                                     // (being walked in: a moment)
     if (ride) { hud.toast(ride.down ? 'Am Lift: d\'Kaart gëtt et ënnen' : 'Am Lift: d\'Kaart gëtt et uewen'); return; }
     // round 6: over a free ride the map is a pause overlay ("Weiderfueren" goes on where the skier stood)
     const resumable = game.screen === 'ski' && game.mode === MODES.freeride && game.phase === 'running' && !!modes.freeRun;
@@ -974,15 +976,61 @@ async function boot() {
   /** Round 6 / R7-B: board the lift at hand (the skier stands in its boarding zone): one press = one boarding. The ride walks / skates
    *  him to the loading line, the next carrier of the lift's own loop picks him up there, up the real line, off at the top station, out
    *  to the exit spot (lift-site.js), and he stands still there until the player moves (game.hold). */
-  function boardLift() {
+  /** Easier boarding (Ian, 26 Nov: "not just that little yellow square"): a press anywhere in the catchment (freeride.js BOARDING)
+   *  first walks / slides him to the boarding spot along a clear way (a few seconds; a second press skips it), then boards. */
+  function startApproach(lift, down) {
+    const st = game.state;
+    // (round the trees if it can; a way only past a trunk beats no way: the station parts and houses are never crossed)
+    const way = modes.lifts.guideWay(lift, down, { x: st.x, z: st.z }, standHeight, (x, z) => !!scatter.hit(x, z, 0.35, -1e9, quality.treeDensity), surfaceAt) || modes.lifts.guideWay(lift, down, { x: st.x, z: st.z }, standHeight, null, surfaceAt);
+    if (!way) { hud.toast(`${lift.name}: op déi giel Plaz fueren`, 2200); return false; }
+    const cum = [0];
+    for (let n = 1; n < way.length; n++) cum.push(cum[n - 1] + Math.hypot(way[n].x - way[n - 1].x, way[n].z - way[n - 1].z));
+    const L = cum[cum.length - 1];
+    approach = { lift, down, way, cum, L, t: 0, dur: Math.min(BOARDING.MAX_S, Math.max(0.5, L / BOARDING.WALK)), h0: st.heading, h1: way[way.length - 1].heading };
+    game.phase = 'approach'; game.hold = false;
+    input.setEnabled(false);
+    document.documentElement.dataset.skiApproach = '1';
+    stepApproach(0);
+    return true;
+  }
+  function stepApproach(dt) {
+    const a = approach;
+    a.t = Math.min(a.dur, a.t + dt);
+    const k = a.t / a.dur, m = (k * k * (3 - 2 * k)) * a.L;
+    let n = 1;
+    while (n < a.way.length - 1 && a.cum[n] < m) n++;
+    const A = a.way[n - 1], B = a.way[n], f = (m - a.cum[n - 1]) / ((a.cum[n] - a.cum[n - 1]) || 1);
+    const x = A.x + (B.x - A.x) * f, z = A.z + (B.z - A.z) * f;
+    const hSeg = Math.atan2(B.z - A.z, B.x - A.x), d = (h0, h1, w) => h0 + Math.atan2(Math.sin(h1 - h0), Math.cos(h1 - h0)) * Math.max(0, Math.min(1, w));
+    const heading = k > 0.85 ? d(hSeg, a.h1, (k - 0.85) / 0.15) : d(a.h0, hSeg, a.t / 0.35);
+    const v = a.L / a.dur * (k < 0.85 ? 1.15 * Math.min(1, a.t / 0.3) : 0.5);
+    game.state = { ...createSkierState(x, z, heading, standHeight(x, z)), vx: Math.cos(heading) * v, vz: Math.sin(heading) * v, speed: v, walk: m };
+    if (a.t >= a.dur) {
+      approach = null;
+      document.documentElement.dataset.skiApproach = '';
+      placeAt(x, z, a.h1);
+      game.phase = 'running';
+      input.setEnabled(true);
+      if (modes.freeRun) modes.freeRun.moved({ x, z, heading: a.h1 });
+      boardLift({ lift: a.lift, down: a.down });
+    }
+  }
+  function boardLift(guided = null) {
+    if (approach) { stepApproach(approach.dur); return; }               // a second press: straight to the spot
     if (game.mode !== MODES.freeride || game.phase !== 'running' || ride || game.paused) return;
-    const lift = modes.liftAt, down = !!modes.liftDown;
+    const lift = guided ? guided.lift : modes.liftAt, down = guided ? guided.down : !!modes.liftDown;
     if (!lift) return;
     const view = buildLifts();
     const path = view.pathOf(lift.index), site = view.siteOf(lift.index);
     if (!path || !site) { hud.toast('Dëse Lift fiert net'); return; }
     const st = game.state;
-    if (down ? !(site.down && site.down.inZone(st.x, st.z)) : !site.inZone(st.x, st.z)) return;      // only from inside the zone (no jump onto the line)
+    const inZone = down ? !!(site.down && site.down.inZone(st.x, st.z)) : site.inZone(st.x, st.z);
+    if (!inZone) {                                                            // easier boarding: guided in from the catchment
+      if (guided) return;
+      if (st.speed > BOARDING.FAST) { hud.toast('Ze séier: brems fir anzesteigen', 1600); return; }
+      startApproach(lift, down);
+      return;
+    }
     const height = standHeight;                                               // R8b: the walk to the loading line is on the deck
     const tree = (x, z) => !!scatter.hit(x, z, 0.4, -1e9, quality.treeDensity);
     if (down) {
@@ -1068,6 +1116,7 @@ async function boot() {
   /** R8b (3V QA: a stale "Funiculaire …" ride line stayed on the HUD): a ride cut short by a fast travel / teleport / challenge / park
    *  start ends cleanly (no carrier, no ride HUD, the lift's own loop takes its carrier back). */
   function dropRide() {
+    if (approach) { approach = null; document.documentElement.dataset.skiApproach = ''; if (game.phase === 'approach') game.phase = 'running'; input.setEnabled(true); }
     if (!ride) return;
     const r = ride;
     ride = null; skipping = false;
@@ -1298,6 +1347,7 @@ async function boot() {
         if (game.countdown <= 0) { audio.event('go'); game.phase = 'running'; document.documentElement.dataset.skiRunning = '1'; setTimeout(() => hud.count(''), 700); mark('go'); pushStart(); }
       }
       if (game.phase === 'lift' && ride) stepRide(dt * timescale);               // round 6: riding a lift
+      else if (game.phase === 'approach' && approach) stepApproach(dt * timescale);      // easier boarding: walked in
       if (game.phase === 'running' || game.phase === 'finished') {
         const plan = planSteps(acc, dt, timescale);
         acc = plan.acc;
