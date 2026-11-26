@@ -27,7 +27,7 @@ const OWN_NAME = /trade republic|\bian\b/i;
  * Ian himself is always an own transfer. Applies to the TR account only; on
  * Spuerkeess/BDL Raoul stays income/spending (see OWN_NAME above). */
 export const TR_LABEL = "Trade Republic";
-const TR_OWN_IN = /raoul|mulheims|\bian\b|einzahlung|top[- ]?up/i;
+const TR_OWN_IN = /raoul|\bian\b|einzahlung|top[- ]?up/i;
 const TR_GENERIC = /^(kartenzahlung|karte|card payment|card|zahlung|payment|paiement|purchase|kauf)$/i;
 const TR_GENERIC_PREFIX = /^(kartenzahlung|card payment|paiement par carte|zahlung)\s*[-:·]?\s*/i;
 const CARD_HINT = /\b(carte|card|visa|mastercard|maestro|debit ?card|apple ?pay|google ?pay|v ?pay|paiement|pos)\b/i;

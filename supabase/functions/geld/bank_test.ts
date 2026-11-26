@@ -338,3 +338,9 @@ Deno.test("suppressed ids are filtered before the upsert", async () => {
   const kept = dropSuppressed(rows, new Set([rows[0].id]));
   assertEquals(kept.map((r) => r.id), [rows[1].id]);
 });
+
+Deno.test("TR own-money rule does not cover other family members", async () => {
+  const tx = parsed({ credit_debit_indicator: "CRDT", creditor: undefined, debtor: { name: "M. QUINN MULHEIMS" }, remittance_information: ["Kino"] });
+  const [row] = await mapBankTxs([tx], await ctx({ label: "Trade Republic" }));
+  assertEquals(row.is_transfer, false);
+});
