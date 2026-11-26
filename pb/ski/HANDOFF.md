@@ -2065,3 +2065,51 @@ piste map looked at, traced or copied). The old plan from above stays one tap aw
 - **Not done yet (phase 2 leftovers, for the next agent)**: the queue MAZE (rope posts / lanes merging to the gate, npc.js queue spots on
   the lanes, shuffling forward, boarding in groups by seats; the player led through the lanes by guideWay = a way through the maze);
   boarding animations polish (cabin doors closing, T-bar grab readability); evening lights / station look are the station agent's.
+
+## Station look (26 Nov 2026; Ian: "more beautiful the stations")
+Only the station buildings changed (geometry / materials); boarding zones, mats, gates, belts, descent mats, queues, carrier paths and exits
+are where they were (every new part is drawn only, never solid, inside the end's old footprint).
+- **Roofs** (`lift-site.js`, part flag `shape`: `gableA` ridge along the line, `gableB` across it, `bevel` a soft snow cap; drawn by
+  `station-mesh.js shapeGeometry`, the box stays the part's bounds for pruning / floating / tests): chair canopy = a low steel gable over
+  the bull-wheel with snow, the drive house on its ridge (+ its own snow gable); operator huts and drag huts = timber gable roofs with
+  snow; gondola hall = ONE big gable over hall, platform overhang and front (the drive house on the flat roof is gone: under the roof);
+  cable-car machine house = larch clad, gable roof across; dock roof = bevelled snow cap; funicular hall = gable roof. A neighbour's
+  carriers grazing a gable flatten it to 0.3 m (`pruneCrossings`, recorded as a shift) before it is cut.
+- **Dressing** (`stations.js dressEnd`, pure, called by `createLiftSite` per end; parts flagged `near` go to `ski-lift-near-*` 640 m
+  cells drawn within 250 m, the rest stays in the station chunks): chair: fascia boards round the canopy, lamps under it over the outer
+  platform, a lamp bar over the name sign, the hut's stone plinth, framed windows (lane + line side), door + lamp. Gondola: a glazed gable
+  front with mullions, a lit window in the back gable, sign lamp. Cable car: plinth, window bands (3 faces), door + lamp, a glazed
+  clerestory hung from the dock roof's return edge (from 2.7 m: the ride-down walk passes under it), a glass band over the front above the
+  cabins. Funicular: glazed gable front, clerestory, a fascia with the lift's NAME (new sign), lamps over the platform, its white edge.
+  Drag / rope tow huts: plinth, framed window, door + lamp, a window towards the line. Bull-wheels > 0.8 m get a lighter rim disc (near).
+- **Rules the dressing keeps** (station-diag.mjs checks them all): touches a standing part (`dropFloating` now repeats after cutting a
+  post that only held a cut roof: a fascia on those posts floated); the part LIST never depends on the heights (`applyCuts` repeats the
+  first world's cuts by index: a height-dependent `if` broke Davos Schiferbahn 2's cut back wall in round7b); nothing in the lift's OWN
+  carriers' path (new check; the gondola front overhang now only reaches as far as the leaving cabins clear it, `ropeTop`; that also
+  removed most old hits: 246 -> 19 over 10 resorts, the rest are old roofs / posts where the rope climbs steeply out of a hall).
+- **Evening** (`station-mesh.js stationMaterial` = vertex-coloured Lambert + `aGlow`): panes (default 0.45, dressing 0.5-0.9) and lamps
+  (1.1-1.6) add the env's `uGlow` warm light (the village windows' term); snow (`aGlow` -1) keeps the light grey-blue of the village roofs
+  in the evening shade instead of slate. Same chunks, same draw calls; `createLifts({ env })` (main.js passes it).
+- **Foundations**: a deck above the snow stands on rough stone with a darker footing course and a concrete edge band (lifts.js `foundation`).
+- **Gondola cabins slow down in the hall** (lifts.js `hallWarp` / `HALL_SLOW`): the pool draws each cabin at a monotone remap of its
+  loop parameter (0.34 x line speed in a hall + ramp, the line <= 12 % faster), anchored at the bottom loading point; a lift the player
+  rides eases back to the plain loop in 0.9 s (his own cabin is drawn by the ride; the neighbours never come closer than in a hall).
+  NOT applied to the player's own cabin (liftride.js / carriers.js are the other agent's): it crosses the hall at line speed.
+- **Checks**: `node scripts/ski/station-diag.mjs <rid> zzz` now also prints `drawn parts in the lift's own carriers' path` and `frames
+  whose part list depends on the heights` (both must not grow; the latter 0). Shots: `scripts/ski/station-look-shots.mjs` (SHOT_LIFTS,
+  views zone = the real chase camera in the boarding zone, near = a skier 25 m out, top; midday + evening) through shot.mjs --script.
+- **Results** (26 Nov): station-diag all 10 resorts floating 0, unheld 0, part lists height-independent; own-carrier-path parts
+  246 -> 19 (old). Node: r8c-node-all (round7b 24601, round7 43, round6 3457, look7d 134, r7d 1452, r8c 36531, round7c 250 + --rides 290,
+  speed 178, deadend, harness x10), review 37, camera 15: green. calls-sweep7d (Niddreg, all spots) before -> after worst calls / max
+  triangles: killy 145 -> 146 / 408k -> 413k, 3V 144 -> 144 / 445.9k -> 446.6k (the tightest: 3.4k under 450k), zermatt 131 -> 133 /
+  348k -> 352k, arlberg 141 -> 143, kronplatz 138 -> 141, vialattea 138 -> 141, obertauern 136 -> 138, livigno 139 -> 140, davos 129 ->
+  131, laax 130 -> 132 (p95 +1). First play: +~10 KB gzip of JS (stations.js 3.9, station-mesh.js 2.6, the rest diffs), < 0.5 %.
+  Chromium flows ski, ski-lift, ski-freeride PASS; ski-lifts-all PASS at full quality (power mode: 3V Pralong 0.155 m / Zermatt Du Col
+  0.34 m drift after the exit at 30 fps, both 0.000 m in the full-quality rerun; no station part there changed).
+  After the rebase on the easier-boarding round: Chromium ski-lift, ski-boarding PASS; WebKit ski, ski-webkit PASS. memory-check all
+  green (killy revisits +29 MB, 3V -4 MB, limit 50).
+  Shots (iPad 1080 x 810 @2, midday + evening, zone / near / top; Killy chair 6, gondola 37, cable 16, funicular 81, drag 23; Arlberg
+  7, 22, 29, 60; Davos 7, 29, 10, 53, 8): `~/Library/Caches/ski-work/stations/{before,after2}/sheet-<rid>-<lift>.jpg`.
+- **Still open**: the player's own gondola cabin crosses the hall at line speed (liftride / carriers own it: `lifts.js hallWarp` could
+  be shared); summit landmark variants untouched; the dressing is our own type model, not the real buildings; funicular clerestories hang
+  as a tall glass band where the track climbs steeply through the hall (Parsennbahn 1); 3V Niddreg triangles 3.4k under the budget.
