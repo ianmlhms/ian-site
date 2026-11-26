@@ -16,7 +16,6 @@ import { loadWeekly, countdownText, weeklyGameLabel } from "./arcade-weekly.js?v
 import "./quick-open.js?v=14"; // same URL theme.js loads, so this is the same module instance
 
 const TESTER_CLASS = "4C6";
-const ARCADE_APP = "pixelbreak.html";
 const GATES_KEY = "homeGates";
 const WEEKLY_KEY = "homeWeekly";
 const WEEKLY_TIMEOUT_MS = 5000;
@@ -221,10 +220,9 @@ function setThumb(img, gameId) {
 function renderWeekTile(url) {
   setThumb($("gtWeekTileImg"), weekly.gameId);
   $("gtWeekTile").href = url;
-  $("gtWeekTile").dataset.game = weekly.gameId;
   $("gtWeekTileName").textContent = gameName(weekly.gameId);
   $("gtWeekTileKick").removeAttribute("data-i18n");
-  $("gtWeekTileKick").textContent = t("home.weekKick");
+  $("gtWeekTileKick").textContent = `🏆 ${t("home.weekKick")}`;
   $("gtWeekTile").title = countdownText(weekly.endsAt);
 }
 
@@ -239,7 +237,6 @@ function renderWeek() {
   setThumb($("gtWeekImg"), weekly.gameId);
   $("gtWeekShot").href = url;
   $("gtWeekPlay").href = url;
-  $("gtWeekPlay").dataset.game = weekly.gameId;
   $("gtWeekName").textContent = gameName(weekly.gameId);
   $("gtWeekKick").setAttribute("data-i18n", "home.weekKick");
   $("gtWeekKick").textContent = t("home.weekKick");
@@ -270,6 +267,11 @@ async function loadWeek(sbPromise) {
   }
 }
 
+function renderAllGames() {
+  const count = Number($("gtAll").dataset.count);
+  $("gtAllText").textContent = t("home.allGames").replace("{n}", String(count));
+}
+
 /* ---------------- boot ---------------- */
 let refreshRun = 0;
 
@@ -288,6 +290,7 @@ async function refresh(sbPromise) {
 function boot() {
   applyGates(cachedGates(storedSession()?.user?.id));
   renderGreeting();
+  renderAllGames();
   weekly = cachedWeekly();
   if (weekly) { renderWeek(); markWeekLoaded(); }
   startClock();
@@ -297,12 +300,9 @@ function boot() {
   $("gtFree").addEventListener("click", openAuthModal);
   document.addEventListener("click", (event) => {
     const link = event.target.closest?.("a[data-app]");
-    if (!link) return;
-    recordUsage(link.dataset.app);
-    // a game: also under its own key, "Weider spillen" (home-games.js) puts the last opened one first
-    if (link.dataset.game && link.dataset.app === ARCADE_APP) recordUsage(`${ARCADE_APP}?g=${link.dataset.game}`);
+    if (link) recordUsage(link.dataset.app);
   });
-  document.addEventListener("i18n:change", () => { renderGreeting(); renderWeek(); });
+  document.addEventListener("i18n:change", () => { renderGreeting(); renderAllGames(); renderWeek(); });
   setInterval(() => { renderGreeting(); renderWeek(); }, MINUTE_MS);
 
   const sbPromise = client().catch((error) => {
