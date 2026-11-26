@@ -2113,3 +2113,47 @@ are where they were (every new part is drawn only, never solid, inside the end's
 - **Still open**: the player's own gondola cabin crosses the hall at line speed (liftride / carriers own it: `lifts.js hallWarp` could
   be shared); summit landmark variants untouched; the dressing is our own type model, not the real buildings; funicular clerestories hang
   as a tall glass band where the track climbs steeply through the hall (Parsennbahn 1); 3V Niddreg triangles 3.4k under the budget.
+## Lift lines + boarding animations (26 Nov 2026, branch `ski-queues`; Ian: "rework the climbing in and lift lines before boarding")
+- **The maze** (`lift-queue.js` createQueueMaze, pure): at the busy lifts (`mazeSpec`: chairs 3+ seats, gondolas / funitels, cable cars,
+  trains; none at drag lifts, rope tows, carpets, 2-seat chairs) on the outer side (+b) of the bottom zone: 1-3 queue lanes + 1 free lane
+  (the +a one, blue tape: "Single", nobody queues in it), straight, merging over the last 2.6 m to the zone's width, rope (belt tape)
+  lines on posts every <= 2.4 m. The head line = just beyond whatever deck / platform the station has in front of the zone (read from the
+  parts, so a new station design moves it; a barrier part in the maze or between a lane head and the zone = no maze). Ground: <= 2.4 m rise,
+  the head <= 1.1 m below the deck; else 72 % / 50 % of the length, else none. `lift-site.js createLiftWorld` builds it AFTER the buildings
+  and keeps it only where no other station frame, low lift lane, pylon or kept house is (`mazeFree`), then puts it in the grid as a frame
+  of its own (`site.queue`; NOT in frames(site), so lifts.js does not draw it): skier collisions (posts + ropes are solid over the
+  ground's whole rise), the others' clear bands, exits and trees keep out of it. 306 of 398 busy lifts have one (queue-check prints the
+  reasons for the rest: steep 164 / head below the deck 138 / station 64 / no way in 48 tries).
+- **Drawn** by `queue-view.js`: ONE instanced unit box (posts, caps, feet within 120 m, tapes; instanceColor) for every maze within 260 m
+  of the camera (+1 draw call only when one is near; rebuilt on 25 m moves / every 2 s), from `modes.lifts.world` (the world with houses).
+- **The line** (`lift-queue.js createQueueSim`, run by npc.js for the nearest mazes, `NPC.levels.*.lines` 26 / 40 / 56 people, the nearest
+  maze always whole): loop lifts by the carriers' lattice (`lifts.latticeA`; carrier n reaches the loading line at phi = n): ONE GROUP PER
+  CARRIER (size by seats / cabin spots x the day's share, deterministic), the same people npc.js `riders()` seats on that chair / stands in
+  that cabin (count, seats, outfits: `groupOf`). Lane FIFO (group k in lane k mod lanes), people 1.15 m apart, the file steps up after the
+  group ahead left (ripple), into the zone when the group ahead has left its spots, (chairs) through the gate single file, the first to the
+  farthest seat, onto the loading line, (cabins) to the door spots; gone the instant their carrier reaches the line (no shrink-out). The
+  chair gate opens for them (`crowd.gates` -> main.js `lineGates` -> `lifts.setGate`). Jig-back lifts (`lifts.shuttleClock`): while the
+  cabin is docked 3-4 per lane walk in, lanes in turn.
+- **The player**: `freeride.js guideWay` leads him through the free lane (already in a lane: along it); main.js `startApproach` walks him to
+  2.2 m short of the zone, he waits there while the group ahead is still in the zone (`crowd.lineInfo.clearIn`, <= 6 s, then they are
+  cleared), then in; his carrier comes after theirs (`lineInfo.after`). While he is led in / boards / stands in the zone (`lineHold`), no new
+  group enters the zone: their carriers go up empty (reserved, keyed so the waiting groups keep their identity). A second press = in at once
+  (the group in the zone goes). Never stuck: no line = the old walk.
+- **Boarding animations** (`modes/liftride.js` CABIN / PULL / BAR, `modes/carriers.js`): cabins (gondola, funitel, cable car): he walks
+  to the door spot on the platform BESIDE the cabin (no longer onto its lane), it docks with its doors opening (two leaves slide apart:
+  the player's cabin has a door gap on the boarding side, `createCarrier({ doorSide: path.sign })`, `w.doorK`), he walks in, they close, it
+  pulls away over 1.6 s; at the top it slows into the station (loop cabins; a cable car keeps its old arrival: slowed, its roof clips the
+  Cime Caron terminal roof edge), stops (held: `carrierU` during `alight.tHold`), doors open, he walks out, they close. The camera: from the
+  platform outside the door (`w.doorCam`), easing into the ride camera. Trains use the door spot too (no doors). Chairs: the bar is its own
+  part on a pivot, swings down 0.9 s after leaving and up 1.6 s before the top (`w.barK`). T-bar / platter: he glances back at the bar
+  coming, takes it (hand on the rod while still standing), it pulls him up to speed over 0.8 s. A drag lift's boarding camera stands on the
+  return side (it stood in the operator's hut); main.js `rideCamera1` moves an off-carrier camera that is in a part / house to his other side.
+  NOT done: the ride DOWN boarding at the top still walks onto the down lane without doors (createDescent unchanged); NPCs at non-maze
+  lifts keep the old standing spots.
+- **Small fixes**: speedo 0 while walked in; ONE prompt: the floating "Lift: <name> (L / Enter)" / "Mat der Gondel erof" toasts are gone,
+  the Astegen / Erof button names the lift and shows the key (`<kbd>L</kbd>`, hidden on touch); also no toast after a fast travel.
+  A bug of the guided walk found on the way: a one-corner way lost the zone's heading -> NaN heading -> black screen at drag lifts.
+- **Checks**: `node scripts/ski/queue-check.mjs [rids] [--verbose]` (mazes, lane slots clear, 90 s of every line: nobody in a part, no
+  overlaps, riders = the group, the gate, deterministic, a hold), `scripts/ski/queues-node-checks.sh` (queue / npc / round7b / deadend /
+  review / camera / station-diag), `scripts/ski/queues-flows.sh chromium|webkit <flows>`; shots `scripts/ski/queue-shots.mjs`
+  (mazes with people) and `scripts/ski/board-shots.mjs` (chair / gondola / drag boarding contact sheets) -> ~/Library/Caches/ski-work/queues/.
