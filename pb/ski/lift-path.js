@@ -263,5 +263,7 @@ export function createLiftPath(src, height) {
     loopLen, loopAt, shuttleAt, shuttle, upU, downU, wheelR: R, wheelC: C, sign, key, docks: [d0, d1],
     /** The ground under the line at s (the far grid before the 5 m tiles arrive). */
     ground,
+    /** The height function the line was built on (lift-queue.js: the ground under a station's queue maze). */
+    height,
   };
 }

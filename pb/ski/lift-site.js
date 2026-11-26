@@ -18,6 +18,7 @@
  *                              not stand (the lift aisles, the stations, the pylon bases). */
 import { liftClass, BOARD, UNLOAD, canRideDown } from './lift-path.js';
 import { dressEnd } from './stations.js';
+import { createQueueMaze, mazeWhy } from './lift-queue.js';
 
 export { BOARD, UNLOAD };
 /** Half widths of the tree aisle along the line (m) and the height of the rope over the treetops above which trees may stay. */
@@ -561,6 +562,34 @@ export function createLiftWorld(paths, opts = {}) {
     return false;
   }
   const nearPylon = (x, z, r) => { for (const it of near(x, z, r + 1)) if (it.t === 'pylon' && Math.hypot(x - it.x, z - it.z) < r + it.r) return true; return false; };
+  // Lift lines (26 Nov 2026, lift-queue.js): the queue maze in front of every busy lift's bottom station, where nothing else stands (no
+  // other station, lift lane, pylon or kept building); then it is a frame of the grid like a station's (the skier, the others, the exits
+  // and the trees keep out of it; its posts and ropes are solid). site.queue (null: none). Decided per world (this one's buildings).
+  for (const [index, site] of sites) {
+    site.queue = null;
+    const p = site.path;
+    if (!p.height) continue;
+    const m = createQueueMaze(site, p.height);
+    if (!m || !mazeFree(site, m)) { if (m) mazeWhy[`blocked: ${mazeFree.why}`] = (mazeWhy[`blocked: ${mazeFree.why}`] || 0) + 1; continue; }
+    site.queue = m;
+    const corners = [[m.rect.a0, m.rect.b0], [m.rect.a1, m.rect.b0], [m.rect.a0, m.rect.b1], [m.rect.a1, m.rect.b1]].map(([a, b]) => m.toWorld(a, b, {}));
+    put(Math.min(...corners.map((c) => c.x)), Math.min(...corners.map((c) => c.z)), Math.max(...corners.map((c) => c.x)), Math.max(...corners.map((c) => c.z)), { t: 'frame', index, f: m });
+  }
+  function mazeFree(site, m) {
+    const r = m.rect, w = {}, l = {};
+    for (let a = r.a0 - 0.3; a <= r.a1 + 0.31; a += 0.8) for (let b = r.b0 - 0.3; b <= r.b1 + 0.31; b += 0.8) {
+      m.toWorld(a, b, w);
+      for (const it of near(w.x, w.z, 3)) {
+        if (it.t !== 'frame' || it.f === site.bottom) continue;
+        const f = it.f.toLocal(w.x, w.z, l);
+        if (f.a >= it.f.rect.a0 - 0.3 && f.a <= it.f.rect.a1 + 0.3 && f.b >= it.f.rect.b0 - 0.3 && f.b <= it.f.rect.b1 + 0.3) { mazeFree.why = 'station'; return false; }
+      }
+      if (inLowLane(w.x, w.z, site.path.height, 3.2)) { mazeFree.why = 'lane'; return false; }
+      if (nearPylon(w.x, w.z, 0.8)) { mazeFree.why = 'pylon'; return false; }
+      if (inBuilding(w.x, w.z, 0.4)) { mazeFree.why = 'building'; return false; }
+    }
+    return true;
+  }
 
   /** Must a tree at (x, z) (its foot at ground y) go? Stations (+4 m), pylon bases (5 m) and the lift aisles where the carriers pass
    *  less than AISLE_HIGH m over the treetops. path heights: the far grid (stable while tiles stream; the margin covers it). */

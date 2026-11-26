@@ -54,9 +54,9 @@ export const FRAME_BUDGET_MS = Object.freeze({ low: 40, medium: 30, high: 24 });
  * nearest get the finer figure (and a shadow on Mëttel / Héich). The rest of the numbers shape them (m, s, m/s). */
 export const NPC = Object.freeze({
   levels: Object.freeze({
-    low: { skiers: 18, queue: 6, walkers: 3, riders: 22, near: 3, radius: 380, queueRadius: 240, walkRadius: 220, riderRadius: 300 },
-    medium: { skiers: 32, queue: 10, walkers: 5, riders: 48, near: 6, radius: 560, queueRadius: 340, walkRadius: 300, riderRadius: 480 },
-    high: { skiers: 48, queue: 14, walkers: 8, riders: 84, near: 10, radius: 760, queueRadius: 460, walkRadius: 380, riderRadius: 680 },
+    low: { skiers: 18, queue: 6, lines: 26, walkers: 3, riders: 22, near: 3, radius: 380, queueRadius: 240, walkRadius: 220, riderRadius: 300 },
+    medium: { skiers: 32, queue: 10, lines: 40, walkers: 5, riders: 48, near: 6, radius: 560, queueRadius: 340, walkRadius: 300, riderRadius: 480 },
+    high: { skiers: 48, queue: 14, lines: 56, walkers: 8, riders: 84, near: 10, radius: 760, queueRadius: 460, walkRadius: 380, riderRadius: 680 },
   }),
   nearRadius: 70,             // m: the finer figure only this close
   perMetre: Object.freeze({ green: 1 / 28, blue: 1 / 34, red: 1 / 50, black: 1 / 85 }),      // skiers per m of piste (busy day)

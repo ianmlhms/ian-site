@@ -212,7 +212,7 @@ export function createNpcView({ scene, height, level = 'medium' }) {
         const hb = height(o.x - fx, o.z - fz), hf = height(o.x + fx, o.z + fz);
         pitch = -Math.atan((hb - hf) / 2);
       }
-      last.x = o.x; last.y = o.y; last.z = o.z; last.heading = o.heading; last.pitch = pitch; last.a = o.poseA; last.b = o.poseB; last.k = o.blend; last.o = o.outfit; last.s = o.scale || 1;
+      last.cut = !!o.cut; last.x = o.x; last.y = o.y; last.z = o.z; last.heading = o.heading; last.pitch = pitch; last.a = o.poseA; last.b = o.poseB; last.k = o.blend; last.o = o.outfit; last.s = o.scale || 1;
       if (!inView(o.x, o.y, o.z)) continue;
       e.set(0, -o.heading, pitch); q.setFromEuler(e);
       const sc = last.s * Math.max(0.02, smoothstep(f));
@@ -223,6 +223,7 @@ export function createNpcView({ scene, height, level = 'medium' }) {
     for (const [id, last] of lastOf) {
       if (seen.has(id)) continue;
       if (opts.hidden && opts.hidden(last.x, last.z)) { fades.delete(id); lastOf.delete(id); continue; }      // a challenge's corridor: at once
+      if (last.cut) { fades.delete(id); lastOf.delete(id); continue; }      // lift lines: on the chair now (it shows them seated), at once
       const d = Math.hypot(last.x - cx, last.z - cz);
       let fd = fades.get(id);
       if (!fd || !fd.out) { if (d > NPC.fadeNear || opts.fadeIn === false) { lastOf.delete(id); fades.delete(id); continue; } fd = { f: fd ? fd.f : 1, out: true }; fades.set(id, fd); }

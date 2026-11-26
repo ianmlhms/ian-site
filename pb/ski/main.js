@@ -63,6 +63,7 @@ import { createAvalanches } from './avalanche.js';
 // the other skiers (Ian: "you're not alone in the whole ski area"): npc.js simulates, npc-view.js draws (2 instanced meshes)
 import { createCrowd, dayShare, corridorOf, strHash } from './npc.js';
 import { createNpcView } from './npc-view.js';
+import { createQueueView } from './queue-view.js';
 
 const THREE = window.THREE;
 const LOAD = window.__skiLoad || { set() {}, done() {}, fail() {} };
@@ -304,7 +305,7 @@ async function boot() {
   let spray = createSnowSpray({ scene, env, level, height: (x, z) => surface.height(x, z) });          // R7-C: spray.js
   let signs = null;                                                          // R7-D
   let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
-  let crowd = null, npcView = null, npcOn = readNpcPref(param('npcs')), npcCorridor = null, npcCorridorOf = null;
+  let crowd = null, npcView = null, npcOn = readNpcPref(param('npcs')), npcCorridor = null, npcCorridorOf = null, queueView = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
    *  is built again (between rides) once all tiles are in. */
   function buildLifts() {
@@ -986,26 +987,45 @@ async function boot() {
     const cum = [0];
     for (let n = 1; n < way.length; n++) cum.push(cum[n - 1] + Math.hypot(way[n].x - way[n - 1].x, way[n].z - way[n - 1].z));
     const L = cum[cum.length - 1];
-    approach = { lift, down, way, cum, L, t: 0, dur: Math.min(BOARDING.MAX_S, Math.max(0.5, L / BOARDING.WALK)), h0: st.heading, h1: way[way.length - 1].heading };
+    // lift lines: at a lift with a queue maze he is led through its free lane and waits at its head (2.2 m short of the zone) while the
+    // group ahead of him is still in the zone; then in. Never longer than BOARDING.MAX_S + LINE_WAIT s in all.
+    const line = !down && !!(crowd && crowd.lineOf(lift.index) && npcLive);
+    const Lw = line ? Math.max(0, L - 2.2) : L;
+    const d1 = Math.min(BOARDING.MAX_S, Math.max(0.5, Lw / BOARDING.WALK));
+    approach = { lift, down, way, cum, L, Lw, line, t: 0, d1, waited: 0, t3: null, d3: line ? Math.max(0.7, (L - Lw) / (BOARDING.WALK * 0.75)) : 0, h0: st.heading, h1: way[way.length - 1].heading };
     game.phase = 'approach'; game.hold = false;
     input.setEnabled(false);
     document.documentElement.dataset.skiApproach = '1';
     stepApproach(0);
     return true;
   }
-  function stepApproach(dt) {
+  const LINE_WAIT = 6;                         // s at most he waits at the head of the free lane
+  function stepApproach(dt, skip = false) {
     const a = approach;
-    a.t = Math.min(a.dur, a.t + dt);
-    const k = a.t / a.dur, m = (k * k * (3 - 2 * k)) * a.L;
+    a.t += dt;
+    if (skip && a.line && crowd) crowd.clearZone(a.lift.index);          // (a second press: in at once; the group still there goes)
+    // m = metres along the way: to the wait point, (the wait), the last steps into the zone
+    let m, k;
+    if (skip) { m = a.L; k = 1; }
+    else if (a.t < a.d1) { k = a.t / a.d1; m = (a.L > a.Lw ? k * k * (3 - 2 * k) * 0.82 + k * 0.18 : k * k * (3 - 2 * k)) * a.Lw; }
+    else if (a.t3 === null) {
+      const info = a.line && crowd ? crowd.lineInfo(a.lift.index) : null;
+      a.waited += dt;
+      if (!info || info.clearIn <= 0.05 || a.waited >= LINE_WAIT) { if (a.waited >= LINE_WAIT && crowd) crowd.clearZone(a.lift.index); a.t3 = a.t; }
+      m = a.Lw; k = 0.85;
+    }
+    if (m === undefined) { const f = Math.min(1, (a.t - a.t3) / Math.max(0.01, a.d3)); m = a.Lw + (a.L - a.Lw) * f * f * (3 - 2 * f); k = a.L > a.Lw ? 0.85 + 0.15 * f : 1; }
     let n = 1;
     while (n < a.way.length - 1 && a.cum[n] < m) n++;
     const A = a.way[n - 1], B = a.way[n], f = (m - a.cum[n - 1]) / ((a.cum[n] - a.cum[n - 1]) || 1);
     const x = A.x + (B.x - A.x) * f, z = A.z + (B.z - A.z) * f;
     const hSeg = Math.atan2(B.z - A.z, B.x - A.x), d = (h0, h1, w) => h0 + Math.atan2(Math.sin(h1 - h0), Math.cos(h1 - h0)) * Math.max(0, Math.min(1, w));
-    const heading = k > 0.85 ? d(hSeg, a.h1, (k - 0.85) / 0.15) : d(a.h0, hSeg, a.t / 0.35);
-    const v = a.L / a.dur * (k < 0.85 ? 1.15 * Math.min(1, a.t / 0.3) : 0.5);
+    const heading = k > 0.85 && m > a.L - 0.8 ? d(hSeg, a.h1, (m - (a.L - 0.8)) / 0.8) : d(a.h0, hSeg, a.t / 0.35);
+    const done = skip || (a.t3 !== null ? a.t - a.t3 >= a.d3 : a.t >= a.d1 && a.L <= a.Lw);
+    const moving = !done && (a.t < a.d1 || a.t3 !== null);
+    const v = moving ? 1.6 : 0;
     game.state = { ...createSkierState(x, z, heading, standHeight(x, z)), vx: Math.cos(heading) * v, vz: Math.sin(heading) * v, speed: v, walk: m };
-    if (a.t >= a.dur) {
+    if (done) {
       approach = null;
       document.documentElement.dataset.skiApproach = '';
       placeAt(x, z, a.h1);
@@ -1016,7 +1036,7 @@ async function boot() {
     }
   }
   function boardLift(guided = null) {
-    if (approach) { stepApproach(approach.dur); return; }               // a second press: straight to the spot
+    if (approach) { stepApproach(0, true); return; }                  // a second press: straight to the spot
     if (game.mode !== MODES.freeride || game.phase !== 'running' || ride || game.paused) return;
     const lift = guided ? guided.lift : modes.liftAt, down = guided ? guided.down : !!modes.liftDown;
     if (!lift) return;
@@ -1042,7 +1062,8 @@ async function boot() {
     } else {
       // the next carrier of the lift's own loop that reaches the loading line at least 1.6 s from now picks him up
       const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
-      const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * 1.6);
+      const after = crowd && npcLive ? crowd.lineInfo(lift.index).after : 0;          // lift lines: after the group ahead of him
+      const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * Math.max(1.6, after));
       ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
         exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list) });
     }
@@ -1560,7 +1581,16 @@ async function boot() {
     return modes.clock ? dayShare(modes.clock.hour) : 1;
   }
   function npcFrame(dt, st) {
-    if (!npcLive) { if (npcView && npcView.enabled) { npcView.setEnabled(false); if (crowd) crowd.reset(); } return; }
+    // lift lines: the mazes (posts, tape) are scenery: drawn whatever the other skiers' switch
+    if (game.screen === 'ski') {
+      if (!queueView) { try { queueView = createQueueView({ scene, ground: standHeight }); } catch (error) { console.warn('[ski] queue view failed', error); queueView = false; } }
+      if (queueView) queueView.update(camera.position.x, camera.position.z, modes.lifts.world, dt);
+    }
+    if (!npcLive) {
+      if (npcView && npcView.enabled) { npcView.setEnabled(false); if (crowd) crowd.reset(); }
+      if (lifts && lineGateOpen.size) { for (const i of lineGateOpen) if (!(ride && ride.lift.index === i)) lifts.setGate(i, 0); lineGateOpen.clear(); }
+      return;
+    }
     if (!npcView) {
       try { npcView = createNpcView({ scene, height: (x, z) => surface.height(x, z), level }); } catch (error) { console.warn('[ski] other skiers: view failed', error); npcOn = false; return; }
       if (lifts) lifts.setRiderSink(npcView.addCarrier);
@@ -1576,8 +1606,31 @@ async function boot() {
       x: camera.position.x, z: camera.position.z, fx: Math.cos(camYaw), fz: Math.sin(camYaw), level, share,
       player: st && !riding && !st.ride ? st : null,
       hidden: npcCorridor, skipPiste: npcCorridor ? game.piste : null,
+      lifts, hold: lineHold(st),
     });
+    lineGates();
     npcView.draw(list, camera, crowd, { level, share, dt, fadeIn: !game.camPose, hidden: npcCorridor });
+  }
+  /** Lift lines: the lift whose line waits for the player ('walk': led in / boarding; 'zone': he stands in its zone), or null. */
+  function lineHold(st) {
+    if (approach && !approach.down) return { index: approach.lift.index, kind: 'walk' };
+    if (ride && !ride.down && ride.phase === 'board') return { index: ride.lift.index, kind: 'walk' };
+    if (st && game.phase === 'running' && modes.liftAt && !modes.liftDown) {
+      const site = modes.lifts.world.sites.get(modes.liftAt.index);
+      if (site && site.queue && site.inZone(st.x, st.z)) return { index: modes.liftAt.index, kind: 'zone' };
+    }
+    return null;
+  }
+  /** Lift lines: the chair gates the line walks through (the player's own ride drives its lift's gate). */
+  const lineGateOpen = new Set();
+  function lineGates() {
+    if (!lifts) return;
+    for (const i of lineGateOpen) if (!crowd.gates.has(i) && !(ride && ride.lift.index === i)) { lifts.setGate(i, 0); lineGateOpen.delete(i); }
+    for (const [i, open] of crowd.gates) {
+      if (ride && ride.lift.index === i) continue;
+      lifts.setGate(i, open);
+      if (open > 0) lineGateOpen.add(i); else lineGateOpen.delete(i);
+    }
   }
   function setNpcs(on) {
     npcOn = !!on;

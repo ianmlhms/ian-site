@@ -738,6 +738,17 @@ export function createLifts({ scene, resort, height, env = null }) {
     siteOf: (index) => (byIndex.get(index) ? byIndex.get(index).site : null),
     /** The loop parameter of the carrier held for the player on lift `index` (null: none). */
     heldOf: (index) => (byIndex.get(index) ? byIndex.get(index).rideU : null),
+    /** Lift lines (lift-queue.js createQueueSim): the loop's lattice origin A now (carrier n is at u = A + n x gap; npc.js carrierId),
+     *  with the player's held carrier leading; null for a jig-back lift. */
+    latticeA(index) { const l = byIndex.get(index); if (!l || l.shuttle || !(l.spec.gap > 0)) return null; return l.rideU !== null ? l.rideU + (l.heldShift || 0) : lastT * l.spec.speed + l.offset; },
+    /** Lift lines: a jig-back pair's clock { c (cycle), u (s into it: < dwell = the up cabin docked at the bottom), dwell }, or null
+     *  (no jig-back, or the player rides it). */
+    shuttleClock(index) {
+      const l = byIndex.get(index);
+      if (!l || !l.shuttle || l.rideU !== null) return null;            // (the player rides it: the line waits)
+      const T = (l.docks[1] - l.docks[0]) / (l.spec.speed * SHUTTLE_FACTOR), cycle = 2 * (T + DWELL), v = (lastT || 0) + l.offset;
+      return { c: Math.floor(v / cycle), u: ((v % cycle) + cycle) % cycle, dwell: DWELL };
+    },
     world,
     /** R8 (tests / shots): the name signs shown now and every sign spot. */
     get signs() { return signs ? { shown: signs.count, spots: signs.spots.length } : { shown: 0, spots: signSpots.length }; },

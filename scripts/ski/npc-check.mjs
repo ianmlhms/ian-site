@@ -92,7 +92,7 @@ for (const rid of rids.length ? rids : ALL) {
 
   // ---- run the crowd at each spot ----
   const bad = { piste: [], solid: [], station: [], overlap: [], player: [], zone: [], queue: [], walk: [] };
-  let frames = 0, ms = 0, maxListed = 0, kinds = { ski: 0, queue: 0, walk: 0 }, poses = new Set(), bumps = 0, minPair = Infinity, minPlayer = Infinity;
+  let frames = 0, ms = 0, maxListed = 0, kinds = { ski: 0, queue: 0, walk: 0, line: 0 }, poses = new Set(), bumps = 0, minPair = Infinity, minPlayer = Infinity;
   const DT = 1 / 30, FR = 600;
   const zoneOf = new Map(lifts.list.map((l) => [l.index, lifts.world.sites.get(l.index)]));
   for (const sp of spots) {
@@ -138,22 +138,28 @@ for (const rid of rids.length ? rids : ALL) {
           }
         }
         if (o.kind === 'walk' && blocked(o.x, o.z, 0.3)) bad.walk.push(tag);
-        if (scatter.hit(o.x, o.z, 0.3, -1e9, density) || lifts.world.hit(o.x, o.z, 0.3) || boxIndex.hit(o.x, o.z, 0.2) || nets.near(o.x, o.z, 0.5)) bad.solid.push(tag);
+        // (lift lines: they walk under a chair station's canopy to the loading line, so the parts count at their height)
+        const stationHit = o.kind === 'line' ? lifts.world.hit(o.x, o.z, 0.3, o.y + 0.05, height, 1.6) : lifts.world.hit(o.x, o.z, 0.3);
+        if (scatter.hit(o.x, o.z, 0.3, -1e9, density) || stationHit || boxIndex.hit(o.x, o.z, 0.2) || nets.near(o.x, o.z, 0.5)) bad.solid.push(tag);
         for (let j = i + 1; j < list.length; j++) {
           const q = list[j], d = Math.hypot(q.x - o.x, q.z - o.z);
           minPair = Math.min(minPair, d);
-          if (d < NPC.bodyR * 2 - 0.05) bad.overlap.push(`${tag} vs ${q.kind} ${q.id}: ${d.toFixed(2)} m`);
+          // (lift lines: a group side by side at its chair's loading line / the door 0.38 m, passing in the line 0.6 m: queue-check.mjs)
+          const lim = o.kind === 'line' && q.kind === 'line' ? (Math.floor(o.id / 8) === Math.floor(q.id / 8) ? 0.38 : 0.6) : NPC.bodyR * 2 - 0.05;
+          if (d < lim) bad.overlap.push(`${tag} vs ${q.kind} ${q.id}: ${d.toFixed(2)} m`);
         }
         const dp = Math.hypot(player.x - o.x, player.z - o.z);
         minPlayer = Math.min(minPlayer, dp);
-        if (dp < NPC.bodyR + NPC.playerR - 0.12) bad.player.push(`${tag}: ${dp.toFixed(2)} m from the player`);
+        // (lift lines stand between ropes: this scripted player skis straight through a maze, the bump pushes him out)
+        if (dp < NPC.bodyR + NPC.playerR - 0.12 && o.kind !== 'line') bad.player.push(`${tag}: ${dp.toFixed(2)} m from the player`);
       }
     }
   }
   const show = (k) => (bad[k].length ? ` e.g. ${bad[k].slice(0, 2).join(' | ')}` : '');
-  const total = kinds.ski + kinds.queue + kinds.walk;
-  check(total > 0 && kinds.ski > 0, `${spots.length} spots x ${FR} frames (${LEVEL}): ${kinds.ski} skier, ${kinds.queue} queue, ${kinds.walk} walker draws, up to ${maxListed} at once, poses ${[...poses].sort((a, b) => a - b).join(',')}`);
-  check(maxListed <= NPC.levels[LEVEL].skiers + NPC.levels[LEVEL].queue + NPC.levels[LEVEL].walkers, `never more than the level's cap (${maxListed})`);
+  const total = kinds.ski + kinds.queue + kinds.walk + kinds.line;
+  check(total > 0 && kinds.ski > 0, `${spots.length} spots x ${FR} frames (${LEVEL}): ${kinds.ski} skier, ${kinds.queue} queue, ${kinds.walk} walker, ${kinds.line} lift-line draws, up to ${maxListed} at once, poses ${[...poses].sort((a, b) => a - b).join(',')}`);
+  // (lift lines: whole mazes up to `lines`, the nearest one always: a 6-seater's full maze ~45)
+  check(maxListed <= NPC.levels[LEVEL].skiers + NPC.levels[LEVEL].queue + NPC.levels[LEVEL].walkers + Math.max(NPC.levels[LEVEL].lines, 48), `never more than the level's cap (${maxListed})`);
   check(!bad.piste.length, `every skier inside his piste's half width (${bad.piste.length} out)${show('piste')}`);
   check(!bad.solid.length, `never in a house, station part, pylon, tree or race net (${bad.solid.length})${show('solid')}`);
   check(!bad.station.length && !bad.zone.length, `no skier in a station footprint / boarding zone (${bad.station.length} / ${bad.zone.length})${show('station')}${show('zone')}`);

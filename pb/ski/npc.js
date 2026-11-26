@@ -5,7 +5,9 @@
  *                   sometimes a stop at the side of the piste, a rest after the bottom. Where he is at time t is ANALYTIC (a speed
  *                   profile per piste: slower on the flats, faster on the steeps), so the far ones cost nothing; the ones listed near
  *                   the camera get a little state (avoidance of the player and of each other, the side they pass a house on)
- *   at the lifts    a few standing at each bottom station (beside / behind the boarding zone, never in it, on the belt or in the gate)
+ *   at the lifts    a few standing at each bottom station (beside / behind the boarding zone, never in it, on the belt or in the gate);
+ *                   at a busy lift (lift-queue.js: a queue maze) the line: groups in the lanes, shuffling forward, into the zone, through
+ *                   the gate onto the loading line / to the door, onto the carrier (the riders it shows are that group)
  *   on the lifts    seats of the real carriers (lifts.js asks riders(lift, carrier id)): deterministic per carrier, so a chair keeps its
  *                   riders from the bottom to the top
  *   in the villages walking along the streets with the skis on the shoulder
@@ -14,6 +16,7 @@
 import { NPC } from './config.js';
 import { createLineIndex } from './pistes.js';
 import { worldcupNets } from './landmarks.js';
+import { createQueueSim } from './lift-queue.js';
 
 /* ---------- deterministic numbers ---------- */
 function mix(h, v) { h = Math.imul(h ^ (v | 0), 0x9e3779b1); return (h ^ (h >>> 15)) | 0; }
@@ -365,7 +368,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     const out = [];
     queues.set(index, out);
     const key = site ? site.key : '';
-    if (!site || !NPC.queue[key]) return out;
+    if (!site || !NPC.queue[key] || site.queue) return out;              // (a lift with a maze: its line, lineOf)
     const path = site.path, f = site.bottom;
     const bOut = path.side + path.carrier.hw + 0.6;
     const z = site.zone;
@@ -396,6 +399,34 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       out.push({ id: 2e6 + index * 64 + i, index, x: w.x, z: w.z, heading: site.wait.heading + (rand01(seed, ls, i, 5) - 0.5) * 0.7, outfit: Math.floor(rand01(seed, ls, i, 6) * OUTFIT_COUNT) % OUTFIT_COUNT, share: rand01(seed, ls, i, 7), phase: rand01(seed, ls, i, 8) * 6.28, scale: lerp(0.9, 1.06, rand01(seed, ls, i, 9)) });
     }
     return out;
+  }
+
+  /* ---------- the lines at the busy lifts (lift-queue.js) ---------- */
+  const sims = new Map();                  // lift index -> createQueueSim (for the site of the current world)
+  const lineClock = new Map();             // lift index -> the last clock (a jig-back the player rides: the line waits)
+  const gates = new Map();                 // lift index -> this frame's chair gate (0..1) for the line walking through it
+  let selMazes = [];
+  /** The line of lift `index` (null: no maze there). */
+  function lineOf(index) {
+    const site = liftNet.world && liftNet.world.sites.get(index);
+    if (!site || !site.queue) return null;
+    let sim = sims.get(index);
+    if (!sim || sim.maze !== site.queue) { sim = createQueueSim(site, seed, index); sims.set(index, sim); }
+    return sim;
+  }
+  /** The clock of a line: the carriers' lattice (lifts.js latticeA) or the jig-back cycle; in Node (no lifts.js) the lifts' start. */
+  function clockOf(sim, index, t, lifts) {
+    const site = liftNet.world.sites.get(index), p = site.path, off = (index * 7.31) % 50;
+    if (sim.maze.loop) {
+      const A = lifts && lifts.latticeA ? lifts.latticeA(index) : null;
+      const a = A === null || A === undefined ? t * p.spec.speed + off : A;
+      return { phi: (p.upU(site.boardS) - a) / p.spec.gap };
+    }
+    let c = lifts && lifts.shuttleClock ? lifts.shuttleClock(index) : undefined;
+    if (c === undefined) { const T = (p.docks[1] - p.docks[0]) / (p.spec.speed * 4), cyc = 2 * (T + 8), v = t + off; c = { c: Math.floor(v / cyc), u: ((v % cyc) + cyc) % cyc, dwell: 8 }; }
+    if (c === null) c = lineClock.get(index) || null;
+    if (c) lineClock.set(index, c);
+    return c;
   }
 
   /* ---------- walkers in the villages (along the streets, skis on the shoulder) ---------- */
@@ -443,6 +474,9 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
   /** The riders of carrier `id` of lift `index` (kind, seats, sub): count n in riderBuf[0..n) with { a (forward), b (right), y (below
    *  the grip / above the rail), yaw, pose, outfit } in the carrier's own frame; share = the day's crowd share. Deterministic. */
   function riders(index, id, kind, seats, sub, share = 1) {
+    // a busy lift's line put them on: that group, in those seats / spots, in those outfits (the ride-down ids are the old kind)
+    const line = id < 5e5 ? lineOf(index) : null;
+    if (line && line.maze.loop) return lineRiders(line, id, kind, seats, sub, share);
     const occ = NPC.occupancy[kind] || 0;
     const r = (k) => rand01(seed, index, id, k, 4242);
     if (r(1) >= occ * share) return 0;
@@ -476,8 +510,31 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     return n;
   }
 
+  function lineRiders(line, id, kind, seats, sub, share) {
+    const gr = line.groupOf(id, share);
+    if (!gr) return 0;
+    let n = 0;
+    if (kind === 'chair') {
+      const S = Math.max(1, seats || 4), W = Math.max(1.6, Math.min(4.2, S * 0.52)), pitch = (W - 0.25) / S;
+      for (let m = 0; m < Math.min(gr.n, riderBuf.length); m++) {
+        const o = riderBuf[n++];
+        o.a = -0.05; o.b = (gr.order[m] - (S - 1) / 2) * pitch; o.y = SEAT_Y.chair; o.yaw = 0; o.pose = POSE.sit;
+        o.outfit = line.outfitOf(gr.k, m) % OUTFIT_COUNT; o.scale = line.scaleOf(gr.k, m);
+      }
+    } else {
+      const spots = sub === 'funitel' ? [[0.7, 0.9], [-0.7, 0.9], [0.7, -0.9], [-0.7, -0.9], [0, 0.2], [0.75, 0], [-0.75, 0]] : [[0.5, 0.45], [-0.5, 0.45], [0.5, -0.45], [-0.5, -0.45]];
+      const y = sub === 'funitel' ? SEAT_Y.funitel : SEAT_Y.gondola;
+      for (let m = 0; m < Math.min(gr.n, spots.length, riderBuf.length); m++) {
+        const o = riderBuf[n++], sp = spots[gr.order[m] % spots.length];
+        o.a = sp[0]; o.b = sp[1]; o.y = y; o.yaw = (m % 2 ? Math.PI : 0) + (rand01(seed, gr.k, m, 61) - 0.5) * 0.8; o.pose = POSE.cabin;
+        o.outfit = line.outfitOf(gr.k, m) % OUTFIT_COUNT; o.scale = line.scaleOf(gr.k, m);
+      }
+    }
+    return n;
+  }
+
   /* ---------- the list near the camera ---------- */
-  function take() { const o = pool.pop() || {}; o.fade = 1; o.stop = 0; o.piste = null; o.hide = false; return o; }
+  function take() { const o = pool.pop() || {}; o.fade = 1; o.stop = 0; o.piste = null; o.hide = false; o.cut = false; return o; }
   /** Re-chooses who is listed (a few times a second): every candidate in the radius, nearest first, the ones listed already keep their
    *  place a little longer (no flicker at the edge). */
   function select(t, view, cfg) {
@@ -512,6 +569,21 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       for (const q of queueOf(l.index)) if (q.share < share) qs.push({ key: q.id, kind: 'queue', q, d: rank(q.x, q.z, Math.hypot(q.x - fx, q.z - fz)) });
     }
     qs.sort((a, b) => a.d - b.d);
+    // the lines: whole mazes, nearest first, while they fit the level's cap (the nearest always)
+    const ms = [];
+    for (const l of liftNet.list) {
+      const d0 = Math.hypot(l.bottom.x - fx, l.bottom.z - fz);
+      if (d0 > Math.min(R, cfg.queueRadius) || !lineOf(l.index)) continue;
+      ms.push({ index: l.index, d: rank(l.bottom.x, l.bottom.z, d0) });
+    }
+    ms.sort((a, b) => a.d - b.d);
+    selMazes = [];
+    let room = cfg.lines;
+    for (const m of ms) {
+      const sim = lineOf(m.index), est = sim.maze.npcLanes * sim.maze.lanes[0].cap + 8;
+      if (selMazes.length && est > room) break;
+      selMazes.push(m.index); room -= est;
+    }
     const ws = [];
     for (const w of walkerList()) {
       if (w.share >= share) continue;
@@ -526,6 +598,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
   }
 
   const tmp = {};
+  const linePeople = [];
   /**
    * Every frame. t = the game clock (s, the lifts' clock too), dt (s), view = { x, z (camera / focus), player: { x, z, vx, vz } | null,
    * level: 'low' | 'medium' | 'high', share (the day's crowd share), hidden(x, z) (a running challenge's corridor), skipPiste }.
@@ -573,6 +646,30 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       o.st = st;
       list.push(o);
     }
+    // the lines (their own walk: never pushed about, never stepping aside: ropes all round)
+    gates.clear();
+    for (const index of selMazes) {
+      const sim = lineOf(index);
+      if (!sim) continue;
+      const clock = clockOf(sim, index, t, view.lifts);
+      if (!clock) continue;
+      const hold = view.hold && view.hold.index === index ? view.hold.kind : '';
+      for (const p of sim.people(clock, view.share ?? 1, hold, linePeople)) {
+        if (view.hidden && view.hidden(p.x, p.z)) continue;
+        const o = take();
+        o.id = p.id; o.kind = 'line'; o.x = p.x; o.z = p.z; o.vx = 0; o.vz = 0; o.speed = 0; o.outfit = p.outfit % OUTFIT_COUNT; o.scale = p.scale; o.cut = p.cut;
+        const ph = (p.id % 97) * 0.37;
+        if (p.carry) {                                  // skis on the shoulder (a cabin's line): walking, or standing (between the steps)
+          o.poseA = POSE.walkA; o.poseB = POSE.walkB; o.blend = p.moving ? 0.5 - 0.5 * Math.sin(t * 7 + ph) : 0.5;
+          o.heading = p.heading + (p.moving ? 0 : Math.sin(t * 0.21 + ph) * 0.12);
+        } else if (p.moving) { o.poseA = POSE.ski; o.poseB = POSE.plough; o.blend = 0.35 + 0.25 * Math.sin(t * 6 + ph); o.heading = p.heading; }
+        else { o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.12 + 0.1 * Math.sin(t * 0.13 + ph); o.heading = p.heading + Math.sin(t * 0.21 + ph) * 0.15; }
+        o.st = null;
+        list.push(o);
+      }
+      if (sim.gate > 0) gates.set(index, sim.gate);
+      else if (sim.maze.kind === 'chair') gates.set(index, 0);
+    }
     giveWay(dt, pl);
     // a running challenge's corridor: checked last (giving way may move somebody)
     if (view.hidden) for (let i = list.length - 1; i >= 0; i--) if (view.hidden(list[i].x, list[i].z)) { pool.push(list[i]); list.splice(i, 1); }
@@ -596,6 +693,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     const R2 = NPC.personal * 2;
     for (const o of list) {
       const st = o.st;
+      if (!st) continue;                                                   // (the lines: their own walk)
       let want = 0, slow = 0;
       if (pl && o.kind === 'ski' && !o.stop) {
         // the closest approach to the player over the next 2 s (both straight on)
@@ -617,8 +715,10 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     pairs.length = 0;
     for (let i = 0; i < list.length; i++) {
       const o = list[i];
+      if (o.kind === 'line') continue;
       for (let j = i + 1; j < list.length; j++) {
         const q = list[j], dx = q.x - o.x, dz = q.z - o.z;
+        if (q.kind === 'line') continue;
         if (dx > R2 || dx < -R2 || dz > R2 || dz < -R2) continue;
         pairs.push(i, j);
         const d = Math.hypot(dx, dz);
@@ -642,7 +742,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     // standing ones step out of the player's way (back slowly when he is gone)
     if (pl) {
       for (const o of list) {
-        if (o.kind === 'ski') continue;
+        if (o.kind === 'ski' || o.kind === 'line') continue;
         const st = o.st, dx = o.x - pl.x, dz = o.z - pl.z, d = Math.hypot(dx, dz);
         const tx = d < NPC.stepAside && d > 1e-3 ? st.sx + dx / d * (NPC.stepAside - d) : 0, tz = d < NPC.stepAside && d > 1e-3 ? st.sz + dz / d * (NPC.stepAside - d) : 0;
         const k = 1 - Math.exp(-dt * (d < NPC.stepAside ? 6 : 0.4));
@@ -669,6 +769,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     if (pl) {
       const min = NPC.bodyR + NPC.playerR + 0.05;
       for (const o of list) {
+        if (o.kind === 'line') continue;                                    // (the player is bumped out of them: collide)
         const dx = o.x - pl.x, dz = o.z - pl.z, d = Math.hypot(dx, dz);
         if (d >= min) continue;
         const ux = d > 1e-4 ? dx / d : -Math.sin(o.heading), uz = d > 1e-4 ? dz / d : Math.cos(o.heading), push = min - d + 0.01;
@@ -709,17 +810,24 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       vx *= keep; vz *= keep;
       const pen = min - d;
       out = { ...out, x: out.x + nx * pen, z: out.z + nz * pen, vx, vz, speed: Math.hypot(vx, vz) };
-      if (o.st) { if (o.kind === 'ski') o.st.av -= (-Math.sin(o.heading) * nx + Math.cos(o.heading) * nz) * 0.6; else { o.st.sx -= nx * 0.3; o.st.sz -= nz * 0.3; } o.st.lag += 0.3; }
+      if (o.st && o.kind !== 'line') { if (o.kind === 'ski') o.st.av -= (-Math.sin(o.heading) * nx + Math.cos(o.heading) * nz) * 0.6; else { o.st.sx -= nx * 0.3; o.st.sz -= nz * 0.3; } o.st.lag += 0.3; }
       stats.bumps = (stats.bumps || 0) + 1;
     }
     return out;
   }
 
   return {
-    update, collide, riders, riderBuf, list, stats, popOf, skierAt, queueOf, walkerList, solid,
+    update, collide, riders, riderBuf, list, stats, popOf, skierAt, queueOf, walkerList, solid, lineOf,
+    /** This frame's chair gates opened by the lines: Map(lift index -> 0..1) (main.js lifts.setGate; 0 = shut it again). */
+    gates,
+    /** The player at lift `index` (view.hold): { clearIn (s until the zone ahead of him is free), after (s until their carrier has passed
+     *  the loading line: his must come after it) }. */
+    /** Lift lines: the player is put down in lift `index`'s zone: the group there goes. */
+    clearZone(index) { const sim = sims.get(index); if (sim) sim.clearZone(); },
+    lineInfo(index) { const sim = sims.get(index); return sim ? { clearIn: sim.clearIn, after: sim.after } : { clearIn: 0, after: 0 }; },
     get selected() { return selected; },
     /** obstacles(x, z, r) -> true where a skier must not stand (main.js: trees, stations, pylons, houses); the bands are built again. */
-    setBlocked(fn) { blocked = fn || (() => false); bands.clear(); queues.clear(); walkers = null; state.clear(); },
+    setBlocked(fn) { blocked = fn || (() => false); bands.clear(); queues.clear(); sims.clear(); walkers = null; state.clear(); },
     setRoads(rows) { roads = rows || []; walkers = null; },
     reset() { state.clear(); selected = []; selT = -1e9; for (const o of list) pool.push(o); list.length = 0; },
     netIndex,

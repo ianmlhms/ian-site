@@ -8,6 +8,7 @@
  *              player fixed the time of day */
 import { liftClass, LIFT_SPEC, createLiftPath } from '../lift-path.js';
 import { createLiftWorld } from '../lift-site.js';
+import { freeWay } from '../lift-queue.js';
 
 export const DAY = Object.freeze({ start: 9, end: 16.5, hoursPerSecond: 1 / 240 });     // one game hour = 4 real minutes
 const NEAR_ZONE = 18;          // m from a boarding zone's waiting spot: the hint where to stand (outside the zone)
@@ -114,7 +115,7 @@ export function createLiftNet(resort, heightAt, pistes = null) {
     return best;
   }
   /** Easier boarding: the way from (x, z) to the lift's boarding spot (bottom) / descent mat (top): straight, or round one corner
-   *  (points 4-12 m from the spot), every 0.5 m clear of station parts, pylons, buildings and trees (tree(x, z), optional).
+   *  (points 4-12 m from the spot); lift lines: at a lift with a queue maze through its free lane (in a lane: along it), every 0.5 m clear of station parts, pylons, buildings and trees (tree(x, z), optional).
    *  Returns [{ x, z }, ..., spot] or null. height(x, z) = the snow. */
   function guideWay(lift, down, from, height = heightAt, tree = null, ground = height) {      // (ground: the stations' own, as main.js world.hit)
     const site = world.sites.get(lift.index);
@@ -129,14 +130,33 @@ export function createLiftNet(resort, heightAt, pistes = null) {
       return true;
     };
     if (clear(from, to)) return [{ x: from.x, z: from.z }, { ...to }];
-    let best = null, bl = Infinity;
-    for (const r of [4, 7, 10, 13]) for (let k = 0; k < 16; k++) {
-      const a = (k / 16) * Math.PI * 2, P = { x: to.x + Math.cos(a) * r, z: to.z + Math.sin(a) * r };
-      const L = Math.hypot(P.x - from.x, P.z - from.z) + r;
-      if (L >= bl || world.hit(P.x, P.z, 0.3, height(P.x, P.z), ground) || world.inBuilding(P.x, P.z, 0.2) || (tree && tree(P.x, P.z))) continue;
-      if (clear(from, P) && clear(P, to)) { best = [{ x: from.x, z: from.z }, P, { ...to }]; bl = L; }
+    /** From `from` to T straight or round one corner (points `radii` m from T), the shortest clear way, or null. */
+    const leg = (T, radii) => {
+      if (clear(from, T)) return [{ x: from.x, z: from.z }, { x: T.x, z: T.z }];
+      let best = null, bl = Infinity;
+      for (const r of radii) for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2, P = { x: T.x + Math.cos(a) * r, z: T.z + Math.sin(a) * r };
+        const L = Math.hypot(P.x - from.x, P.z - from.z) + r;
+        if (L >= bl || world.hit(P.x, P.z, 0.3, height(P.x, P.z), ground) || world.inBuilding(P.x, P.z, 0.2) || (tree && tree(P.x, P.z))) continue;
+        if (clear(from, P) && clear(P, T)) { best = [{ x: from.x, z: from.z }, P, { x: T.x, z: T.z }]; bl = L; }
+      }
+      return best;
+    };
+    // lift lines (lift-queue.js): a lift with a queue maze: through its free lane (already in a lane: along it to the head)
+    const mz = !down && site.queue;
+    if (mz) {
+      for (const lane of mz.lanes) {
+        const p = lane.pts;
+        for (let i = 0; i + 1 < p.length; i++) {
+          const dx = p[i + 1].x - p[i].x, dz = p[i + 1].z - p[i].z, L2 = dx * dx + dz * dz || 1, u = Math.max(0, Math.min(1, ((from.x - p[i].x) * dx + (from.z - p[i].z) * dz) / L2));
+          if ((i < p.length - 2 || u < 0.98) && Math.hypot(p[i].x + dx * u - from.x, p[i].z + dz * u - from.z) < 0.75) return [{ x: from.x, z: from.z }, ...p.slice(0, i + 1).reverse().map((q) => ({ x: q.x, z: q.z })), { x: lane.head.x, z: lane.head.z }, { ...to }];
+        }
+      }
+      const free = freeWay(mz, to);
+      const into = leg(free[0], [3, 5, 8, 11]);
+      if (into) return [...into, ...free.slice(1, -1).map((q) => ({ x: q.x, z: q.z })), { ...to }];
     }
-    return best;
+    return leg(to, [4, 7, 10, 13]);
   }
   function nearestBottom(x, z, radius = BOTTOM_RADIUS) {
     let best = null, bd = radius;
