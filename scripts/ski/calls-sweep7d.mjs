@@ -9,7 +9,7 @@ import { launchBrowser, startServer } from "../flows/lib.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
-const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos,laax").split(",");
+const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos,laax,soelden").split(",");
 const every = Number(opt("--every", "1"));
 const limit = Number(opt("--limit", "160"));
 const trisLimit = Number(opt("--tris", "450000"));

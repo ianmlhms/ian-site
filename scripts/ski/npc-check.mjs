@@ -41,7 +41,7 @@ const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : d; };
 const LEVEL = opt('--level', 'high'), SPOTS = Number(opt('--spots', '8'));
 const rids = args.filter((a, i) => !a.startsWith('--') && !['--level', '--spots'].includes(args[i - 1]));
-const ALL = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax'];
+const ALL = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax', 'soelden'];
 let failed = 0, passed = 0;
 const check = (ok, msg) => { if (ok) passed++; else failed++; console.log(`${ok ? '  ok  ' : '  FAIL'} ${msg}`); return ok; };
 const summary = [];

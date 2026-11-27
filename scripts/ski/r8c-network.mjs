@@ -13,7 +13,7 @@ const root = path.resolve(here, '../../pb/ski');
 const { unpackResort } = await import(path.join(root, 'linepack.js'));
 const LIFT_NEAR = 150, RUN_NEAR = 60, SHORT_TRAIN = 150;
 const args = process.argv.slice(2), check = args.includes('--check');
-const resorts = args.filter((a) => !a.startsWith('--')).length ? args.filter((a) => !a.startsWith('--')) : ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax'];
+const resorts = args.filter((a) => !a.startsWith('--')).length ? args.filter((a) => !a.startsWith('--')) : ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax', 'soelden'];
 let bad = 0;
 for (const rid of resorts) {
   const r = unpackResort(JSON.parse(fs.readFileSync(path.join(root, 'data', rid, 'resort.json'), 'utf8')));

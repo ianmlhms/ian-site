@@ -4,6 +4,6 @@ cd "$(dirname "$0")/../.." || exit 1
 for t in queue-check npc-check round7b-test deadend-check review-check camera-check; do
   echo "== $t"; nice -n 10 node "scripts/ski/$t.mjs" 2>&1 | tail -4
 done
-for r in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax; do
+for r in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax soelden; do
   echo "== station-diag $r"; nice -n 10 node scripts/ski/station-diag.mjs "$r" 'nomatch^' 2>&1 | tail -3
 done

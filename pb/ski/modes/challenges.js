@@ -31,6 +31,7 @@ export const UNLOCK = Object.freeze({
   livigno: { red: 4, black: 8 },       // 96 pistes, only 8 black
   davos: { red: 5, black: 14 },        // 142 pistes in four areas
   laax: { red: 5, black: 12 },         // 98 pistes, 24 black
+  soelden: { red: 4, black: 10 },      // 100 pistes, 21 black
 });
 
 /* The 1D target ride (see targetFor) */

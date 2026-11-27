@@ -409,12 +409,38 @@ def longest_paths(segs, gap=JOIN):
     return out
 
 
+def cut_loops(p, near=12.0, min_loop=40.0):
+    """Sölden (27 Nov 2026): a mapped turning loop on the way (Blo 13 circles a flat bench by the Silberbrünnl bottom station before it runs on): a
+    run that comes back within `near` m of a point it passed more than `min_loop` m of path earlier is cut at that point, the loop dropped
+    (the scripted skier / a player projected onto the line can never get round it). Runs without a loop come back unchanged."""
+    q = p
+    for _ in range(4):
+        seg = np.hypot(*np.diff(q, axis=0).T)
+        s = np.concatenate([[0.0], np.cumsum(seg)])
+        cut = None
+        for j in range(len(q)):
+            far = np.flatnonzero(s[:j] < s[j] - min_loop)
+            if far.size:
+                d = np.hypot(q[far, 0] - q[j, 0], q[far, 1] - q[j, 1])
+                k = int(np.argmin(d))
+                if d[k] < near:
+                    cut = (int(far[k]), j)
+                    break
+        if cut is None:
+            break
+        q = np.concatenate([q[:cut[0] + 1], q[cut[1] + 1:]])
+    if q is not p:
+        q = smooth_line(resample(q, 5.0), 4)                      # the join of the two ends is a corner: round it off
+    return q
+
+
 def make_run(chain, dem):
     """One run from a chain of ways: resampled, smoothed, trimmed from its highest point (first third) to its lowest (last third);
     None when it is too short or too flat to be a run."""
     p = np.concatenate([chain[0]["p"]] + [s["p"][1:] for s in chain[1:]])
     p = resample(p, 5.0)
     p = smooth_line(p, 3)
+    p = cut_loops(p)
     h = dem(p[:, 0], p[:, 1])
     # OSM lines often run on over a flat or up the far side of a dip to the next lift, which would be a skate uphill at the finish
     n3 = max(1, len(h) // 3)

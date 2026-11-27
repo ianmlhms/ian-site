@@ -2211,3 +2211,55 @@ where they were; every new part is drawn only (det, never solid) and inside the 
 - Join never lands on friends.html any more (invite-pop `resolveTarget`, friends.js): unknown game id in an old cached mp-games.js -> fresh list -> `lobby.html?g=<id>&c=<code>`; expired -> «D'Invitatioun ass ofgelaf.». Push tap now opens the lobby (notify edge function, deployed; `ski` has a name).
 - Re-invite: SQL `scripts/mp-invite-resend-v1.sql` APPLIED (only a pending invite < 45 s counts as already invited); lobby offers an invited friend again + «↻» on the invited row; hint when invited friends are not here yet. A late friend still cannot join a running session (roster fixed at start).
 - Flow `ski-mp-invite` (Chromium + WebKit, iPad touch guest). WebKit `ski-mp` already fails on main (cancelled-load noise), unrelated.
+## Sölden (27 Nov 2026): the 11th resort (Ötztal, Tyrol; Gaislachkogl, Giggijoch, Hochsölden, Schwarze Schneid, Rettenbach + Tiefenbach glaciers)
+- **Data** `soelden` (common.py): box 46.895..46.995 N, 10.895..11.050 E (frame 10 x 10 tiles = 12.8 x 12.8 km, 55 tiles shipped, 2.3 MB), frame EPSG:25832
+  (UTM 32N, like Arlberg / Kronplatz). Heights `at-dgm` = the BEV ALS DTM 1 m (the BEV mosaic IS the Land Tirol airborne scan, CC BY 4.0; the near tiles are
+  100 % BEV, no Copernicus seam; the three BEV 50 km files that answer 404 lie outside the box), far grid Copernicus GLO-30. Not used: data.tirol.gv.at directly
+  (same data, the pipeline source is the BEV COG). Overpass answered 502 for the whole session: `fetch_osm_api.py soelden` (~10 min) built the layers.
+  First box (46.885..47.03 / 10.88..11.10) was cut down after the first bake: it held Obergurgl-Hochgurgl, Vent, the Pitztal and Stubai glaciers.
+- **Left out (on purpose)**: **Obergurgl-Hochgurgl** (not connected by lift or piste to Sölden: its own ski area, `tidy_network` dropped the 3 Hochgurgl lifts + pistes
+  as "a separate ski area 4.9 km from the network"), **Vent** (outside the box), Pitztal glacier + Stubai glacier (separate areas, outside the box), the
+  unnamed drag on the Gaislachalm bench and the 133 m "Gletscher Skitunnel" (`exclude` circles: the drag was drawn but 6 m rise = not rideable; the tunnel runs
+  through the rock while the game's terrain goes over it: a tucked skier crawled at 5 km/h = speed-check red).
+- **Bake**: **99 pistes / 99 km** (27 red, 50 blue, 21 black, 1 green; 4 slalom), **33 lifts** (13 chairs, 9 gondolas, 8 drags, 2 carpets, the Zentrum Shuttle
+  funicular). The Rettenbach / Tiefenbach glacier lifts (Gletscherexpress, Schwarze Schneid I / II, Tiefenbachbahn, Seiterkar, Mutkogl ...) are in the ONE
+  connected network by pistes (no BUS_AREAS needed; `keep_areas` Gletscherexpress / Tiefenbachbahn stays as a safety net and never fired). The glacier road itself
+  is a road, not a lift: nothing to model. deadend-check: 33 lifts, 23 ride down, reached 3521 of 3523 places, 0 pockets.
+  **Official-name match**: skiresort.com names 13 lifts (Giggijochbahn, Giggijoch, Gaislachkoglbahn I / II, Einzeiger, Silberbrünnl, Wasserkar, Langeggbahn,
+  Schwarze Schneid I, Gletscherexpress, Tiefenbachbahn, Seiterkar, Mini Tiefenbach, Gratl, Mutkogl): all 13 are in OSM and in the game under that name. The
+  resort numbers its pistes (3 Wasserkar, 11 Langegg, 24 Einzeiger, 13 / 15 / 23 Giggijoch; "Golden Gate" and the Rettenbach World Cup slope are not named in OSM): OSM carries the numbers, the game names them
+  "Rout 22" / "Blo 30" / "Schwaarz 14". No official piste list is online as text; check names only, no map copied.
+- **New generic bake step `cut_loops`** (bake.py `make_run`): Blo 13 circled a flat bench (a turning loop of 60 m by the Silberbrünnl bottom station) before it
+  ran on; a rider projected onto that line could never get round it (round7c --rides 99/100, the bot and a pure-pursuit skier both stuck at s 1830 / 1904). A run
+  that comes back within 12 m of a point it passed > 40 m of path earlier is cut there (and the join re-smoothed: the first version left a corner that put NPC skiers of Blo 13 into the Silberbrünnl footprint, npc-check red in the all-resort run only). It changed ONLY Blo 13 (1908 -> 1867 m) in Sölden; the other ten resorts are
+  not re-baked (re-bake them and check `git diff` of resort.json if you do).
+- **Start / park**: start piste `22` (red, 3.2 km, 1981 m -> Sölden village 1356 m, the longest red; bake's default), FIRST_LIFT `Giggijochbahn` (gondola from the village, spawn 9 m from it),
+  second `Gaislachkoglbahn I`. Park = `park_site.mjs` pick "AREA 47 Snowpark Sölden" (OSM way 448535310, 420 m, 9.3 deg, Silberbrünnl chair 6 m away; it is the real
+  Snowpark Sölden, the mapped Funslope lines are unusable; `park_osm.py soelden` had to run first, the cache folder was recreated). UNLOCK {red 4, black 10}.
+  Villages (`ALPINE_RESORTS`, "chalet"): Sölden, Hochsölden, Zwieselstein, Heiligkreuz. No landmarks.
+- **Printed map**: camera `CAMERAS["soelden"] = {az 200}` (looking north-north-east from above the Windach valley: Sölden bottom-left, Giggijoch / Gaislachkogl in the
+  middle, the glaciers top-right). The score pick (az 255) painted the resort as a thin band; az 180 / 215 / 160 had piste taps > 20 m off (grazing view), 200 is clean
+  (pano-check 100 % on the page, 99.4 % visible, taps 0 m). Shots ~/Library/Caches/ski-work/soelden/map/.
+- **Picker**: picture = our own GPU render (pose 5600,3400,300,3500,6200,0,50: the Rettenbach glacier bench with the Gletscherexpress station and the lake;
+  `scripts/ski/picker-shots.mjs` = shot.mjs --script that hides all page elements, POSES env), blurred 1.6 px, 59 / 28 KB. Eleven cards = 1 hero + 10 small = 5 columns on
+  the iPad, `rp-dense` as for ten. mp-games `SKI_RESORTS` + 6 pistes (mp-games v14, friends v80, mp-lobby v27, arcade-feature v5, arcade-catalogue v3, i18n-dict v63);
+  texts say 11 + "bis Sölden", 2.174 Pisten, 710 Liften (about / i18n-dict / catalogue / banner / pixelbreak; arcade_feature flow).
+- **SQL**: `scripts/ski-v1.sql` regenerated (+100 boards `ski-soelden-*` incl. `ski-soelden-park`, 2185 in all). ONLY the `ski-soelden-*` rows were applied to production
+  (`supabase db query --linked -f`), production == the committed rows (100 / 100). One row (`ski-soelden-skitunnel`) was applied before the tunnel was excluded and
+  deleted again (it was ours, additive rule kept for everyone else's rows).
+- Helpers: `scripts/ski/soelden-node-checks.sh` (= laax's + deadend / queue / shape), `scripts/ski/soelden-flows.sh chromium|webkit [flow ...]` (one flow at a time
+  through the browser slot, soelden-only env for ski-lifts-all / ski-boarding / ski-ipad-start), `scripts/ski/picker-shots.mjs`. Every per-resort list in scripts / flows
+  / mp-games got `soelden`.
+- **Checks (27 Nov, all on the final bake)**: round7c --rides 319 / 0 (soelden 99 / 99 rides, 0 through a net), round7b 25844 / 25844 (33 drawn, 33 ridden), r8c 36577,
+  speed 194 / 0, review 37, camera 15, barrier 24 (99 courses, 0 crossing), npc 172 / 0, cliff 18, floors 2174 + parks (2185 rows), security, memory-check green,
+  station-diag soelden: floating 0, unheld 0, 33 / 33 rideable, own-carrier-path parts 0, height-dependent 0; ONE shared gondola end without a roof (Rotkogl I top = Rotkogl II
+  bottom, a chained section like Laax / Via Lattea), fp-steer 156, pano-check 88, piste_index complete, cloud-size 20, street-check, mp-race, deadend-check (33 lifts, 23 ride down,
+  3514 of 3516 places, 0 pockets; two valley runs end in a village without a lift = info), queue-check (15 of 23 busy lifts have a maze), shape-check, harness 25 / 0.
+  calls-sweep7d soelden --gpu (132 spots): worst 146 calls (piste 13 Variante) / max 383k triangles (budget 160 / 450k). ground-check chromium soelden green (spawn 0, streets 0,
+  rays 6 mm, cracks 0). Chromium flows PASS: ski, ski-resorts, ski-spawn, ski-lift, ski-lifts-all (soelden), ski-course, ski-challenges, ski-park, ski-freeride, ski-npc,
+  ski-modules, ski-teleport, ski-boarding (soelden), ski-ride-down, ski-ipad-start (soelden), arcade-feature, home-page. WebKit: ski-webkit, ski-lift PASS, ski PASS on the rerun
+  (first run failed with node checks / memory-check running at the same time: "right arrow heading -1.15 -> -1.20" in power mode, Niddreg p95 26 ms in full quality; the same
+  load made ski-npc (CPU x4, 1.1 ms) fail once in Chromium, it passed in a quiet run). Do NOT run the memory-check next to the flows.
+  Shots (~/Library/Caches/ski-work/soelden/): queues (gondola + chair mazes with people), ground (park sign, village from the ground and from above, glacier lift), map (printed map
+  + the game's map screen), picker (iPad landscape 11 cards in one screen, iPad portrait / phone scroll as with ten), pick (picture candidates).
+- **Not run / open**: real iPad untested; the iPad portrait picker scrolls (11 cards; unchanged behaviour); the other ten resorts were not re-baked; Obergurgl-Hochgurgl / Vent are not in.

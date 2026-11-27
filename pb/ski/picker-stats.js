@@ -11,4 +11,5 @@ export const PICKER_STATS = Object.freeze({
   "livigno": {"pistes": 96, "km": 75, "lifts": 37, "top": 2791, "low": 1810},
   "davos": {"pistes": 142, "km": 173, "lifts": 56, "top": 2827, "low": 816},
   "laax": {"pistes": 98, "km": 146, "lifts": 37, "top": 2974, "low": 1050},
+  "soelden": {"pistes": 99, "km": 99, "lifts": 33, "top": 3253, "low": 1346},
 });

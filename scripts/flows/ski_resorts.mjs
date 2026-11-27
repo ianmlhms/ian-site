@@ -16,6 +16,7 @@ const CASES = {
   livigno: { title: "Livigno", start: "mottolino", credit: /Lombardia/, landmarks: 0, minPistes: 60 },
   davos: { title: "Davos Klosters", start: "kreuzweg-klosters", credit: /swissALTI3D/, landmarks: 0, minPistes: 60 },
   laax: { title: "Laax", start: "curnius-laax", credit: /swissALTI3D/, landmarks: 0, minPistes: 60 },
+  soelden: { title: "Sölden", start: "22", credit: /BEV/, landmarks: 0, minPistes: 60 },
 };
 
 export const flow = {
@@ -29,7 +30,7 @@ export const flow = {
       // a fresh save once per tab (the resort switch reloads the page and must find the picked resort in it)
       // round 4A: the start pistes are reds / blacks, open at a number of stars per resort: this player has them
       const stars = {};
-      for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax"]) for (let i = 0; i < 9; i++) stars[`${rid}/seed${i}`] = 7;
+      for (const rid of ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax", "soelden"]) for (let i = 0; i < 9; i++) stars[`${rid}/seed${i}`] = 7;
       try { if (!sessionStorage.getItem("skiFlowInit")) { sessionStorage.setItem("skiFlowInit", "1"); localStorage.setItem("pb_ski_save", JSON.stringify({ v: 1, best: {}, ghosts: {}, runs: {}, stars, park: {}, bestHash: {}, last: null, ghostOrder: [] })); } } catch (error) { /* ignore */ }
       window.addEventListener("arcade:board", (e) => { window.__board = e.detail.board; });
     });

@@ -22,7 +22,7 @@ import { startServer, launchBrowser } from "../flows/lib.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
-const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos,laax").split(",");
+const resorts = opt("--resorts", "killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos,laax,soelden").split(",");
 const engines = opt("--engines", "chromium,webkit").split(",");
 const villages = Number(opt("--villages", "5"));
 const out = opt("--out", path.join(process.env.HOME, "Library/Caches/ski-work/round7/ground"));

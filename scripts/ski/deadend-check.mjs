@@ -36,7 +36,7 @@ const KNOWN = new Set(['killy:Col Pers', 'killy:Génépy (Blo)', 'killy:Golf', '
   'kronplatz:Ried (Rout)', 'kronplatz:Lumen', 'vialattea:46 bassa', 'obertauern:Verbindung → Kehrkopf (Variante)', 'obertauern:Verbindung → Monte Flu-Bahn',
   'davos:Müli', 'laax:Flims Oberdorf']);
 const args = process.argv.slice(2), verbose = args.includes('--verbose');
-const ALL = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax'];
+const ALL = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax', 'soelden'];
 const resorts = args.filter((a) => !a.startsWith('--')).length ? args.filter((a) => !a.startsWith('--')) : ALL;
 let failed = 0;
 

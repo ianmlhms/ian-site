@@ -10,7 +10,7 @@ load() { q "http://127.0.0.1:$P/goto?q=go%3D1%26debug%3D1%26q%3Dmedium%26weather
 # a spot looking uphill (rock faces) or toward (tx, tz)
 up() { js "const S=window.__ski,f=S.field,x=$2,z=$3,d=20; const h=Math.atan2(f.height(x,z+d)-f.height(x,z-d), f.height(x+d,z)-f.height(x-d,z)); return await window.__r8.spot(x-Math.cos(h)*30, z-Math.sin(h)*30, h, [x-Math.cos(h)*45, z-Math.sin(h)*45, 1.6, x, z, 2, 60])"; shot "$1"; }
 look() { js "return await window.__r8.spot($2, $3, Math.atan2($5-$3, $4-$2), [$2, $3, ${6:-3}, $4, $5, ${7:-0}, 55])"; shot "$1"; }
-for rid in ${1:-killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax}; do
+for rid in ${1:-killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax soelden}; do
   load "$rid"
   shot "$rid-spawn"
   js "return window.__r8.labelBoxes()"

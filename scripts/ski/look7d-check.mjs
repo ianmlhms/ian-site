@@ -26,7 +26,7 @@ const { parkSnowGeometry } = await imp('modes/views.js');
 const { TREE_GEOMETRY } = await imp('scatter-view.js');
 
 const RIDS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const ALL = RIDS.length ? RIDS : ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax'];
+const ALL = RIDS.length ? RIDS : ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax', 'soelden'];
 const OLD_TRIS = { spruceNear: 154, larchNear: 190, spruceFar: 10, larchFar: 18 };
 const TOL = 0.05;                     // m: drawn vs skied
 let failed = 0, passed = 0;

@@ -21,6 +21,7 @@ const INFO = Object.freeze({
   livigno: { title: 'Livigno', places: 'Mottolino a Carosello 3000', flags: ['🇮🇹'], region: 'Lombardei' },
   davos: { title: 'Davos Klosters', places: 'Parsenn, Jakobshorn, Rinerhorn, Madrisa', flags: ['🇨🇭'], region: 'Graubünden' },
   laax: { title: 'Laax', places: 'Flims, Laax, Falera, Vorab-Gletscher', flags: ['🇨🇭'], region: 'Graubünden' },
+  soelden: { title: 'Sölden', places: 'Gaislachkogl, Giggijoch, Hochsölden, Gletscher', flags: ['🇦🇹'], region: 'Tirol' },
   obertauern: { title: 'Obertauern', places: 'Tauernrunde ronderëm de Pass', flags: ['🇦🇹'], region: 'Salzburger Land' },
 });
 

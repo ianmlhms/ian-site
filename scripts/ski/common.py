@@ -292,6 +292,27 @@ RESORTS = {
             ("Laax", 9.2581, 46.8064, 600, "chalet"), ("Laax Murschetg", 9.2643, 46.8193, 250, "chalet"), ("Falera", 9.2321, 46.8008, 400, "chalet"),
         ],
     },
+    # Sölden (Ötztal, Tyrol): Gaislachkogl, Giggijoch, Hochsölden, Schwarze Schneid and the Rettenbach / Tiefenbach glaciers (the glacier road tunnel
+    # is a road, the Gletscherexpress / Gaislachkogl lifts are in the one connected network). ETRS89 / UTM 32N frame; heights: BEV ALS DTM 1 m
+    # (= the Land Tirol airborne scan, CC BY 4.0), Copernicus GLO-30 where BEV has no data. Obergurgl-Hochgurgl and Vent are separate areas.
+    "soelden": {
+        "name": "Sölden", "short": "Gaislachkogl · Giggijoch · Gletscher", "country": "AT", "crs": "EPSG:25832",
+        "bbox": (46.895, 10.895, 46.995, 11.050),
+        "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        "tree_line": 2150.0, "derived_forest": 2000.0,
+        "buildings": "villages",
+        "villages": [
+            ("Sölden", 11.0073, 46.9666, 900, "chalet"), ("Hochsölden", 10.9845, 46.9774, 300, "chalet"), ("Zwieselstein", 11.0275, 46.9396, 250, "chalet"),
+            ("Heiligkreuz", 10.9764, 46.9100, 150, "chalet"),
+        ],
+        # the Rettenbach and Tiefenbach glaciers are reached by the glacier road (bus / car): no piste or lift links them to Sölden
+        # (config.js BUS_AREAS, bake.py keep_areas). Obergurgl-Hochgurgl (south-east), Vent (south-west), the Pitztal glacier (west) and the
+        # Stubai glacier (east) are separate ski areas: outside the box / dropped by tidy_network.
+        "keep_areas": ("Gletscherexpress", "Tiefenbachbahn"),
+        # a 67 m unnamed rope tow on the Gaislachalm bench (drawn, not rideable: 6 m rise) and the "Gletscher Skitunnel" (133 m through the rock,
+        # the game's terrain runs over it: a tucked skier crawls at 5 km/h)
+        "exclude": [("Seilzug Gaislachalm", 10.9966, 46.93415, 40), ("Gletscher Skitunnel", 10.9263, 46.9232, 60)],
+    },
 }
 
 # Height tiles: TILE_CELLS cells of NEAR_STEP metres (the files hold TILE_CELLS + 1 nodes per side, neighbours share their edge).

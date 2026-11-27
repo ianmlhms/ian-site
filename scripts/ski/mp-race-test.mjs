@@ -15,7 +15,7 @@ const eq = (a, b, msg) => ok(JSON.stringify(a) === JSON.stringify(b), `${msg}${J
   const seed = matchSeed('KXRM', roster);
   eq(seed, matchSeed('kxrm', roster), 'seed ignores the code case');
   ok(seed !== matchSeed('KXRM', [roster[1], roster[0], roster[2]]), 'another roster order draws anew');
-  const ready = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax'];
+  const ready = ['killy', '3vallees', 'zermatt', 'arlberg', 'kronplatz', 'vialattea', 'obertauern', 'livigno', 'davos', 'laax', 'soelden'];
   eq(resolveResort({ resort: 'zermatt' }, seed, ready), 'zermatt', 'a chosen resort stays');
   ok(ready.includes(resolveResort({ resort: 'random' }, seed, ready)), 'random resort is a ready one');
   const pistes = Array.from({ length: 30 }, (_, i) => ({ id: `p${String(i).padStart(2, '0')}`, diff: ['green', 'blue', 'red', 'black'][i % 4], length: 600 + i * 120, src: { drop: 150 + i * 20 } }));

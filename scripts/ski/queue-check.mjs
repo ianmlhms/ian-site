@@ -21,7 +21,7 @@ const { createLiftNet } = await imp('modes/freeride.js');
 const { mazeSpec, createQueueSim, laneAt, mazeWhy } = await imp('lift-queue.js');
 const args = process.argv.slice(2);
 const verbose = args.includes('--verbose');
-const list = (args.find((a) => !a.startsWith('--')) || 'killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos,laax').split(',');
+const list = (args.find((a) => !a.startsWith('--')) || 'killy,3vallees,zermatt,arlberg,kronplatz,vialattea,obertauern,livigno,davos,laax,soelden').split(',');
 let fails = 0;
 const fail = (m) => { fails++; console.log('  FAIL', m); };
 const totals = { made: 0, eligible: 0 };

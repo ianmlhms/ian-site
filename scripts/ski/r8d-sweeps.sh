@@ -1,7 +1,7 @@
 #!/bin/bash
 # R8d: the village sweep (every village / hamlet centre, 4 headings; r8c-helpers.js sweep) per level and resort, a FRESH browser
 # (r8c-drv.mjs through browser-slot.py) for every level x resort (22 Nov memory rule: a browser tree > 2.5 GB is killed).
-#   scripts/ski/r8d-sweeps.sh "low medium" "killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax" <out dir>
+#   scripts/ski/r8d-sweeps.sh "low medium" "killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax soelden" <out dir>
 # Also writes mem-<level>-<rid>.json: renderer.info.memory + the JS heap at the end of the sweep.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 P=${PORT:-8795}

@@ -208,6 +208,7 @@ export const FIRST_LIFT = Object.freeze({
   vialattea: ['Sestriere - Fraiteve 1', 'Cit Roc'],        // Sestriere village: the Fraiteve gondola
   livigno: ['Mottolino Gondola', 'Livigno-Tagliede'],      // Livigno centre: the Mottolino gondola from the village
   laax: ['Laax Murschetg - Crap Sogn Gion', 'Arena Express Flims - Plaun'],   // Laax Murschetg: the Crap Sogn Gion cable car; Flims: the Arena Express
+  soelden: ['Giggijochbahn', 'Gaislachkoglbahn I'],          // Sölden village: the Giggijoch gondola; second the Gaislachkogl gondola
   davos: ['Parsennbahn 1', 'Klosters - Gotschnaboden'],    // Davos Dorf: the Parsenn funicular up to Weissfluhjoch
   obertauern: ['Zehnerkarbahn I', 'Grünwaldkopfbahn'],   // the west end of the pass village: the Zehnerkar gondola
 });

@@ -96,7 +96,7 @@ export const flow = {
       const c = await import("/pb/ski/modes/cloud.js");
       const ch = await import("/pb/ski/modes/challenges.js");
       const stars = {};
-      const rids = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax"];
+      const rids = ["killy", "3vallees", "zermatt", "arlberg", "kronplatz", "vialattea", "obertauern", "livigno", "davos", "laax", "soelden"];
       for (const rid of rids) for (let i = 0; i < 160; i++) stars[ch.starKey(rid, `piste-${i}`)] = 7;
       const bestHash = Object.fromEntries(Object.keys(stars).map((k) => [k, 123456]));
       const rec = c.encodeCloud({ stars, park: { killy: 12345 }, bestHash });

@@ -46,6 +46,7 @@ CAMERAS = {
     "arlberg": {"az": 0, "f0": 0.76, "f1": 0.58},          # St. Anton in front, Lech and Warth behind, the Sonnenkopf left
     "kronplatz": {"az": 208},                              # from above Bruneck
     "davos": {"az": 15, "f0": 0.78, "f1": 0.6},            # from above Glaris looking north up the valley: Rinerhorn and Jakobshorn in front, Davos and the Parsenn in the middle, Klosters and Madrisa behind
+    "soelden": {"az": 200},                                # from above the Windach valley looking north: Sölden bottom-left, Giggijoch / Gaislachkogl in the middle, the glaciers top-right
 }
 
 

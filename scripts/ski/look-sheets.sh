@@ -4,7 +4,7 @@
 D="$1"; PY="${SKI_PY:-$HOME/Library/Caches/luxtram-work/.venv/bin/python}"; S="$(cd "$(dirname "$0")" && pwd)/look_sheet.py"
 B="$D/before"; A="$D/after"
 name() { case "$1" in killy) echo "Espace Killy";; 3vallees) echo "3 Vallées";; zermatt) echo "Zermatt";; arlberg) echo "St. Anton";; kronplatz) echo "Kronplatz";; esac; }
-for r in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax; do
+for r in killy 3vallees zermatt arlberg kronplatz vialattea obertauern livigno davos laax soelden; do
   n="$(name $r)"
   "$PY" "$S" "$D/sheet-$r.jpg" --width 1400 \
     "$n · Niddreg · VIRDRUN|$B/$r-low-run.png" "$n · Niddreg · NEI|$A/$r-low-run.png" \
