@@ -2242,7 +2242,7 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   (pano-check 100 % on the page, 99.4 % visible, taps 0 m). Shots ~/Library/Caches/ski-work/soelden/map/.
 - **Picker**: picture = our own GPU render (pose 5600,3400,300,3500,6200,0,50: the Rettenbach glacier bench with the Gletscherexpress station and the lake;
   `scripts/ski/picker-shots.mjs` = shot.mjs --script that hides all page elements, POSES env), blurred 1.6 px, 59 / 28 KB. Eleven cards = 1 hero + 10 small = 5 columns on
-  the iPad, `rp-dense` as for ten. mp-games `SKI_RESORTS` + 6 pistes (mp-games v14, friends v80, mp-lobby v27, arcade-feature v5, arcade-catalogue v3, i18n-dict v63);
+  the iPad, `rp-dense` as for ten. mp-games `SKI_RESORTS` + 6 pistes (mp-games v15, friends v81, mp-lobby v28, arcade-feature v5, arcade-catalogue v3, i18n-dict v63);
   texts say 11 + "bis Sölden", 2.174 Pisten, 710 Liften (about / i18n-dict / catalogue / banner / pixelbreak; arcade_feature flow).
 - **SQL**: `scripts/ski-v1.sql` regenerated (+100 boards `ski-soelden-*` incl. `ski-soelden-park`, 2185 in all). ONLY the `ski-soelden-*` rows were applied to production
   (`supabase db query --linked -f`), production == the committed rows (100 / 100). One row (`ski-soelden-skitunnel`) was applied before the tunnel was excluded and
