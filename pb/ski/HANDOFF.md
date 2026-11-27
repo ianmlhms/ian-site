@@ -2205,3 +2205,9 @@ where they were; every new part is drawn only (det, never solid) and inside the 
 - **Still open**: a shell grazed by a neighbour's chairs is flattened to 0.3 m by the old gable rule (Killy Bollin / Fresse top reads as a
   flat canopy); the terminals are as long as the old footprint allows (-9 m), real ones are longer; heated chairs look like the others;
   the player's own chair crosses the rail at line speed; real iPad untested.
+
+## Inviting a friend from Ski Alpen (27 Nov 2026; Ian: "ski alpen multiplayer is really buggy, when inviting by friends"; bugs: ~/Library/Caches/ski-work/mp-invites/bugs.md)
+- Standalone `pb/ski.html` never got invites: auth.js read `window.PB_CONFIG` once at its first import (pulled in early by arcade-kit's score saving), and the page had no config. Now the config is loaded in the head (top level only; the arcade frame gets none) and the page starts the auth client when idle, so invite-pop (banner while playing) works.
+- Join never lands on friends.html any more (invite-pop `resolveTarget`, friends.js): unknown game id in an old cached mp-games.js -> fresh list -> `lobby.html?g=<id>&c=<code>`; expired -> «D'Invitatioun ass ofgelaf.». Push tap now opens the lobby (notify edge function, deployed; `ski` has a name).
+- Re-invite: SQL `scripts/mp-invite-resend-v1.sql` APPLIED (only a pending invite < 45 s counts as already invited); lobby offers an invited friend again + «↻» on the invited row; hint when invited friends are not here yet. A late friend still cannot join a running session (roster fixed at start).
+- Flow `ski-mp-invite` (Chromium + WebKit, iPad touch guest). WebKit `ski-mp` already fails on main (cancelled-load noise), unrelated.
