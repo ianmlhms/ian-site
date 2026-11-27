@@ -47,8 +47,10 @@ const GAME_NAMES: Record<string, string> = {
   connect4: "Connect 4", slf: "Stadt-Land-Fluss", battleship: "Battleship",
   color: "Colour Guess", draw: "Draw & Guess", reversi: "Reversi",
   dots: "Dots & Boxes", tictactoe: "Tic-Tac-Toe",
-  checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel",
+  checkers: "Checkers", maumau: "Mau-Mau Cards", "dice-duel": "Kniffel", ski: "Ski Alpen",
 };
+// games that start through lobby.html (keep in step with mp-games.js, lobby: true): the tap on the push joins the lobby, not the friends page
+const LOBBY_GAMES = new Set(["connect4", "slf", "tictactoe", "battleship", "reversi", "dots", "checkers", "maumau", "dice-duel", "color", "pong", "tank-wars", "fighters", "air-hockey", "draw", "meme", "intro", "roulette", "blackjack", "ski"]);
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -212,7 +214,7 @@ async function planFor(table: string, rec: any): Promise<Plan[]> {
       recipients: [rec.to_user],
       title: "🎮 Game invite",
       body: `${rec.from_name || "Someone"} invited you to ${gname}`,
-      url: "friends.html",
+      url: LOBBY_GAMES.has(rec.game) && /^[A-Za-z0-9]{4,10}$/.test(String(rec.room || "")) ? `lobby.html?g=${rec.game}&c=${String(rec.room).toUpperCase()}` : "friends.html",
       tag: "invite-" + rec.from_user,
     }];
   }

@@ -167,5 +167,20 @@ if (!window.THREE) {
   // Absolute imports: inside the arcade this page runs as a srcdoc iframe (relative URLs inside main.js come from import.meta.url).
   if (window.bootProbe) window.bootProbe("/pb/ski/main.js", window.__skiLoad); else import("/pb/ski/main.js");
 </script>
+<script>
+/* Opened on its own (pb/ski.html, not inside the arcade frame): the arcade shell is not here, so nothing would ever show a friend's game invite
+ * (invite-pop.js starts from auth.js). Load both once the game is up; in the arcade frame the shell already does it. */
+(function () {
+  try { if (window.top !== window) return; } catch (error) { return; }
+  function go() { import("/auth.js?v=47").catch(function (error) { console.warn("[ski] invites unavailable", error); }); }
+  function lib() {   // the same pinned client build as lobby.html (auth.js would otherwise import it as an ES module from the CDN)
+    var s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js";
+    s.integrity = "sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz"; s.crossOrigin = "anonymous"; s.onload = go; s.onerror = go; document.head.appendChild(s);
+  }
+  function cfg() { var s = document.createElement("script"); s.src = "/pixelbreak-config.js"; s.onload = lib; s.onerror = function () { console.warn("[ski] invites: no config"); }; document.head.appendChild(s); }
+  function later() { if ("requestIdleCallback" in window) window.requestIdleCallback(cfg, { timeout: 8000 }); else setTimeout(cfg, 4000); }
+  if (document.readyState === "complete") later(); else window.addEventListener("load", later);
+})();
+</script>
 </body>
 </html>

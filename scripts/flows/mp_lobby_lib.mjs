@@ -32,8 +32,8 @@ export function createWorld({ hub, friends = {} } = {}) {
 }
 
 /** A player = one browser context. `user` null = signed-out guest. first: reuse the flow's own context/page (it gets the video). */
-export async function newPlayer(h, world, { label, user = null, first = false, viewport = VIEWPORT, extraRpc = {} } = {}) {
-  const context = first ? h.context : await h.context.browser().newContext({ viewport, serviceWorkers: "block" });
+export async function newPlayer(h, world, { label, user = null, first = false, viewport = VIEWPORT, extraRpc = {}, contextOptions = {} } = {}) {
+  const context = first ? h.context : await h.context.browser().newContext({ viewport, serviceWorkers: "block", ...contextOptions });
   const page = first ? h.page : await context.newPage();
   const player = { label, user, context, page, http: [], errors: [], warnings: [], backend: null, first };
   const uid = user ? user.id : "";
@@ -51,7 +51,7 @@ export async function newPlayer(h, world, { label, user = null, first = false, v
           const target = Object.values(USERS).find((u) => u.id === to);
           if (!target) return { user_id: to, status: "unknown_user" };
           if (to === uid) return { user_id: to, status: "self" };
-          if (world.invites.some((i) => i.from_user === uid && i.to_user === to && i.game === p_game && i.room === p_room)) return { user_id: to, status: "already_invited" };
+          if (world.invites.some((i) => i.from_user === uid && i.to_user === to && i.game === p_game && i.room === p_room && i.status === "pending" && Date.now() - Date.parse(i.created_at) < 45000)) return { user_id: to, status: "already_invited" };
           const row = { id: world.seq++, from_user: uid, from_name: user.username, to_user: to, game: p_game, room: p_room, status: "pending", created_at: new Date().toISOString() };
           world.invites.push(row);
           world.hub.pushInsert("game_invites", row, to);

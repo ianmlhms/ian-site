@@ -177,8 +177,10 @@ function renderInvites(list) {
     </div>`).join("");
   $("invites").querySelectorAll("[data-join]").forEach(b => b.onclick = async () => {
     const [game, room, id] = b.dataset.join.split("|");
-    const url = joinUrl(game, room);   // lobby games → lobby.html?g=…&c=CODE, the rest → page?room=…&role=guest
-    if (!url) return;
+    // lobby games → lobby.html?g=…&c=CODE, the rest → page?room=…&role=guest. A game id this copy of mp-games.js does not know (an older
+    // cached one) is not a dead button: the lobby loads its own registry and says in Luxembourgish if it does not know the game either.
+    const url = joinUrl(game, room) || (/^[a-z0-9-]{2,24}$/.test(game) && /^[A-Za-z0-9]{4,10}$/.test(room) ? `lobby.html?g=${game}&c=${room.toUpperCase()}` : null);
+    if (!url) { alert("Dës Invitatioun ass net méi gëlteg."); return; }
     // The invite is only marked as answered; joining must not depend on it.
     try {
       const { error } = await sb.from("game_invites").update({ status: "accepted" }).eq("id", +id);

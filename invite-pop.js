@@ -35,9 +35,9 @@ const ROOM_RE = /^[A-Za-z0-9]{4,10}$/;
 const LIVE_BY_DEFAULT = /(?:^|\/)(?:pb\/[A-Za-z0-9_-]+|geometrydash|mordsfall)\.html$/;
 
 const TEXT = Object.freeze({
-  lb: { kicker: "Spillinvitatioun", body: "{name} huet dech op {game} invitéiert.", bar: "{name} invitéiert dech op {game}", tap: "Tippen fir ze äntwerten", join: "Bäitrieden", decline: "Ofleenen", later: "Méi spéit", more: "+{n} weider", sheet: "Invitatioun" },
-  de: { kicker: "Spieleinladung", body: "{name} hat dich zu {game} eingeladen.", bar: "{name} lädt dich zu {game} ein", tap: "Tippen zum Antworten", join: "Beitreten", decline: "Ablehnen", later: "Später", more: "+{n} weitere", sheet: "Einladung" },
-  en: { kicker: "Game invite", body: "{name} invited you to {game}.", bar: "{name} invites you to {game}", tap: "Tap to respond", join: "Join", decline: "Decline", later: "Later", more: "+{n} more", sheet: "Invitation" },
+  lb: { kicker: "Spillinvitatioun", body: "{name} huet dech op {game} invitéiert.", bar: "{name} invitéiert dech op {game}", tap: "Tippen fir ze äntwerten", join: "Bäitrieden", decline: "Ofleenen", later: "Méi spéit", more: "+{n} weider", sheet: "Invitatioun", expired: "D'Invitatioun ass ofgelaf.", noGame: "Dat Spill ass net verfügbar." },
+  de: { kicker: "Spieleinladung", body: "{name} hat dich zu {game} eingeladen.", bar: "{name} lädt dich zu {game} ein", tap: "Tippen zum Antworten", join: "Beitreten", decline: "Ablehnen", later: "Später", more: "+{n} weitere", sheet: "Einladung", expired: "Die Einladung ist abgelaufen.", noGame: "Dieses Spiel ist nicht verfügbar." },
+  en: { kicker: "Game invite", body: "{name} invited you to {game}.", bar: "{name} invites you to {game}", tap: "Tap to respond", join: "Join", decline: "Decline", later: "Later", more: "+{n} more", sheet: "Invitation", expired: "This invitation has expired.", noGame: "This game is not available." },
 });
 const tx = () => { let l = "lb"; try { const v = window.I18N?.lang || localStorage.getItem("site_lang"); if (TEXT[v]) l = v; } catch { /* storage blocked: Luxembourgish */ } return TEXT[l]; };
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
@@ -116,7 +116,7 @@ async function systemNotify(inv) {   // background tab, permission granted, no p
     const reg = await navigator.serviceWorker?.getRegistration?.();
     if (!reg?.showNotification || await reg.pushManager?.getSubscription?.()) return;   // push already tells this device
     const t = tx(), d = describe(inv);
-    await reg.showNotification(t.kicker, { body: fill(t.body, { name: d.name, game: d.game }), icon: "favicon.svg", badge: "favicon.svg", tag: "ginv-" + inv.id, data: { url: "friends.html" } });
+    await reg.showNotification(t.kicker, { body: fill(t.body, { name: d.name, game: d.game }), icon: "favicon.svg", badge: "favicon.svg", tag: "ginv-" + inv.id, data: { url: joinUrl(inv.game, inv.room) || "friends.html" } });
   } catch { /* the in-page presentation is enough */ }
 }
 
@@ -125,7 +125,24 @@ function describe(inv) {
   const g = gameInfo(inv.game);
   return { name: inv.from, game: gameName(inv.game), emoji: g?.emoji || "🎮", thumb: g ? thumbUrl(g) : "" };
 }
-const targetUrl = (inv) => `${location.origin}/${joinUrl(inv.game, inv.room) || "friends.html"}`;
+/* Where Join leads. NEVER the friends page: a game id this device's mp-games.js does not know (an older copy kept by the browser or the
+ * service worker, the game was added after it) used to fall back to friends.html. Now: a fresh copy of the registry first, then the
+ * lobby with that game id (lobby.html loads its own registry and says in Luxembourgish if it does not know the game either). */
+const GAME_ID_RE = /^[a-z0-9-]{2,24}$/;
+async function resolveTarget(inv) {
+  let url = joinUrl(inv.game, inv.room);
+  if (!url) {
+    try { url = (await import(`./mp-games.js?fresh=${Date.now()}`)).joinUrl(inv.game, inv.room); } catch (error) { console.warn("[invites] fresh game list failed", error); }
+  }
+  if (!url && GAME_ID_RE.test(inv.game)) url = `lobby.html?g=${inv.game}&c=${inv.room.toUpperCase()}`;
+  return url ? `${location.origin}/${url}` : null;
+}
+function notice(text) {
+  injectCss();
+  const el = h("div", { class: "ip-note", role: "status" }, text);
+  document.body.append(el);
+  setTimeout(() => el.remove(), 6000);
+}
 
 async function setStatus(inv, status) {
   try {
@@ -205,11 +222,23 @@ function answer(inv, action, previous, close) {
   markState(inv.id, DONE);
   close();
   if (action === "later") { restoreFocus(previous); return; }
+  if (action === "join" && Date.now() - inv.createdAt > EXPIRY_MS) {   // a popup nobody answered for hours
+    void setStatus(inv, "declined");
+    restoreFocus(previous);
+    notice(tx().expired);
+    return;
+  }
   const saved = setStatus(inv, action === "join" ? "accepted" : "declined");
   if (action === "join") {
     leaving = true;
     // leave through the same links the lobby / friends page use; wait briefly so the status reaches the server first
-    void Promise.race([saved, sleep(1500)]).then(() => location.assign(targetUrl(inv)));
+    void Promise.race([saved, sleep(1500)]).then(() => resolveTarget(inv)).then((url) => {
+      if (url) { location.assign(url); return; }
+      leaving = false;
+      restoreFocus(previous);
+      notice(tx().noGame);
+      void pump();
+    });
     return;
   }
   restoreFocus(previous);
@@ -334,6 +363,7 @@ function injectCss() {
   .ip-sheet-t{flex:1;min-width:0;font-size:14px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
   .ip-sheet .ip-actions{margin-top:10px;justify-content:flex-end}
   .ip-sheet .ip-btn{min-height:44px;min-width:92px}
+  .ip-note{position:fixed;z-index:100003;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);max-width:min(420px,calc(100% - 32px));padding:12px 18px;border-radius:14px;background:var(--card-opaque,var(--card,#161625));color:var(--text,#e8e8f0);border:1px solid var(--border,rgba(255,255,255,.18));box-shadow:0 12px 32px rgba(0,0,0,.45);font:700 14px/1.35 var(--font,system-ui,-apple-system,sans-serif);text-align:center}
   @keyframes ipFade{from{opacity:0}to{opacity:1}}
   @keyframes ipDrop{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
   @media (prefers-reduced-motion:reduce){.ip-ov,.ip-top{animation:none}}

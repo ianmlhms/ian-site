@@ -64,6 +64,7 @@ const S = {
     invSent: "{n} invitéiert.", invAlready: "{name} ass scho invitéiert.", invNotAllowed: "{name} ass net verfügbar.", invUnknown: "{name} gouf net fonnt.",
     invRate: "Zevill Invitatiounen — probéier et gläich nach eng Kéier.", invUnavailable: "Invitéieren ass nach net verfügbar. Deel de Link.", invFailed: "Invitatioun ass net ukomm. Deel de Link.",
     guestNote: "Gäscht kënnen iwwer de Code oder de Link matmaachen.",
+    invAgain: "{name} nach eng Kéier invitéieren", waitInv: "{n} invitéiert Frënn sinn nach net do.",
   },
   de: {
     lobby: "Lobby", create: "Lobby erstellen", createD: "Du bekommst einen Code und kannst Leute einladen", joinTitle: "Mit einem Code beitreten",
@@ -86,6 +87,7 @@ const S = {
     invSent: "{n} eingeladen.", invAlready: "{name} ist schon eingeladen.", invNotAllowed: "{name} ist nicht verfügbar.", invUnknown: "{name} wurde nicht gefunden.",
     invRate: "Zu viele Einladungen — versuch es gleich nochmal.", invUnavailable: "Einladen ist noch nicht verfügbar. Teile den Link.", invFailed: "Die Einladung ist nicht angekommen. Teile den Link.",
     guestNote: "Gäste können über den Code oder den Link mitspielen.",
+    invAgain: "{name} noch einmal einladen", waitInv: "{n} eingeladene Freunde sind noch nicht da.",
   },
   en: {
     lobby: "Lobby", create: "Create lobby", createD: "You get a code and can invite people", joinTitle: "Join with a code",
@@ -108,6 +110,7 @@ const S = {
     invSent: "{n} invited.", invAlready: "{name} is already invited.", invNotAllowed: "{name} is not available.", invUnknown: "{name} was not found.",
     invRate: "Too many invitations — try again in a moment.", invUnavailable: "Inviting is not available yet. Share the link instead.", invFailed: "The invitation did not go through. Share the link instead.",
     guestNote: "Guests can join with the code or the link.",
+    invAgain: "Invite {name} again", waitInv: "{n} invited friends are not here yet.",
   },
 };
 const readLang = () => { try { const v = localStorage.getItem("site_lang"); return S[v] ? v : "lb"; } catch { return "lb"; } };
@@ -568,7 +571,7 @@ export async function mountLobby(root, options = {}) {
       const { data } = await ident.sb.rpc("my_friends");
       friends = (data || []).map((f) => ({ id: String(f.user_id).toLowerCase(), username: f.username }));
     } catch (e) { warn("friends unavailable", e); }
-    const taken = new Set([ident.uid, ...st.members.map((m) => m.uid).filter(Boolean), ...st.invited.keys()]);
+    const taken = new Set([ident.uid, ...st.members.map((m) => m.uid).filter(Boolean)]);   // an invited friend who has not come (declined, missed it) can be invited again
     const res = await picker.openPeoplePicker({
       sb: ident.sb, title: t("pickTitle"), okText: t("pickOk"), exclude: taken, allow: restriction.allow, friends, recent: loadRecent(),
       maxPick: MAX_INVITE_BATCH,
@@ -587,7 +590,7 @@ export async function mountLobby(root, options = {}) {
       const problems = [];
       for (const r of data || []) {
         const name = names.get(r.user_id) || "";
-        if (r.status === "sent") { sent++; st.invited.set(r.user_id, { username: name || "…" }); }
+        if (r.status === "sent") { sent++; st.invited.set(r.user_id, { username: name || st.invited.get(r.user_id)?.username || "…" }); }
         else if (r.status === "already_invited") { st.invited.set(r.user_id, { username: name || "…" }); problems.push(t("invAlready", { name })); }
         else problems.push(t(STATUS_TEXT[r.status] || "invFailed", { name }));
       }
@@ -740,7 +743,8 @@ export async function mountLobby(root, options = {}) {
         host && !isMe ? h("button", { class: "mpl-x", type: "button", "aria-label": t("kickAria", { name: m.name }), title: t("kick"), onclick: () => kick(m) }, h("span", { "aria-hidden": "true" }, "✕")) : null);
     });
     for (const [uid, inv] of st.invited) {
-      rows.push(h("li", { class: "mpl-row mpl-invited", "data-uid": uid }, avatarEl(inv.username, ""), h("span", { class: "mpl-name" }, inv.username || "…"), h("span", { class: "mpl-state" }, t("invitedTag"))));
+      rows.push(h("li", { class: "mpl-row mpl-invited", "data-uid": uid }, avatarEl(inv.username, ""), h("span", { class: "mpl-name" }, inv.username || "…"), h("span", { class: "mpl-state" }, t("invitedTag")),
+        host ? h("button", { class: "mpl-x mpl-again", type: "button", "aria-label": t("invAgain", { name: inv.username }), title: t("invAgain", { name: inv.username }), onclick: () => void sendInvites([{ id: uid, username: inv.username }]) }, h("span", { "aria-hidden": "true" }, "↻")) : null));
     }
     for (let i = rows.length, shown = 0; i < game.max && shown < MAX_EMPTY_SLOTS; i++, shown++) rows.push(h("li", { class: "mpl-row mpl-empty" }, h("span", { class: "mpl-av mpl-av-empty", "aria-hidden": "true" }), h("span", { class: "mpl-name" }, t("empty"))));
     els.list.replaceChildren(...rows);
@@ -755,7 +759,7 @@ export async function mountLobby(root, options = {}) {
     els.start.disabled = !canStart();
     let hint = "";
     if (st.starting) hint = t("starting");
-    else if (host) hint = n < game.min ? t("needMore", { n: game.min }) : (canStart() ? t("readyToGo") : t("waitReady"));
+    else if (host) { hint = n < game.min ? t("needMore", { n: game.min }) : (canStart() ? t("readyToGo") : t("waitReady")); if (st.invited.size && n >= game.min) hint += " " + t("waitInv", { n: st.invited.size }); }
     else hint = me.ready ? t("waitHost") : "";
     els.hint.textContent = hint;
     if (!ident.signedIn) els.hint.textContent = (hint ? hint + " " : "") + t("guestNote");
