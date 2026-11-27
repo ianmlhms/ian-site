@@ -102,6 +102,11 @@
 <link rel="modulepreload" href="/pb/ski/main.js?v=a66fe0aab2">
 <!-- importmap:end -->
 <!-- online races: the lobby context (lobby.html -> pixelbreak.html?g=ski&room=..&lb=..); a bare visit stays on the game (data-menu) -->
+<script>
+/* top level only: auth.js (pulled in by arcade-kit's score saving and by the invites below) reads window.PB_CONFIG once, when it is first
+ * imported, so the config has to be there first. The arcade frame gets none (it cannot reach Supabase; the shell does it). */
+try { if (window.top === window) document.write('<script src="/pixelbreak-config.js"><\/script>'); } catch (error) { /* cross-origin parent */ }
+</script>
 <script src="/mp-gate.js?v=10" data-game="ski" data-menu data-adopt="#mpLobbyBtn"></script>
 <script>
 /* Starts the first resort's files right away (they download while the code loads); resort-data.js takes them from window.__skiPre.
@@ -169,16 +174,15 @@ if (!window.THREE) {
 </script>
 <script>
 /* Opened on its own (pb/ski.html, not inside the arcade frame): the arcade shell is not here, so nothing would ever show a friend's game invite
- * (invite-pop.js starts from auth.js). Load both once the game is up; in the arcade frame the shell already does it. */
+ * (invite-pop.js starts from auth.js). Load the client once the game is up (the config is loaded in the head); in the arcade frame the shell already does it. */
 (function () {
   try { if (window.top !== window) return; } catch (error) { return; }
-  function go() { import("/auth.js?v=47").catch(function (error) { console.warn("[ski] invites unavailable", error); }); }
+  function go() { import("/auth.js?v=47").then(function (auth) { return auth.client(); }).catch(function (error) { console.warn("[ski] invites unavailable", error); }); }
   function lib() {   // the same pinned client build as lobby.html (auth.js would otherwise import it as an ES module from the CDN)
     var s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js";
     s.integrity = "sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz"; s.crossOrigin = "anonymous"; s.onload = go; s.onerror = go; document.head.appendChild(s);
   }
-  function cfg() { var s = document.createElement("script"); s.src = "/pixelbreak-config.js"; s.onload = lib; s.onerror = function () { console.warn("[ski] invites: no config"); }; document.head.appendChild(s); }
-  function later() { if ("requestIdleCallback" in window) window.requestIdleCallback(cfg, { timeout: 8000 }); else setTimeout(cfg, 4000); }
+  function later() { if ("requestIdleCallback" in window) window.requestIdleCallback(lib, { timeout: 8000 }); else setTimeout(lib, 4000); }
   if (document.readyState === "complete") later(); else window.addEventListener("load", later);
 })();
 </script>

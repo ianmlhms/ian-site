@@ -86,7 +86,7 @@ export const flow = {
 
       h.step("(a) Emma (iPad, playing) gets the slim banner, taps it, taps Join -> the lobby, not the friends page");
       await emma.page.waitForSelector(".ip-top .ip-bar", { timeout: 40000 }).catch(async (e) => {
-        console.log("    DEBUG emma", JSON.stringify({ errors: emma.errors.slice(-6), warnings: emma.warnings.slice(-6), auth: await emma.page.evaluate(() => ({ g: !!window.__pbAuth, sess: !!(window.__pbAuth && window.__pbAuth.session), sb: !!window.supabase, cfg: !!window.PB_CONFIG, top: window.top === window })) }));
+        console.log("    DEBUG emma", JSON.stringify({ errors: emma.errors.slice(-6), warnings: emma.warnings.slice(-6), auth: await emma.page.evaluate(() => ({ g: !!window.__pbAuth, sess: !!(window.__pbAuth && window.__pbAuth.session), sb: !!window.supabase, cfg: !!window.PB_CONFIG, top: window.top === window, res: performance.getEntriesByType('resource').filter((e) => /auth\.js|config|supabase/.test(e.name)).map((e) => e.name.slice(-36) + '@' + Math.round(e.startTime)), url: window.PB_CONFIG && window.PB_CONFIG.url })) }));
         throw e;
       });
       h.expect(await emma.page.locator(".ip-ov").count() === 0, "playing Ski Alpen: a banner, no popup over the game");
@@ -114,8 +114,8 @@ export const flow = {
       const F = {};
       for (const p of [host, emma]) { await p.page.goto(p.page.url() + "&" + DEBUG_Q, { waitUntil: "domcontentloaded" }); F[p.label] = await arcadeFrame(p); }
       for (const p of [host, emma]) await F[p.label].waitForFunction(() => document.documentElement.dataset.skiMp === "free" && window.__ski.game.phase === "running", null, T);
-      const resorts = await Promise.all([host, emma].map((p) => F[p.label].evaluate(() => window.__ski.resortId || document.documentElement.dataset.skiResort)));
-      h.expect(resorts[0] && resorts[0] === resorts[1] && /killy/.test(resorts[0]), `same resort on both (${resorts.join(" / ")})`);
+      const resorts = await Promise.all([host, emma].map((p) => F[p.label].evaluate(() => window.__skiMp.ctx.cfg.resort + "/" + (window.__ski.spawn && window.__ski.spawn.name))));
+      h.expect(resorts[0] && resorts[0] === resorts[1] && /^killy\//.test(resorts[0]), `same resort on both (${resorts.join(" / ")})`);
       await F.host.waitForFunction(() => window.__skiMp.remotes.all().filter((r) => r.state).length === 1, null, { timeout: 90000 });
       await F.emma.waitForFunction(() => window.__skiMp.remotes.all().filter((r) => r.state).length === 1, null, { timeout: 90000 });
       h.expect(!!(await seenBy(F.host, "Emma")) && !!(await seenBy(F.emma, "tester")), "they see each other");
@@ -186,10 +186,10 @@ export const flow = {
       h.eq(statusOf(world, world.invites.at(-1).id), "pending", "Later keeps the invite pending");
       // sent twice, right away: the server says already invited
       await host.page.click("#mplAdd");
-      h.expect(await host.page.locator('.ppk-row[data-name="Max"]').count() === 1, "the invited-but-silent friend is offered again in the picker");
+      h.expect(!!(await until(async () => (await host.page.locator('.ppk-row[data-name="Max"]').count()) === 1, 8000)), "the invited-but-silent friend is offered again in the picker");
       await host.page.click('.ppk-row[data-name="Max"]');
       await host.page.click("#ppGo");
-      await host.page.waitForSelector(".mpl-toast.on");
+      await host.page.waitForFunction(() => /scho/.test(document.querySelector(".mpl-toast")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
       h.expect(/scho invitéiert/.test(await host.page.textContent(".mpl-toast")), `a second tap within seconds: ${await host.page.textContent(".mpl-toast")}`);
       const count0 = world.invites.length;
       // 60 s later (the invite row is old): invite again -> a NEW invite
@@ -260,7 +260,8 @@ export const flow = {
       h.step("(f) friends page: the pending invite's Join goes to the lobby");
       const row3 = mk(code2, 0);
       await emma.page.goto(h.origin + "/friends.html", { waitUntil: "domcontentloaded" });
-      await emma.page.waitForSelector("#invites [data-join]", T);
+      await emma.page.waitForSelector("#invites [data-join]", { state: "attached", ...T });
+      if (await emma.page.locator(".ip-card").count()) await emma.page.keyboard.press("Escape");     // the pop-up (Later) is over the list on this page too
       await emma.page.locator("#invites [data-join]").first().click();
       await emma.page.waitForURL(/lobby\.html\?g=ski&c=/, T);
       h.expect(true, "friends page Join -> lobby");
