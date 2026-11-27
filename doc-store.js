@@ -1,4 +1,4 @@
-import * as auth from "./auth.js?v=47";
+import * as auth from "./auth.js?v=48";
 import { validateDocument } from "./doc-schema.js?v=1";
 
 const TABLE = "documents";

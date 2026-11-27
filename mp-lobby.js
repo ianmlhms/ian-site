@@ -17,7 +17,7 @@
  * Everything that arrives over Realtime is untrusted: names, avatars, settings are sanitised before they are rendered. */
 import {
   gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, offlineUrl, sanitizeCfg, defaultCfg, optionsFor, settingShown,
-} from "./mp-games.js?v=13";
+} from "./mp-games.js?v=14";
 
 /* ------------------------------------------------------------------ constants */
 const CTX_KEY = "mpl.ctx";               // handed to mp-gate.js in the game page
@@ -180,7 +180,7 @@ function avatarEl(name, avatar) {
 async function loadIdentity() {
   const id = { sb: null, uid: "", username: "", signedIn: false, avatar: "", auth: null };
   try {
-    const auth = await import("./auth.js?v=47");
+    const auth = await import("./auth.js?v=48");
     id.auth = auth;
     if (auth.authConfigured) {
       id.sb = await auth.client();
