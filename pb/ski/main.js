@@ -1746,8 +1746,17 @@ async function boot() {
   mark('ready');
 }
 
+/* A page that is being left (a reload, the lobby's link, a back tap) cancels its own downloads; Safari / WebKit reports those as "Load failed"
+ * rejections of the boot. A page that is really gone never runs the timer below, so only a boot that failed on a page that stays is reported
+ * (it used to log "boot failed" for every cancelled boot: the WebKit failures of the ski-mp flows). */
+let leaving = false;
+addEventListener('pagehide', () => { leaving = true; });
+const BOOT_REPORT_DELAY_MS = 400;
 boot().catch((error) => {
-  console.error('[ski] boot failed', error);
-  document.documentElement.dataset.bootError = error.message || 'boot';
-  LOAD.fail(`Feeler: ${error.message}`);
+  setTimeout(() => {
+    if (leaving) return;
+    console.error('[ski] boot failed', error);
+    document.documentElement.dataset.bootError = error.message || 'boot';
+    LOAD.fail(`Feeler: ${error.message}`);
+  }, BOOT_REPORT_DELAY_MS);
 });

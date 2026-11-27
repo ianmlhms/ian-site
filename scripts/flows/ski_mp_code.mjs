@@ -55,6 +55,10 @@ export const flow = {
       const emma = await newPlayer(h, world, { label: "emma", user: USERS.emma, ...IPAD }); players.push(emma);
       const max = await newPlayer(h, world, { label: "max", user: USERS.max, viewport: SMALL }); players.push(max);
       for (const p of players) await mockTurn(p);
+      // the debug / low-quality switches ride on the game link from the start (no reload in the middle of the boot: WebKit logs what that cancels)
+      for (const p of players) await p.context.addInitScript((q) => {
+        if (/\/pixelbreak\.html$/.test(location.pathname) && /[?&]room=/.test(location.search) && !/[?&]debug=/.test(location.search)) history.replaceState(null, "", location.pathname + location.search + q);
+      }, DEBUG_Q);
 
       /* ---------------- (a) the choice ---------------- */
       h.step("(a) picker -> «Online-Rennen»: the choice (create / join by code), nothing is created; wrong codes get a clear answer");
@@ -108,7 +112,7 @@ export const flow = {
       await host.page.click("#mplStart");
       for (const p of [host, emma]) await p.page.waitForURL(/pixelbreak\.html\?g=ski&room=/, T);
       const F = {};
-      for (const p of [host, emma]) { await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" }); F[p.label] = await arcadeFrame(p); }
+      for (const p of [host, emma]) F[p.label] = await arcadeFrame(p);
       for (const p of [host, emma]) await F[p.label].waitForFunction(() => document.documentElement.dataset.skiMp === "free" && window.__ski.game.phase === "running", null, T);
       for (const p of [host, emma]) await F[p.label].waitForFunction(() => window.__skiMp.remotes.all().filter((r) => r.state).length === 1, null, { timeout: 90000 });
       h.expect(true, "host + Emma ride together");
@@ -121,7 +125,6 @@ export const flow = {
       await max.page.click("#mplJoin");
       await max.page.waitForURL(/pixelbreak\.html\?g=ski&room=/, T);
       h.expect(max.page.url().includes("role=guest"), "Max is a guest");
-      await max.page.goto(max.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" });
       F.max = await arcadeFrame(max);
       await F.max.waitForFunction(() => document.documentElement.dataset.skiMp === "free" && window.__ski.game.phase === "running", null, T);
       const resortOf = (f) => f.evaluate(() => window.__skiMp.ctx.cfg.resort + "/" + window.__ski.spawn.name);
@@ -169,7 +172,7 @@ export const flow = {
       await host.page.click("#mplStart");
       for (const p of [host, emma]) await p.page.waitForURL(/pixelbreak\.html\?g=ski&room=/, T);
       const R = {};
-      for (const p of [host, emma]) { await p.page.goto(p.page.url() + DEBUG_Q, { waitUntil: "domcontentloaded" }); R[p.label] = await arcadeFrame(p); }
+      for (const p of [host, emma]) R[p.label] = await arcadeFrame(p);
       for (const p of [host, emma]) await R[p.label].waitForFunction(() => !!window.__skiMp && document.documentElement.dataset.skiMp, null, T);
       await max.page.goto(h.origin + `/lobby.html?g=ski&c=${code2}`, { waitUntil: "domcontentloaded" });
       await max.page.waitForSelector("#mplCancelWait", { timeout: 60000 });

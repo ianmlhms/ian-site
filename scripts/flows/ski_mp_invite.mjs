@@ -232,7 +232,7 @@ export const flow = {
       await emma.page.waitForURL(/lobby\.html\?g=ski&c=WXYZ/, T);
       await emma.page.waitForSelector("#mplMsg:not([hidden])", T);
       const gone = await emma.page.textContent("#mplMsg");
-      h.expect(/net|nët/.test(gone) && /Lobby/.test(gone), `a lobby that is gone says so in Luxembourgish: ${gone.trim()}`);
+      h.expect(/net|nët/.test(gone) && /Code/.test(gone), `a lobby that is gone says so in Luxembourgish: ${gone.trim()}`);
       await shot(emma, "d-room-gone");
 
       /* ---------------- (e) an OLD cached client: its mp-games.js does not know `ski` ---------------- */

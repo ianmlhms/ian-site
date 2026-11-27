@@ -55,7 +55,7 @@ export const flow = {
       await a.page.click("#mplJoin");
       await a.page.waitForSelector("#mplMsg:not([hidden])", { timeout: 15000 });
       await a.page.waitForFunction(() => /gëtt et net/.test(document.getElementById("mplMsg")?.textContent || ""), null, { timeout: 15000 });
-      h.expect(true, "an unknown lobby is reported («Dës Lobby gëtt et net (méi)»)");
+      h.expect(true, "an unknown code is reported («Dëse Code gëtt et net (méi)»)");
       h.expect(await a.page.isVisible("#mplCreate"), "…and the entry screen is back");
       h.eq(await a.page.evaluate(() => document.getElementById("mplCode").value), "", "…with an empty code field");
 
