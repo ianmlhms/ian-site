@@ -37,6 +37,9 @@ async function mockTurn(p) {
     return route.fulfill({ status: 200, headers: CORS, contentType: "application/json", body: JSON.stringify({ iceServers: [{ urls: ["stun:127.0.0.1:3478"] }], turn: false, provider: "mock", ttl: 7200 }) });
   });
 }
+/* WebKit logs the requests of a page that a reload / navigation cancelled in the middle of its boot as errors (HANDOFF: ski-mp, ski-mp-freeride drop them too) */
+const WEBKIT_CANCELLED = /access control checks|load https:|load \/|cancel|Load failed|cannot be parsed as a URL|Importing a module script failed|boot failed/i;
+const realErrs = (p) => realErrors(p).filter((e) => process.env.FLOW_BROWSER !== "webkit" || !WEBKIT_CANCELLED.test(e));
 const rosterCount = (page) => page.evaluate(() => document.querySelectorAll("#mplRoster .mpl-row:not(.mpl-empty):not(.mpl-invited)").length);
 const statusOf = (world, id) => world.invites.find((i) => i.id === id)?.status;
 const until = async (fn, ms = 15000, step = 150) => { const end = Date.now() + ms; for (;;) { const v = await fn(); if (v) return v; if (Date.now() > end) return false; await sleep(step); } };
@@ -168,7 +171,7 @@ export const flow = {
       await F.emma.waitForFunction(() => window.__skiMp.remotes.all().filter((r) => r.state && r.name === "tester").length === 1, null, { timeout: 90000 });
       const hostBack = await me(F.host);
       h.expect(Math.hypot(hostBack.x - hostSpot.x, hostBack.z - hostSpot.z) < 40, "the host is back near where he left");
-      for (const p of [host, emma]) h.eq(realErrors(p), [], `no console errors so far (${p.label})`);
+      for (const p of [host, emma]) h.eq(realErrs(p), [], `no console errors so far (${p.label})`);
 
       /* ---------------- (d) answers: Later, invite again, sent twice, expired, declined, room gone, while in another game ---------------- */
       h.step("(d) new lobby, Max sits in another arcade game (Pong): banner; Later; the host can invite him AGAIN; sent twice is said; then Join");
@@ -284,12 +287,13 @@ export const flow = {
       const R = {};
       for (const p of [host, max]) { await p.page.goto(p.page.url() + "&" + DEBUG_Q + "&bot=1&timescale=4", { waitUntil: "domcontentloaded" }); R[p.label] = await arcadeFrame(p); await R[p.label].evaluate(() => { window.__skiAllowBotScore = true; }); }
       for (const p of [host, max]) await R[p.label].waitForFunction(() => document.documentElement.dataset.skiMpResults === "0", null, { timeout: 240000 });
-      for (const p of [host, max]) await R[p.label].waitForFunction(() => window.__skiMp.race.runTable(0).every((r) => r.place >= 1 && r.res && r.res.ms > 0), null, { timeout: 90000 });     // the other player's time arrives over the link
+      const tableOf = (p) => R[p.label].evaluate(() => window.__skiMp.race.runTable(0).map((r) => [r.name, r.place, r.res && r.res.ms]));
+      await until(async () => { const [a, b] = await Promise.all([host, max].map(tableOf)); return JSON.stringify(a) === JSON.stringify(b) && a.length === 2 && a.every((r) => r[2] > 0); }, 90000, 500);     // the other player's time arrives over the link
       const tables = await Promise.all([host, max].map((p) => R[p.label].evaluate(() => window.__skiMp.race.runTable(0).map((r) => [r.name, r.place, r.res && r.res.ms]))));
       h.eq(tables[1], tables[0], "the same results table on both");
       h.expect(tables[0].length === 2 && tables[0].every((r) => r[1] >= 1 && r[2] > 20000), `two valid times (${JSON.stringify(tables[0])})`);
       await shot(max, "g-results");
-      for (const p of players.filter((x) => x.errors)) h.eq(realErrors(p), [], `no console errors (${p.label})`);
+      for (const p of players.filter((x) => x.errors)) h.eq(realErrs(p), [], `no console errors (${p.label})`);
       report.engine = engine;
     } finally {
       if (process.env.SKI_MPI_REPORT) fs.writeFileSync(process.env.SKI_MPI_REPORT, JSON.stringify(report, null, 2));
