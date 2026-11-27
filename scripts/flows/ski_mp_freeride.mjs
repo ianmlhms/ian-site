@@ -70,7 +70,10 @@ export const flow = {
         let hf = await gameFrame(host);
         await hf.waitForSelector("#resortScreen #skiOnline", T);
         await hf.click("#skiOnline");
-        await host.page.waitForURL(/lobby\.html\?g=ski&c=new/, T);
+        await host.page.waitForURL(/lobby\.html\?g=ski$/, T);
+        h.expect(await host.page.locator("#mplCreate").isVisible() && await host.page.locator("#mplCode").isVisible(), "«Online-Rennen» opens the CHOICE (create / join by code), no lobby created yet");
+        h.expect((await host.page.locator("#mplRoster").count()) === 0 || !(await host.page.locator("#mplRoster").isVisible()), "no lobby was created by pressing «Online-Rennen»");
+        await host.page.click("#mplCreate");
         await host.page.waitForSelector("#mplRoster");
         const code = await lobbyCode(host.page);
         const heads = () => host.page.$$eval("#mplSettings .mpl-setting h4", (e) => e.map((x) => x.textContent));

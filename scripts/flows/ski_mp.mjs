@@ -82,7 +82,10 @@ export const flow = {
       await hf.waitForSelector("#resortScreen #skiOnline", T);
       h.expect(await hf.evaluate(() => !window.__skiMp && !document.documentElement.dataset.skiMp), "no online race without a lobby");
       await hf.click("#skiOnline");
-      await host.page.waitForURL(/lobby\.html\?g=ski&c=new/, T);
+      await host.page.waitForURL(/lobby\.html\?g=ski$/, T);
+      h.expect(await host.page.locator("#mplCreate").isVisible() && await host.page.locator("#mplCode").isVisible(), "«Online-Rennen» opens the CHOICE (create / join by code), no lobby created yet");
+      h.expect((await host.page.locator("#mplRoster").count()) === 0 || !(await host.page.locator("#mplRoster").isVisible()), "no lobby was created by pressing «Online-Rennen»");
+      await host.page.click("#mplCreate");
       await host.page.waitForSelector("#mplRoster");
       const code = await lobbyCode(host.page);
       h.expect(/^[A-HJ-NP-Z]{4}$/.test(code), `lobby code ${code}`);

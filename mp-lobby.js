@@ -17,7 +17,7 @@
  * Everything that arrives over Realtime is untrusted: names, avatars, settings are sanitised before they are rendered. */
 import {
   gameInfo, CODE_ALPHABET, CODE_LEN, cleanCode, isCode, lobbyUrl, gameUrl, offlineUrl, sanitizeCfg, defaultCfg, optionsFor, settingShown,
-} from "./mp-games.js?v=15";
+} from "./mp-games.js?v=16";
 
 /* ------------------------------------------------------------------ constants */
 const CTX_KEY = "mpl.ctx";               // handed to mp-gate.js in the game page
@@ -35,6 +35,12 @@ const CLAIM_WAIT_MS = 450;               // after creating: let the presence sna
 const HOST_SEARCH_MS = 1600;             // after joining: how long to look for the host's presence entry
 const BACK_WAIT_MS = 120000;             // returning from a game: how long a guest waits for the host to reopen the lobby
 const QUICK_WAIT_MS = 1600;
+const PEEK_SYNC_MS = 1800;              // late join: how long to look at the running game's presence
+const PEEK_SETTLE_MS = 350;
+const STARTING_POLL_MS = 1500;           // late join while the host's start is just going out: look again
+const STARTING_POLL_TRIES = 14;
+const RACE_WAIT_MS = 25 * 60 * 1000;     // a late friend of a race waits this long for the new lobby
+const RACE_HOST_LOOK_MS = 15000;
 const START_GRACE_MS = 250;              // between telling everybody and leaving the page
 const CREATE_TRIES = 6;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -44,7 +50,7 @@ const STATUS_TEXT = { already_invited: "invAlready", not_allowed: "invNotAllowed
 /* ------------------------------------------------------------------ text (lb default, then de, en) */
 const S = {
   lb: {
-    lobby: "Lobby", create: "Lobby opmaachen", createD: "Du kriss e Code a kanns Leit invitéieren", joinTitle: "Mat engem Code bäitrieden",
+    lobby: "Lobby", create: "Lobby opmaachen", createD: "Du kriss e Code a kanns Leit invitéieren", joinTitle: "Mat Code bäitrieden",
     codePh: "ABCD", codeLabel: "Code vun de Frënn", join: "Bäitrieden", quick: "Schnellspill", quickD: "Direkt an eng oppen Lobby",
     openLobbies: "Oppe Lobbyen", noOpen: "Grad keng oppe Lobby. Maach selwer eng op!", openN: "{n} vu {m} Spiller", vsAi: "Géint de Computer",
     invitesTitle: "Invitatiounen", invitedBy: "{name} huet dech invitéiert", decline: "Ofleenen", yourName: "Däin Numm", signedInAs: "Ugemellt als {name}",
@@ -57,7 +63,7 @@ const S = {
     hostNow: "{name} ass elo Host.", joined: "{name} ass bäikomm.", left: "{name} ass fortgaang.", starting: "D'Spill fänkt un…",
     connecting: "Verbindung mam Server…", creating: "Lobby gëtt opgemaach…", joining: "Trëtt der Lobby bäi…", finding: "Sich eng Lobby…",
     waitingBack: "Waart bis den Host zréck an der Lobby ass…", back: "Zréck",
-    eNoServer: "Online-Modus ass grad net erreechbar.", eNotFound: "Dës Lobby gëtt et net (méi) — oder d'Spill huet schonn ugefaangen.", eFull: "D'Lobby ass voll.",
+    eNoServer: "Online-Modus ass grad net erreechbar.", eNotFound: "Dëse Code gëtt et net (méi). Kuck, ob en richteg ass.", eFull: "D'Lobby ass voll.",
     eStarted: "D'Spill huet schonn ugefaangen.", eKicked: "Du goufs aus der Lobby geholl.", eBadCode: "Dee Code gesäit net richteg aus (4 Buschtawen).", eUnknownGame: "Dat Spill kennen ech net.",
     pickTitle: "Leit derbäisetzen", pickOk: "Invitéieren", pickN: "{n} invitéieren", pickWho: "Wien soll derbäi sinn?", pickPh: "Numm sichen", pickNone: "Nach keen ausgewielt.",
     pickNoMatch: "Keen fonnt.", pickRemove: "Ewechhuelen", pickFriends: "Frënn", pickRecent: "Rezent Spiller", close: "Zoumaachen",
@@ -65,9 +71,11 @@ const S = {
     invRate: "Zevill Invitatiounen — probéier et gläich nach eng Kéier.", invUnavailable: "Invitéieren ass nach net verfügbar. Deel de Link.", invFailed: "Invitatioun ass net ukomm. Deel de Link.",
     guestNote: "Gäscht kënnen iwwer de Code oder de Link matmaachen.",
     invAgain: "{name} nach eng Kéier invitéieren", waitInv: "{n} invitéiert Frënn sinn nach net do.",
+    joinHint: "Gëff de Code vun dengem Frënd an (4 Buschtawen) oder setz säi Link an.", friendsLink: "👥 Frënn", cancel: "Ofbriechen",
+    lateJoining: "D'Fräi-Fuer leeft schonn — du kënns derbäi…", raceWait: "D'Rennen leeft schonn. Du kanns net méi matfueren, mee ech waarden, bis et fäerdeg ass: da kënns du an déi nei Lobby.",
   },
   de: {
-    lobby: "Lobby", create: "Lobby erstellen", createD: "Du bekommst einen Code und kannst Leute einladen", joinTitle: "Mit einem Code beitreten",
+    lobby: "Lobby", create: "Lobby erstellen", createD: "Du bekommst einen Code und kannst Leute einladen", joinTitle: "Mit Code beitreten",
     codePh: "ABCD", codeLabel: "Code von Freunden", join: "Beitreten", quick: "Schnellspiel", quickD: "Direkt in eine offene Lobby",
     openLobbies: "Offene Lobbys", noOpen: "Gerade keine offene Lobby. Mach selbst eine auf!", openN: "{n} von {m} Spielern", vsAi: "Gegen den Computer",
     invitesTitle: "Einladungen", invitedBy: "{name} hat dich eingeladen", decline: "Ablehnen", yourName: "Dein Name", signedInAs: "Angemeldet als {name}",
@@ -80,7 +88,7 @@ const S = {
     hostNow: "{name} ist jetzt Host.", joined: "{name} ist beigetreten.", left: "{name} ist gegangen.", starting: "Das Spiel beginnt…",
     connecting: "Verbinde mit dem Server…", creating: "Lobby wird erstellt…", joining: "Trete der Lobby bei…", finding: "Suche eine Lobby…",
     waitingBack: "Warte, bis der Host wieder in der Lobby ist…", back: "Zurück",
-    eNoServer: "Der Online-Modus ist gerade nicht erreichbar.", eNotFound: "Diese Lobby gibt es nicht (mehr) — oder das Spiel läuft schon.", eFull: "Die Lobby ist voll.",
+    eNoServer: "Der Online-Modus ist gerade nicht erreichbar.", eNotFound: "Diesen Code gibt es nicht (mehr). Prüfe, ob er stimmt.", eFull: "Die Lobby ist voll.",
     eStarted: "Das Spiel hat schon begonnen.", eKicked: "Du wurdest aus der Lobby entfernt.", eBadCode: "Der Code sieht nicht richtig aus (4 Buchstaben).", eUnknownGame: "Dieses Spiel kenne ich nicht.",
     pickTitle: "Leute hinzufügen", pickOk: "Einladen", pickN: "{n} einladen", pickWho: "Wer soll dabei sein?", pickPh: "Namen suchen", pickNone: "Noch niemand ausgewählt.",
     pickNoMatch: "Niemand gefunden.", pickRemove: "Entfernen", pickFriends: "Freunde", pickRecent: "Zuletzt gespielt mit", close: "Schließen",
@@ -88,6 +96,8 @@ const S = {
     invRate: "Zu viele Einladungen — versuch es gleich nochmal.", invUnavailable: "Einladen ist noch nicht verfügbar. Teile den Link.", invFailed: "Die Einladung ist nicht angekommen. Teile den Link.",
     guestNote: "Gäste können über den Code oder den Link mitspielen.",
     invAgain: "{name} noch einmal einladen", waitInv: "{n} eingeladene Freunde sind noch nicht da.",
+    joinHint: "Gib den Code deines Freundes ein (4 Buchstaben) oder füge seinen Link ein.", friendsLink: "👥 Freunde", cancel: "Abbrechen",
+    lateJoining: "Die freie Fahrt läuft schon — du kommst dazu…", raceWait: "Das Rennen läuft schon. Du kannst nicht mehr mitfahren, aber ich warte, bis es zu Ende ist: dann kommst du in die neue Lobby.",
   },
   en: {
     lobby: "Lobby", create: "Create lobby", createD: "You get a code and can invite people", joinTitle: "Join with a code",
@@ -103,7 +113,7 @@ const S = {
     hostNow: "{name} is the host now.", joined: "{name} joined.", left: "{name} left.", starting: "The game is starting…",
     connecting: "Connecting to the server…", creating: "Creating the lobby…", joining: "Joining the lobby…", finding: "Looking for a lobby…",
     waitingBack: "Waiting for the host to come back to the lobby…", back: "Back",
-    eNoServer: "Online mode is not reachable right now.", eNotFound: "That lobby does not exist (any more), or the game has already started.", eFull: "The lobby is full.",
+    eNoServer: "Online mode is not reachable right now.", eNotFound: "That code does not exist (any more). Check that it is right.", eFull: "The lobby is full.",
     eStarted: "The game has already started.", eKicked: "You were removed from the lobby.", eBadCode: "That code does not look right (4 letters).", eUnknownGame: "I do not know that game.",
     pickTitle: "Add people", pickOk: "Invite", pickN: "Invite {n}", pickWho: "Who should join?", pickPh: "Search a name", pickNone: "Nobody picked yet.",
     pickNoMatch: "Nobody found.", pickRemove: "Remove", pickFriends: "Friends", pickRecent: "Played with recently", close: "Close",
@@ -111,6 +121,8 @@ const S = {
     invRate: "Too many invitations — try again in a moment.", invUnavailable: "Inviting is not available yet. Share the link instead.", invFailed: "The invitation did not go through. Share the link instead.",
     guestNote: "Guests can join with the code or the link.",
     invAgain: "Invite {name} again", waitInv: "{n} invited friends are not here yet.",
+    joinHint: "Type your friend's code (4 letters) or paste his link.", friendsLink: "👥 Friends", cancel: "Cancel",
+    lateJoining: "The free ride is already running — you are joining…", raceWait: "The race is already running. You cannot ride along any more, but I will wait until it is over: then you can join the new lobby.",
   },
 };
 const readLang = () => { try { const v = localStorage.getItem("site_lang"); return S[v] ? v : "lb"; } catch { return "lb"; } };
@@ -180,7 +192,7 @@ function avatarEl(name, avatar) {
 async function loadIdentity() {
   const id = { sb: null, uid: "", username: "", signedIn: false, avatar: "", auth: null };
   try {
-    const auth = await import("./auth.js?v=48");
+    const auth = await import("./auth.js?v=49");
     id.auth = auth;
     if (auth.authConfigured) {
       id.sb = await auth.client();
@@ -223,6 +235,12 @@ function subscribe(ch, later) {
       else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") { done = true; clearTimeout(timer); reject(new Error("channel " + status)); }
     });
   });
+}
+/** a typed / pasted code: spaces and case do not matter; a pasted invite link gives its c= code */
+function codeFrom(raw) {
+  const text = String(raw ?? "");
+  const linked = /[?&#]c=([A-Za-z0-9]{4,10})(?![A-Za-z0-9])/.exec(text);
+  return cleanCode(linked ? linked[1] : text);
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -457,8 +475,12 @@ export async function mountLobby(root, options = {}) {
       let host = await waitForHost(ch, waitForHost_ms(waitLong));
       if (waitLong && host) await sleep(300);                      // let the host's roster settle
       host = readMembers(ch, game.id).find((m) => m.host) || host;
-      if (!host) { closeRealtime(); renderEntry(t("eNotFound")); return; }
-      if (host.starting) { closeRealtime(); renderEntry(t("eStarted")); return; }
+      if (!host) { closeRealtime(); if (game.late && await runningJoin(code)) return; renderEntry(t("eNotFound")); return; }
+      if (host.starting) {
+        closeRealtime();
+        if (game.late) { show("busy", t("starting")); for (let i = 0; i < STARTING_POLL_TRIES; i++) { await sleep(STARTING_POLL_MS); if (await runningJoin(code)) return; } }
+        renderEntry(t("eStarted")); return;
+      }
       if (readMembers(ch, game.id).length >= game.max) { closeRealtime(); renderEntry(t("eFull")); return; }
       st.cfg = host.cfg || defaultCfg(game.id);
       await enterLobby(code);
@@ -474,6 +496,70 @@ export async function mountLobby(root, options = {}) {
       const timer = setTimeout(() => { st.onHostSeen = null; resolve(null); }, ms);
       st.onHostSeen = () => { clearTimeout(timer); st.onHostSeen = null; resolve(have()); };
     });
+  }
+
+  /* ---------- late join: a game that is already running (mp-games.js `late`) ----------
+   * The lobby channel is empty once the host started (everybody left it), but the running game's own channel ("<game>:CODE", pb/ski/net/session.js)
+   * still shows its players. A running FREE RIDE publishes what a newcomer needs (f = free ride, rs = the resort, c = the settings): the newcomer
+   * goes straight into it. A running race cannot take a new skier (fixed line-up, standings): he waits for the new lobby of the rematch. */
+  async function peekRunning(code) {
+    let rt = null;
+    try {
+      rt = realtimeClient();
+      const ch = rt.channel(`${game.id}:${code}`, { config: { broadcast: { self: false }, presence: { key: "peek-" + myId } } });
+      let synced; const first = new Promise((r) => { synced = r; });
+      ch.on("presence", { event: "sync" }, () => synced());
+      await subscribe(ch);                                          // never track(): the peek must not look like a player
+      await Promise.race([first, sleep(PEEK_SYNC_MS)]);
+      await sleep(PEEK_SETTLE_MS);
+      const seen = new Map();
+      for (const metas of Object.values(ch.presenceState())) for (const m of Array.isArray(metas) ? metas : []) {
+        if (m && m.v === 1 && typeof m.i === "string" && ID_RE.test(m.i) && m.i !== myId) seen.set(m.i, m);
+      }
+      return [...seen.values()];
+    } catch (e) { warn("peek failed", e); return []; }
+    finally { try { rt?.removeAllChannels(); rt?.realtime.disconnect(); } catch { /* closing */ } }
+  }
+  /** true = handled (the screen shows what happens next); false = nobody is playing under this code */
+  async function runningJoin(code) {
+    const members = await peekRunning(code);
+    if (!members.length) return false;
+    const free = members.find((m) => m.f === 1 && m.c && typeof m.c === "object");
+    if (!free) { void waitForRematch(code); return true; }
+    if (members.length >= game.max) { renderEntry(t("eFull")); return true; }
+    show("busy", t("lateJoining"));
+    const cfg = sanitizeCfg(game.id, { ...free.c, resort: typeof free.rs === "string" ? free.rs : free.c.resort });
+    resetSession();
+    st.code = code;
+    launch([{ i: myId, n: me.name, u: ident.uid, a: ident.avatar }], cfg, { late: true });
+    return true;
+  }
+  let waitToken = 0;
+  /** a race is running: wait (cancellable) for the host to reopen the lobby under the same code */
+  async function waitForRematch(code) {
+    const token = ++waitToken;
+    const cancel = h("button", { class: "mpl-btn", id: "mplCancelWait", type: "button", onclick: () => { waitToken++; leaveToEntry(); } }, t("cancel"));
+    show("busy", t("raceWait"));
+    busy.append(cancel);
+    resetSession();
+    try {
+      const ch = makeChannel(code);
+      await subscribe(ch, onLater);
+      const until = Date.now() + RACE_WAIT_MS;
+      while (token === waitToken && Date.now() < until) {
+        const host = await waitForHost(ch, RACE_HOST_LOOK_MS);
+        if (token !== waitToken) return;
+        if (host && !host.starting) {
+          if (readMembers(ch, game.id).length >= game.max) { closeRealtime(); renderEntry(t("eFull")); return; }
+          st.claimHost = false; st.joinedAt = Date.now(); st.cfg = host.cfg || defaultCfg(game.id);
+          await enterLobby(code);
+          return;
+        }
+        if (host) { await sleep(STARTING_POLL_MS); continue; }
+        if (!(await peekRunning(code)).length) break;                    // nobody plays under the code any more
+      }
+      if (token === waitToken) { closeRealtime(); renderEntry(t("eNotFound")); }
+    } catch (e) { warn("rematch wait failed", e); if (token === waitToken) { closeRealtime(); renderEntry(t("eNoServer")); } }
   }
 
   async function quickMatch() {
@@ -541,11 +627,11 @@ export async function mountLobby(root, options = {}) {
     renderLobby();
     launch(roster, sanitizeCfg(game.id, p.cfg));
   }
-  function launch(roster, cfg) {
+  function launch(roster, cfg, { late = false } = {}) {
     const code = st.code;
-    const role = roster[0]?.i === myId ? "host" : "guest";
+    const role = !late && roster[0]?.i === myId ? "host" : "guest";
     const ctx = {
-      v: 1, game: game.id, code, room: code.toLowerCase(), role, me: myId, cfg, at: Date.now(),
+      v: 1, game: game.id, code, room: code.toLowerCase(), role, me: myId, cfg, at: Date.now(), ...(late ? { late: 1 } : {}),
       roster: roster.map((r, i) => ({ id: r.i, name: r.n, uid: r.u, avatar: r.a, role: i === 0 ? "host" : "guest" })),
     };
     store.set(CTX_KEY, JSON.stringify(ctx), true);
@@ -622,10 +708,10 @@ export async function mountLobby(root, options = {}) {
     show("entry");
     const nameInput = h("input", { id: "mplName", name: "player-name", type: "text", value: me.name, maxlength: MAX_NAME, autocomplete: "nickname", autocapitalize: "words", spellcheck: "false", readonly: ident.signedIn });
     nameInput.addEventListener("input", () => { me.name = cleanName(nameInput.value) || me.name; });
-    const codeInput = h("input", { id: "mplCode", name: "lobby-code", type: "text", maxlength: 10, placeholder: t("codePh"), "aria-label": t("codeLabel"), autocapitalize: "characters", autocorrect: "off", autocomplete: "off", spellcheck: "false", enterkeyhint: "go" });
-    const joinNow = () => { if (!ident.signedIn) me.name = cleanName(nameInput.value) || me.name; const c = cleanCode(codeInput.value); if (!isCode(c)) { msg.textContent = t("eBadCode"); return; } void joinLobby(c); };
+    const codeInput = h("input", { id: "mplCode", name: "lobby-code", type: "text", inputmode: "text", placeholder: t("codePh"), "aria-label": t("codeLabel"), autocapitalize: "characters", autocorrect: "off", autocomplete: "off", spellcheck: "false", enterkeyhint: "go" });
+    const joinNow = () => { if (!ident.signedIn) me.name = cleanName(nameInput.value) || me.name; const c = codeFrom(codeInput.value); if (!isCode(c)) { msg.textContent = t("eBadCode"); return; } void joinLobby(c); };
     codeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); joinNow(); } });
-    codeInput.addEventListener("input", () => { codeInput.value = cleanCode(codeInput.value); });
+    codeInput.addEventListener("input", () => { codeInput.value = codeFrom(codeInput.value); msg.hidden = true; });
     const msg = h("p", { class: "mpl-msg", id: "mplMsg", role: message ? "alert" : "status" }, message || "");
     msg.hidden = !message;
     const invitesBox = h("div", { class: "mpl-invites", id: "mplInvites", hidden: true });
@@ -643,9 +729,11 @@ export async function mountLobby(root, options = {}) {
         h("button", { class: "mpl-btn mpl-primary", id: "mplCreate", type: "button", onclick: () => { takeName(); void createLobby(); } }, h("b", {}, t("create")), h("small", {}, t("createD"))),
         h("button", { class: "mpl-btn", id: "mplQuick", type: "button", onclick: () => { takeName(); void quickMatch(); } }, h("b", {}, t("quick")), h("small", {}, t("quickD")))),
       h("div", { class: "mpl-join" },
-        h("label", { for: "mplCode" }, t("joinTitle")),
-        h("div", { class: "mpl-joinrow" }, codeInput, h("button", { class: "mpl-btn", id: "mplJoin", type: "button", onclick: joinNow }, t("join")))),
+        h("label", { for: "mplCode", class: "mpl-jointitle" }, t("joinTitle")),
+        h("small", {}, t("joinHint")),
+        h("div", { class: "mpl-joinrow" }, codeInput, h("button", { class: "mpl-btn mpl-primary", id: "mplJoin", type: "button", onclick: joinNow }, t("join")))),
       h("div", { class: "mpl-more" },
+        h("a", { class: "mpl-link", id: "mplFriends", href: "friends.html" }, t("friendsLink")),
         h("button", { class: "mpl-link", id: "mplOpenList", type: "button", "aria-expanded": "false", onclick: (e) => toggleDirectory(e.currentTarget, dirBox) }, t("openLobbies")),
         game.ai ? h("a", { class: "mpl-link", href: offlineUrl(game.id) }, t("vsAi")) : null,
         h("a", { class: "mpl-link", href: "pixelbreak.html" }, "‹ Arcade")),

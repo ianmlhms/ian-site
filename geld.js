@@ -2,7 +2,7 @@
  * Reads geld_* tables directly through RLS with the signed-in session; the
  * brix worker fills them via the `geld` edge function. UI text is Luxembourgish.
  * State is one immutable object replaced by update(); render() redraws from it. */
-import * as auth from "./auth.js?v=48";
+import * as auth from "./auth.js?v=49";
 
 const OWNER = "konto@ian.lu";
 const TZ = "Europe/Luxembourg";

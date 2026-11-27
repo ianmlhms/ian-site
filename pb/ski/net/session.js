@@ -15,6 +15,7 @@ const SUPABASE_SRI = 'sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1
 const ICE_KEY = 'ski_ice_v1';
 const ICE_URL = /^(stun|turn|turns):[^\s]{3,200}$/;
 const TICK_MS = 250;
+const DYN_ID = /^[a-z0-9]{4,16}$/;
 /* security (pre-launch review M1 / LOW 1): the hand-shake and the relay go through unauthenticated Realtime broadcast, so a lobby
  * member (or anybody who guesses the code) can forge them. These limits keep a forgery from cutting or taking over a working link. */
 const MAX_SDP = 20000;                 // chars: a real non-trickle SDP with all candidates is 1-6 KB
@@ -86,14 +87,12 @@ function subscribe(ch, onJoined) {
  * code (lobby code), me (my roster id), roster [{id, name}], name, racing() -> bool (the relay batches only while racing),
  * onMessage(from, msg, reliable), onPeer(id, status)
  */
-export function createSession({ code, me, roster, name, racing = () => false, onMessage = () => {}, onPeer = () => {}, relay: relayOpts = null }) {
+export function createSession({ code, me, roster, name, racing = () => false, onMessage = () => {}, onPeer = () => {}, relay: relayOpts = null, order = 0, extra = null, dynamic = null }) {
   const nonce = nonceOf();
   const ids = new Set(roster.map((r) => r.id));
   const peers = new Map();
-  for (const r of roster) {
-    if (r.id === me) continue;
-    peers.set(r.id, { id: r.id, present: false, nonce: '', pendingNonce: '', bucket: { rel: BUCKET.rel.cap, st: BUCKET.st.cap, at: performance.now() }, link: null, relay: null, tries: 0, connecting: false, everOpen: false, lostAt: 0, presentSince: 0, lastRecv: 0, samples: [], rtt: 0, offset: 0, status: 'wait', bye: false, retryTimer: 0 });
-  }
+  const newPeer = (id) => ({ id, born: performance.now(), present: false, nonce: '', pendingNonce: '', bucket: { rel: BUCKET.rel.cap, st: BUCKET.st.cap, at: performance.now() }, link: null, relay: null, tries: 0, connecting: false, everOpen: false, lostAt: 0, presentSince: 0, lastRecv: 0, samples: [], rtt: 0, offset: 0, status: 'wait', bye: false, retryTimer: 0 });
+  for (const r of roster) if (r.id !== me) peers.set(r.id, newPeer(r.id));
   let sb = null, ch = null, ice = [...NET.ICE_SERVERS], closed = false, lastTick = performance.now(), tickTimer = 0, pingTimer = 0;
   const started = performance.now();
   const pairs = new Map();          // peer id -> relay channel
@@ -209,7 +208,15 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     if (!ch || closed) return;
     const state = ch.presenceState();
     const seen = new Map();
-    for (const key of Object.keys(state)) for (const meta of state[key] || []) if (meta && ids.has(meta.i)) seen.set(meta.i, String(meta.s || ''));
+    for (const key of Object.keys(state)) for (const meta of state[key] || []) {
+      if (!meta || typeof meta.i !== 'string') continue;
+      if (!ids.has(meta.i) && dynamic && meta.i !== me && meta.v === 1 && DYN_ID.test(meta.i) && ids.size < dynamic.max && dynamic.accept(meta)) {
+        // a late joiner of the running free ride: he is a peer from now on (the same rule on every device: the code is the key)
+        ids.add(meta.i); peers.set(meta.i, newPeer(meta.i));
+        dynamic.onJoin({ id: meta.i, name: String(meta.n || '?').slice(0, 16), order: Number.isFinite(meta.o) ? meta.o : 1e9, meta });
+      }
+      if (ids.has(meta.i)) seen.set(meta.i, String(meta.s || ''));
+    }
     const now = performance.now();
     for (const p of peers.values()) {
       const n = seen.get(p.id);
@@ -237,7 +244,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     const l = openLink(p);
     if (l) return now - p.lastRecv > (l.kind === 'relay' ? NET.SILENT_RELAY : NET.SILENT) ? 'away' : 'here';
     // never met: present (still trying, then the relay) or not here at all; neither may hold the match up for ever
-    if (!p.everOpen) return now - started > NET.GONE * (p.present ? 3 : 2) ? 'gone' : 'wait';
+    if (!p.everOpen) return now - Math.max(started, p.born) > NET.GONE * (p.present ? 3 : 2) ? 'gone' : 'wait';
     return now - p.lostAt > NET.GONE ? 'gone' : 'away';
   }
   function evaluate() {
@@ -270,7 +277,7 @@ export function createSession({ code, me, roster, name, racing = () => false, on
     sb = window.supabase.createClient(cfg.url.replace(/\/$/, ''), cfg.anonKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     ch = sb.channel(`ski:${code}`, { config: { broadcast: { self: false }, presence: { key: me } } });
     ch.on('broadcast', { event: 'sig' }, ({ payload }) => onSig(payload)).on('presence', { event: 'sync' }, () => onPresence());
-    await subscribe(ch, () => { ch.track({ i: me, n: String(name || '').slice(0, 16), s: nonce, v: 1 }).catch(() => {}); });
+    await subscribe(ch, () => { ch.track({ i: me, n: String(name || '').slice(0, 16), s: nonce, v: 1, o: order, ...(extra || {}) }).catch(() => {}); });
     tickTimer = setInterval(tick, TICK_MS);
     pingTimer = setInterval(() => { for (const p of peers.values()) ping(p); }, NET.PING_EVERY);
     window.addEventListener('pagehide', close);

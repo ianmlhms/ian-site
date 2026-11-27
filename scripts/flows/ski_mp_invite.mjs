@@ -74,7 +74,10 @@ export const flow = {
       const hf0 = await arcadeFrame(host);
       await hf0.waitForSelector("#resortScreen #skiOnline", T);
       await hf0.click("#skiOnline");
-      await host.page.waitForURL(/lobby\.html\?g=ski&c=new/, T);
+      await host.page.waitForURL(/lobby\.html\?g=ski$/, T);
+      h.expect(await host.page.locator("#mplCreate").isVisible() && await host.page.locator("#mplCode").isVisible(), "«Online-Rennen» opens the CHOICE (create / join by code), no lobby created yet");
+      h.expect((await host.page.locator("#mplRoster").count()) === 0 || !(await host.page.locator("#mplRoster").isVisible()), "no lobby was created by pressing «Online-Rennen»");
+      await host.page.click("#mplCreate");
       await host.page.waitForSelector("#mplRoster");
       const code = await lobbyCode(host.page);
       const group = (label) => host.page.locator("#mplSettings .mpl-setting").filter({ has: host.page.locator("h4", { hasText: label }) });

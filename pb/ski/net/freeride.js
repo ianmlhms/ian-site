@@ -29,6 +29,7 @@ const SAVE_PREFIX = 'pb_ski_mpfree:';
 const loadSaved = (key) => { try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (error) { return null; } };
 const save = (key, v) => { try { sessionStorage.setItem(key, JSON.stringify(v)); } catch (error) { /* storage blocked: a reload starts at the lift */ } };
 const finite = (...v) => v.every(Number.isFinite);
+const LATE_BASE = 1e9;               // order of a latecomer: after every lobby player (their order is 0..7)
 const AVALANCHE_ID = /^[A-Za-z0-9_:.-]{1,64}$/;
 const AVALANCHE_AHEAD = 2000;        // ms: an avalanche "later than now" in my clock is a forgery (LOW 3)
 
@@ -38,7 +39,21 @@ const AVALANCHE_AHEAD = 2000;        // ms: an avalanche "later than now" in my 
  */
 export function createFreeMp({ ctx, host }) {
   const { game, env, hud } = host;
-  const nameOf = new Map(ctx.roster.map((r) => [r.id, r.name]));
+  /* the roster is open: a friend who arrives after the start (lobby.html "late join", ctx.late) is added when his presence shows up, on every
+   * device the same way. Order = the lobby's order, then the latecomers by arrival second (the host handover must agree everywhere). */
+  const roster = [...ctx.roster];
+  const nameOf = new Map(roster.map((r) => [r.id, r.name]));
+  const orderOf = new Map(roster.map((r, i) => [r.id, i]));
+  const myOrder = ctx.late ? LATE_BASE + Math.floor(Date.now() / 1000) : Math.max(0, roster.findIndex((r) => r.id === ctx.me));
+  orderOf.set(ctx.me, myOrder);
+  const byOrder = (a, b) => ((orderOf.get(a.id) ?? 1e12) - (orderOf.get(b.id) ?? 1e12)) || (a.id < b.id ? -1 : 1);
+  function addLatecomer({ id, name, order }) {
+    if (roster.some((r) => r.id === id)) return;
+    roster.push({ id, name: String(name || '?').slice(0, 16), uid: '' });
+    nameOf.set(id, String(name || '?').slice(0, 16));
+    orderOf.set(id, Math.min(order, LATE_BASE * 4));
+    roster.sort(byOrder);
+  }
   const plan = freePlan(ctx.cfg, ctx.seed);
   const saveKey = `${SAVE_PREFIX}${ctx.code}:${ctx.seed}`;
   const mpHud = createMpHud(host.uiRoot);
@@ -98,7 +113,7 @@ export function createFreeMp({ ctx, host }) {
 
   /* ---------- the shared day (host only; handover = the next roster player who is here) ---------- */
   const statusOf = (id) => (session ? session.status(id) : 'wait');
-  const hostId = () => freeHost(ctx.roster, ctx.me, statusOf);
+  const hostId = () => freeHost(roster, ctx.me, statusOf);
   const isHost = () => hostId() === ctx.me;
   function envMsg() {
     const clock = host.dayClock();
@@ -143,7 +158,7 @@ export function createFreeMp({ ctx, host }) {
   /* ---------- the friends list (top left) + "to a friend" ---------- */
   function refreshBoard() {
     const me = game.state;
-    const rows = ctx.roster.filter((p) => p.id !== ctx.me).map((p) => {
+    const rows = roster.filter((p) => p.id !== ctx.me).map((p) => {
       const r = remotes.get(p.id), st = statusOf(p.id);
       let text = st === 'wait' ? 'kënnt …' : st === 'gone' ? 'fort' : '';
       let sort = 1e9;
@@ -155,7 +170,7 @@ export function createFreeMp({ ctx, host }) {
       }
       return { name: p.name + (p.id === hostId() ? ' ★' : ''), me: false, text, away: st === 'away' || st === 'gone', sort };
     }).sort((a, b) => a.sort - b.sort);
-    mpHud.board(`Fräi fueren · ${1 + ctx.roster.filter((p) => p.id !== ctx.me && statusOf(p.id) === 'here').length} / ${ctx.roster.length}`, [{ name: 'Du', me: true, text: '' }, ...rows]);
+    mpHud.board(`Fräi fueren · ${1 + roster.filter((p) => p.id !== ctx.me && statusOf(p.id) === 'here').length} / ${roster.filter((p) => p.id === ctx.me || statusOf(p.id) !== 'gone').length}`, [{ name: 'Du', me: true, text: '' }, ...rows]);
     friendBtn.hidden = !(friendsToJoin().length > 0 && game.phase === 'running' && !game.paused);
     mpHud.el.querySelector('.mp-board').appendChild(friendBtn);          // the list is rebuilt each time: the button goes under it
     root.dataset.skiMpFree = String(remotes.all().filter((x) => x.state).length);
@@ -220,12 +235,17 @@ export function createFreeMp({ ctx, host }) {
     mpHud.show(true);
     env.setWeather(plan.weather, false); env.setTime(plan.time, false);
     if (env.snap) env.snap();
-    session = createSession({ code: ctx.code, me: ctx.me, roster: ctx.roster, name: nameOf.get(ctx.me), racing: () => true, relay: NET.FREE_RELAY, onMessage, onPeer });
+    session = createSession({
+      code: ctx.code, me: ctx.me, roster: ctx.roster, name: nameOf.get(ctx.me), racing: () => true, relay: NET.FREE_RELAY, onMessage, onPeer,
+      order: myOrder, extra: { f: 1, rs: host.rid, c: ctx.cfg },        // f / rs / c: what a latecomer's lobby reads to join this ride (mp-lobby.js peekRunning)
+      dynamic: { max: 2 * NET.MAX_PLAYERS, accept: (meta) => meta.f === 1, onJoin: addLatecomer },
+    });
     // a reload / a rejoin goes on where I was; else side by side at the start lift
     const back = loadSaved(saveKey);
-    const spot = back && finite(back.x, back.z, back.h) ? { x: back.x, z: back.z, heading: back.h } : host.startSpot(sideOffset(ctx.roster, ctx.me));
+    const spot = back && finite(back.x, back.z, back.h) ? { x: back.x, z: back.z, heading: back.h } : host.startSpot(sideOffset(roster, ctx.me));
     host.startFree(spot);
     local.began = true;
+    if (ctx.late) hud.toast('Du kënns spéit derbäi: « Bei e Frënd » bréngt dech bei hien', 3200);
     try { await session.start(); } catch (error) { console.error('[ski-mp] no connection', error); hud.toast('Keng Verbindung: du fiers eleng weider', 2600); }
     root.dataset.skiMp = 'free';
     root.dataset.skiMpHost = hostId();

@@ -549,7 +549,7 @@ _omOpener=null;
 /* Games that have the shared lobby (lobby.html, see mp-games.js) open it instead of a bare room link.
  * 4-letter codes belong to the lobby; older 6-character room codes still join the old way. */
 var MPG=null;
-import('./mp-games.js?v=15').then(function(m){MPG=m}).catch(function(){});
+import('./mp-games.js?v=16').then(function(m){MPG=m}).catch(function(){});
 function lobbyIdFor(href){if(!MPG)return null;var ids=Object.keys(MPG.MP_GAMES);for(var i=0;i<ids.length;i++){var g=MPG.MP_GAMES[ids[i]];if(g.lobby&&g.page===href)return g.id}return null}
 /* A lobby game (pong, tank-wars, fighters, air-hockey) runs in the sandboxed frame and may not navigate this page itself: it asks, and only the
  * game frame's own request for a lobby.html link is honoured. */
@@ -650,7 +650,7 @@ document.addEventListener('arcade-feature:change',applyFilters);   // the "Nei" 
 <script src="pixelbreak-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js" integrity="sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz" crossorigin="anonymous"></script>
 <script src="pb/arcade-kit.js?v=57"></script>
-<script type="module" src="pixelbreak-records.js?v=74"></script>
+<script type="module" src="pixelbreak-records.js?v=75"></script>
 <script>
 /* ---------- install as app (PWA) ---------- */
 (function(){
@@ -701,7 +701,7 @@ document.addEventListener('arcade-feature:change',applyFilters);   // the "Nei" 
   sync();
 })();
 </script>
-  <script type="module" src="rtc-ring.js?v=42"></script>
-  <script type="module" src="class-gate.js?v=43"></script>
+  <script type="module" src="rtc-ring.js?v=43"></script>
+  <script type="module" src="class-gate.js?v=44"></script>
 </body>
 </html>

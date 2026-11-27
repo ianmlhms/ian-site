@@ -5,6 +5,7 @@
  *   id        the page slug used by game_invites.game (NOT the arcade id "o-connect4")
  *   arcade    (iframe games only) the arcade id: the game runs inside pixelbreak.html?g=<arcade>, so that is the page a lobby start opens
  *   lobby     true  = starts through lobby.html (code, add people, ready, settings)
+ *   late      true  = a friend who comes after the start can join the running game (mp-lobby.js runningJoin; the game publishes `f`/`rs`/`c` in its presence)
  *             false = still the old  page?room=CODE&role=host|guest  link (migrate later by flipping this + the SQL row)
  *   min/max   players the game supports; the lobby enforces both
  *   settings  host options shown in the lobby, declarative so the lobby page never needs the game's code:
@@ -75,7 +76,7 @@ const SKI_SETTINGS = Object.freeze([
   { key: "runs", type: "choice", def: 3, showIf: Object.freeze({ mode: "race" }), label: { lb: "Leef", de: "Läufe", en: "Runs" }, options: Object.freeze([1, 3, 5].map((v) => opt(v, String(v)))) },
 ]);
 
-const G = (o) => Object.freeze({ lobby: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
+const G = (o) => Object.freeze({ lobby: false, late: false, arcade: "", ai: false, settings: Object.freeze([]), ...o });
 
 export const MP_GAMES = Object.freeze({
   connect4: G({ id: "connect4", name: "Véier gewënnt", emoji: "🔴", page: "connect4.html", min: 2, max: 2, lobby: true, ai: true }),
@@ -133,7 +134,7 @@ export const MP_GAMES = Object.freeze({
       { key: "chips", type: "choice", def: 1000, label: { lb: "Jetonen", de: "Chips", en: "Chips" }, options: CASINO_CHIPS },
     ]),
   }),
-  ski: G({ id: "ski", name: "Ski Alpen", emoji: "⛷️", page: "pb/ski.html", arcade: "ski", min: 2, max: 8, lobby: true, settings: SKI_SETTINGS }),
+  ski: G({ id: "ski", name: "Ski Alpen", emoji: "⛷️", page: "pb/ski.html", arcade: "ski", min: 2, max: 8, lobby: true, late: true, settings: SKI_SETTINGS }),
   "kart-letzebuerg": G({ id: "kart-letzebuerg", name: "Kart Lëtzebuerg", emoji: "🏎️", page: "pb/kart-letzebuerg.html", min: 2, max: 8 }),
 });
 

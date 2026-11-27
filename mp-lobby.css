@@ -34,6 +34,13 @@
 .mpl-join{display:flex;flex-direction:column;gap:6px}
 .mpl-joinrow{display:flex;gap:10px}
 .mpl-joinrow input{text-transform:uppercase;letter-spacing:.3em;font-weight:800;text-align:center;flex:1;min-width:0}
+/* the code entry is one of the two big choices (create / join): a big field for the iPad keyboard */
+.mpl-join{gap:8px;padding:16px;border:2px solid var(--border,#2a2a4a);border-radius:14px}
+.mpl-join .mpl-jointitle{font-size:1.05rem;font-weight:800;color:inherit}
+.mpl-join small{color:var(--muted,#8888aa);font-size:.85rem}
+.mpl .mpl-joinrow input[type=text]{min-height:64px;font-size:28px;letter-spacing:.35em;padding:0 10px}
+.mpl-joinrow .mpl-btn{min-width:7.5rem;font-size:1.05rem}
+@media(max-width:480px){.mpl-joinrow{flex-direction:column}.mpl-joinrow .mpl-btn{min-height:56px}}
 .mpl-more{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center}
 .mpl-invites h3{margin-bottom:6px}
 .mpl-inv{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border,#2a2a4a)}
@@ -113,6 +120,8 @@ html[data-theme="light"] .mpl{--good:#1a7f37}
 .gt .mpl-field label,.gt .mpl-join label{font:600 13px/1.4 "Geist",system-ui,sans-serif;color:var(--muted)}
 .gt .mpl input[type=text]{border-radius:0;border:1px solid var(--ink);background:var(--white);color:var(--ink);font-family:"Geist",system-ui,sans-serif}
 .gt .mpl input[type=text]:focus{outline:2px solid var(--green);outline-offset:-2px;border-color:var(--green)}
+.gt .mpl-join{border:1px solid var(--ink);border-radius:0}
+.gt .mpl-join .mpl-jointitle{font:600 15px/1.4 "Geist",system-ui,sans-serif;color:var(--ink)}
 .gt .mpl-joinrow input{font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}
 .gt .mpl-inv{border-top:1px solid var(--soft)}
 .gt .mpl-dir code,.gt .mpl code{background:var(--tint);border:1px solid var(--soft);border-radius:0;color:var(--ink);font-family:"Geist Mono",ui-monospace,monospace;font-weight:500}

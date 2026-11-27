@@ -620,7 +620,7 @@ async function boot() {
   function showPicker() {
     game.screen = 'picker';
     hud.show(false); input.showTouch(false);
-    picker = ui.showResorts({ current: rid, onOnline: window.MPGate && window.MPGate.openLobby ? () => window.MPGate.openLobby('new') : null, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; goFree(spawn); } });
+    picker = ui.showResorts({ current: rid, onOnline: window.MPGate && window.MPGate.openLobby ? () => window.MPGate.openLobby('') : null, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; goFree(spawn); } });
     document.documentElement.dataset.skiScreen = 'picker';
   }
   /** Another resort: one resort per page life (its tiles, textures and caches go with it), so remember the pick and load the page again,

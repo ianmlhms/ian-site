@@ -34,7 +34,7 @@
 "/pb/ski/lifts.js":"/pb/ski/lifts.js?v=85f74e8a38",
 "/pb/ski/linepack.js":"/pb/ski/linepack.js?v=4dd970864f",
 "/pb/ski/look.js":"/pb/ski/look.js?v=4df37af008",
-"/pb/ski/main.js":"/pb/ski/main.js?v=a66fe0aab2",
+"/pb/ski/main.js":"/pb/ski/main.js?v=428d093c48",
 "/pb/ski/map-decor.js":"/pb/ski/map-decor.js?v=37be2f8b6f",
 "/pb/ski/map-symbols.js":"/pb/ski/map-symbols.js?v=f47591c4aa",
 "/pb/ski/map.js":"/pb/ski/map.js?v=f1c3895aa8",
@@ -57,14 +57,14 @@
 "/pb/ski/modes/skis.js":"/pb/ski/modes/skis.js?v=67ac2b65a6",
 "/pb/ski/modes/views.js":"/pb/ski/modes/views.js?v=db965cb8a3",
 "/pb/ski/net/config.js":"/pb/ski/net/config.js?v=47226eddac",
-"/pb/ski/net/freeride.js":"/pb/ski/net/freeride.js?v=a79bba87ec",
+"/pb/ski/net/freeride.js":"/pb/ski/net/freeride.js?v=071ec60cf4",
 "/pb/ski/net/hud.js":"/pb/ski/net/hud.js?v=dd45c51bdc",
-"/pb/ski/net/index.js":"/pb/ski/net/index.js?v=3df579cd82",
+"/pb/ski/net/index.js":"/pb/ski/net/index.js?v=772688e8e7",
 "/pb/ski/net/link.js":"/pb/ski/net/link.js?v=843bab8aab",
 "/pb/ski/net/plan.js":"/pb/ski/net/plan.js?v=816959a7d4",
 "/pb/ski/net/race.js":"/pb/ski/net/race.js?v=db99cfc213",
 "/pb/ski/net/remotes.js":"/pb/ski/net/remotes.js?v=68374b903d",
-"/pb/ski/net/session.js":"/pb/ski/net/session.js?v=44d1adda9b",
+"/pb/ski/net/session.js":"/pb/ski/net/session.js?v=e56db162c4",
 "/pb/ski/net/tags.js":"/pb/ski/net/tags.js?v=a0558438af",
 "/pb/ski/net/wire.js":"/pb/ski/net/wire.js?v=0071a6efa6",
 "/pb/ski/netmesh.js":"/pb/ski/netmesh.js?v=ead99d72ea",
@@ -99,7 +99,7 @@
 "/pb/ski/village.js":"/pb/ski/village.js?v=caf1ddae78"
 }}
 </script>
-<link rel="modulepreload" href="/pb/ski/main.js?v=a66fe0aab2">
+<link rel="modulepreload" href="/pb/ski/main.js?v=428d093c48">
 <!-- importmap:end -->
 <!-- online races: the lobby context (lobby.html -> pixelbreak.html?g=ski&room=..&lb=..); a bare visit stays on the game (data-menu) -->
 <script>
@@ -177,7 +177,7 @@ if (!window.THREE) {
  * (invite-pop.js starts from auth.js). Load the client once the game is up (the config is loaded in the head); in the arcade frame the shell already does it. */
 (function () {
   try { if (window.top !== window) return; } catch (error) { return; }
-  function go() { import("/auth.js?v=48").then(function (auth) { return auth.client(); }).catch(function (error) { console.warn("[ski] invites unavailable", error); }); }
+  function go() { import("/auth.js?v=49").then(function (auth) { return auth.client(); }).catch(function (error) { console.warn("[ski] invites unavailable", error); }); }
   function lib() {   // the same pinned client build as lobby.html (auth.js would otherwise import it as an ES module from the CDN)
     var s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.1/dist/umd/supabase.js";
     s.integrity = "sha384-K1nraABOP/zFehpLIUksXebbs7jMpB8gYMlb+uhVKZcWT/9Vkq1+qhv6ndC+1Yuz"; s.crossOrigin = "anonymous"; s.onload = go; s.onerror = go; document.head.appendChild(s);

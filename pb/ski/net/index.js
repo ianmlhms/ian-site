@@ -12,7 +12,7 @@ import { createMpHud, resText } from './hud.js';
 import { createFreeMp } from './freeride.js';
 import { minRunMs } from '../progress.js';
 import { OUTFITS } from '../skier-model.js';
-import { sanitizeCfg } from '../../../mp-games.js?v=15';
+import { sanitizeCfg } from '../../../mp-games.js?v=16';
 
 const GAME = 'ski';
 const CTX_KEY = 'mpl.ctx';
@@ -27,13 +27,13 @@ export function readMpContext() {
   const ctx = gate && gate.ctx;
   if (!ctx || ctx.game !== GAME || !ctx.code || !Array.isArray(ctx.roster) || ctx.roster.length < 1) return null;
   const roster = ctx.roster.filter((r) => r && typeof r.id === 'string' && ID_RE.test(r.id)).slice(0, NET.MAX_PLAYERS).map((r) => Object.freeze({ id: r.id, name: String(r.name || '?').slice(0, 16), uid: typeof r.uid === 'string' ? r.uid : '' }));      // LOW 5: names <= 16
-  let me = '';
-  try { const raw = JSON.parse(sessionStorage.getItem(CTX_KEY) || 'null'); if (raw && raw.code === ctx.code && typeof raw.me === 'string') me = raw.me; } catch (error) { /* storage blocked */ }
+  let me = '', late = false;
+  try { const raw = JSON.parse(sessionStorage.getItem(CTX_KEY) || 'null'); if (raw && raw.code === ctx.code && typeof raw.me === 'string') { me = raw.me; late = raw.late === 1; } } catch (error) { /* storage blocked */ }
   if (!roster.some((r) => r.id === me)) me = ctx.role === 'host' ? roster[0].id : '';
   if (!me) { console.warn('[ski-mp] my roster id is unknown: solo'); return null; }
   const cfg = sanitizeCfg(GAME, ctx.cfg);
   const seed = matchSeed(ctx.code, roster);
-  return Object.freeze({ code: ctx.code, me, role: ctx.role, roster: Object.freeze(roster), cfg, seed });
+  return Object.freeze({ code: ctx.code, me, role: ctx.role, roster: Object.freeze(roster), cfg, seed, late: late && cfg.mode === 'free' });
 }
 export const mpResort = (ctx, readyIds) => resolveResort(ctx.cfg, ctx.seed, readyIds);
 
