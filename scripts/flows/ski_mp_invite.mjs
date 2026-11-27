@@ -284,7 +284,7 @@ export const flow = {
       const R = {};
       for (const p of [host, max]) { await p.page.goto(p.page.url() + "&" + DEBUG_Q + "&bot=1&timescale=4", { waitUntil: "domcontentloaded" }); R[p.label] = await arcadeFrame(p); await R[p.label].evaluate(() => { window.__skiAllowBotScore = true; }); }
       for (const p of [host, max]) await R[p.label].waitForFunction(() => document.documentElement.dataset.skiMpResults === "0", null, { timeout: 240000 });
-      for (const p of [host, max]) await R[p.label].waitForFunction(() => window.__skiMp.race.runTable(0).every((r) => r.res), null, { timeout: 90000 });     // the other player's time arrives over the link
+      for (const p of [host, max]) await R[p.label].waitForFunction(() => window.__skiMp.race.runTable(0).every((r) => r.place >= 1 && r.res && r.res.ms > 0), null, { timeout: 90000 });     // the other player's time arrives over the link
       const tables = await Promise.all([host, max].map((p) => R[p.label].evaluate(() => window.__skiMp.race.runTable(0).map((r) => [r.name, r.place, r.res && r.res.ms]))));
       h.eq(tables[1], tables[0], "the same results table on both");
       h.expect(tables[0].length === 2 && tables[0].every((r) => r[1] >= 1 && r[2] > 20000), `two valid times (${JSON.stringify(tables[0])})`);
