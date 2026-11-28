@@ -97,14 +97,17 @@ export const flow = {
             const a = S.game.phase, p0 = { x: S.state.x, z: S.state.z };
             S.boardLift();
             const b = S.game.phase, jump = Math.hypot(S.state.x - p0.x, S.state.z - p0.z), t0 = performance.now();
-            let last = { x: S.state.x, z: S.state.z }, step = 0;
+            // (the fastest it moves, m/s of page time at the test's x2: the hurried walk peaks ~22; a jump is far beyond)
+            let last = { x: S.state.x, z: S.state.z, t: performance.now() }, vmax = 0;
             while (S.game.phase === "approach" && performance.now() - t0 < 8000) {
               await new Promise((r) => requestAnimationFrame(r));
-              step = Math.max(step, Math.hypot(S.state.x - last.x, S.state.z - last.z)); last = { x: S.state.x, z: S.state.z };
+              const now = performance.now();
+              if (now - last.t < 60) continue;               // (over >= 60 ms: a frame's own timing is not the walk's speed)
+              vmax = Math.max(vmax, Math.hypot(S.state.x - last.x, S.state.z - last.z) / ((now - last.t) / 1000)); last = { x: S.state.x, z: S.state.z, t: now };
             }
-            return { first: a, second: b, jump: +jump.toFixed(2), step: +step.toFixed(2), then: S.game.phase, ms: Math.round(performance.now() - t0) };
+            return { first: a, second: b, jump: +jump.toFixed(2), vmax: +vmax.toFixed(1), then: S.game.phase, ms: Math.round(performance.now() - t0) };
           });
-          h.expect(skip.first === "approach" && skip.second === "approach" && skip.jump < 0.3 && skip.step < 1.2 && skip.then === "lift", `${rid} chair: a second press hurries the walk in, no jump (${JSON.stringify(skip)})`);
+          h.expect(skip.first === "approach" && skip.second === "approach" && skip.jump < 0.3 && skip.vmax < 30 && skip.then === "lift", `${rid} chair: a second press hurries the walk in, no jump (${JSON.stringify(skip)})`);
           await page.evaluate(() => window.__ski.goFree());
           await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 30000 });
           const fast = await page.evaluate((s) => {

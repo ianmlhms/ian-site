@@ -2701,7 +2701,8 @@ text list; the maps were read piece by piece (crops, zoom). OSM stays the geomet
   in one frame), onto / off the carrier for drag lifts / carpets / trains (rideCamera1 re-initialised `rideCam`), the arrival at the exit (placeAt again).
   While walked in or on a lift, a camera that jumps > 1.2 m in a frame on its own (a guard pulling it past a station post) eases over 0.5 s. A fast
   travel / map teleport / «Bei de Lift» / a skip still cut behind their fade (`dropRide` clears the ease). The SECOND press during the walk no longer puts
-  him on the spot: it hurries the rest of the walk (x1.7) and clears the group in the zone (`HURRY`; ski-boarding checks it).
+  him on the spot: it hurries the rest of the walk (x1.7, never past 7 m/s at its peak: `BOARDING.HURRY_V`) and clears the group in the
+  zone (`HURRY`; ski-boarding checks it). `BOARDING.MAX_S` 4 -> 6 s: a long way in through a queue maze (Killy) was a ~40 km/h slide.
 - **Carpets** (rideable since R7-B, lift-path.js class 'carpet', >= 15 m): ridden at `CARPET_FACTOR` (2) x the real 1.4 m/s = 2.8 m/s (was x4 = 5.6 m/s
   on a belt whose texture ran at 1.4 m/s: he slid over it); lifts.js runs the carpet belts' texture at the same speed (`ribbon(..., uvLen)`), the chair
   loading belts stay at 1.4 (CHAIR.belt). `lifts.shuttleBoard` returns null for a carpet (it is in lift-path.js SHUTTLE for its track, but a carpet is no
@@ -2712,3 +2713,15 @@ text list; the maps were read piece by piece (crops, zoom). OSM stays the geomet
   frame: skier / camera jumps, ski clearance; `--board`, `--shots DIR` side views + the carpet sequence, `--root DIR` = an old checkout for "before").
 - Shots ~/Library/Caches/ski-work/lift-standing/{before,after,after-board}/ (side views of the steepest T-bars / platters of Killy, Arlberg, Obertauern +
   the carpets; `carpet-*-sheet.png` = belt, carried, off the top, out).
+- **Carpet height**: the belt is drawn on the FIELD (lifts.js height), the snow mesh (surface) lies up to ~16 cm off it in places (Killy
+  Snowtubing): main.js passes `beltHeight` (field) to createRide, a carpet rider stands on field + BELT_TOP, his skis on a plane through
+  his feet pitched by that ground +-0.9 m, raised by the sag in a dip (`beltLift`). Flow `ski-standing-lift`: skis on the belt within 6 cm
+  (Pam, 231 m: worst -5 cm at a knee; measured only where the belt is under both skis, past its ends they reach over the end plates).
+- **Results** (rebased on 41a955f9 lift map + mid stations): probe before 11 / 11 bad (skis 0.3-1.06 m in the snow on every drag lift, camera cuts
+  3-8.8 m), after 0 bad; Chromium ski-standing-lift, ski-boarding, ski-lift, ski-ride-down, ski PASS; round6-test green, round7b-test
+  25409 / 25410 and npc-check 182 / 183 (both failures are on origin/main too: 3V Cairn roof, the Olympique queue). Arlberg has no carpets
+  any more since the official-map alignment (730ab413): the flow rides Killy's. **WebKit NOT tested** (Playwright WebKit cannot open a page on
+  the Mini since ~15:00 on 28 Nov): run `FLOW_BROWSER=webkit` ski-standing-lift / ski-boarding / ski when it works again. Real iPad untested.
+- Not done: the chair loading belt and the gondola walk-in were already continuous (no change); a carpet station still has the steel end
+  plates only (no roof / gate); NPCs never ride carpets (npc-view.js skips them, as before); the board's toe edge is not set on a cross slope
+  (the board takes the roll of the snow under its middle).

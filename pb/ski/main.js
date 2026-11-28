@@ -1125,7 +1125,8 @@ async function boot() {
     // standing lifts (28 Nov 2026; Ian: "teleported to the bottom station"): a second press no longer puts him on the spot at once: the
     // rest of the walk goes HURRY x faster and the group still in the zone goes (no wait at the head of the free lane)
     if (skip) { a.hurry = true; if (a.line && crowd) crowd.clearZone(a.lift.index); }
-    a.t += dt * (a.hurry ? HURRY : 1);
+    // (never faster than BOARDING.HURRY_V at the walk's peak: 1.5 x its mean speed)
+    a.t += dt * (a.hurry ? Math.max(1, Math.min(HURRY, BOARDING.HURRY_V / Math.max(0.1, 1.5 * a.Lw / a.d1))) : 1);
     // m = metres along the way: to the wait point, (the wait), the last steps into the zone
     let m, k;
     if (a.t < a.d1) { k = a.t / a.d1; m = (a.L > a.Lw ? k * k * (3 - 2 * k) * 0.82 + k * 0.18 : k * k * (3 - 2 * k)) * a.Lw; }

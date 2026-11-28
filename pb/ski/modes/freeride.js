@@ -15,7 +15,9 @@ const NEAR_ZONE = 18;          // m from a boarding zone's waiting spot: the hin
 /** Easier boarding (Ian, 26 Nov: "not just that little yellow square"): within CATCH m of a lift's boarding spot (bottom; the top's
  *  descent mat: CATCH_DOWN, so a press right after getting off up there does not send him back down) the Astegen / Erof button shows
  *  and one press walks / slides him in (main.js approach); faster than FAST m/s (25 km/h) the button shows, a press only says slow down. */
-export const BOARDING = Object.freeze({ CATCH: 18, CATCH_DOWN: 9, FAST: 7, WALK: 4.2, MAX_S: 4 });
+// (standing lifts, 28 Nov 2026: MAX_S 4 -> 6: a long way in through a queue maze was a 40 km/h slide; HURRY_V = the fastest a second press
+// makes the walk, m/s at its peak)
+export const BOARDING = Object.freeze({ CATCH: 18, CATCH_DOWN: 9, FAST: 7, WALK: 4.2, MAX_S: 6, HURRY_V: 7 });
 const BOTTOM_RADIUS = 30;      // m from a bottom station: "the lift nearest here" for the map (round 7-B: boarding = lift-site.js zones)
 const MIN_RISE_DRAG = 2;       // m: launch fix ("every lift rideable"): the nursery rope tows (Fontany, Replat, Balmengrat: 4-5 m) ride too
 const MIN_RISE = 8;            // m: lower lifts (flat links) are not ridden (round 7-B: was 25; magic carpets ride from 15 m long)
