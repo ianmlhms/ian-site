@@ -207,15 +207,30 @@ export function showSkiCard(root, opts) {
 }
 
 /** The lift ride panel: the lift, time to the top, Iwwersprangen and the view toggle. */
-export function createRideHud(hudEl, { onSkip, onView }) {
+export function createRideHud(hudEl, { onSkip, onView, onMap = null, onMid = null }) {
   const box = el(`<div class="ridehud" id="rideHud" hidden><div class="rl"><b id="rName"></b><span class="m" id="rLeft"></span></div>
     <div class="rbar"><i id="rBar"></i></div>
-    <div class="rb"><button type="button" class="btn" id="rView" aria-label="Vue wiesselen (V)">👁 Vue</button><button type="button" class="btn primary" id="rSkip" aria-label="Iwwersprangen (Enter)">⏭ Iwwersprangen</button></div></div>`);
+    <div class="rb"><button type="button" class="btn" id="rView" aria-label="Vue wiesselen (V)">👁 Vue</button>${onMap ? '<button type="button" class="btn" id="rMap" aria-label="Pistekaart (M)">🗺 Kaart</button>' : ''}<button type="button" class="btn primary" id="rSkip" aria-label="Iwwersprangen (Enter)">⏭ Iwwersprangen</button></div></div>`);
   hudEl.appendChild(box);
+  // 28 Nov 2026: at a mid station the choice "Hei erausgoen" / "Weiderfueren" (big buttons; keeps riding if nobody answers)
+  const mid = el(`<div class="midchoice" id="midChoice" role="group" aria-label="Tëschestatioun" hidden><div class="mt"><b id="mdTitle"></b><span id="mdLeft"></span></div>
+    <div class="mb"><button type="button" class="btn big" id="midOut" aria-label="Hei erausgoen (X)">Hei erausgoen <kbd class="key">X</kbd></button><button type="button" class="btn big primary" id="midStay" aria-label="Weiderfueren (K)">Weiderfueren <kbd class="key">K</kbd></button></div></div>`);
+  hudEl.appendChild(mid);
+  if (onMap) box.querySelector('#rMap').addEventListener('click', (e) => { e.currentTarget.blur(); onMap(); });
+  if (onMid) for (const [id, c] of [['midOut', 'out'], ['midStay', 'stay']]) mid.querySelector('#' + id).addEventListener('click', (e) => { e.currentTarget.blur(); onMid(c); });
   box.querySelector('#rSkip').addEventListener('click', (e) => { e.currentTarget.blur(); onSkip(); });
   box.querySelector('#rView').addEventListener('click', (e) => { e.currentTarget.blur(); onView(); });
   return {
-    show(lift) { box.hidden = !lift; if (lift) box.querySelector('#rName').textContent = `${kindName(lift.kind, lift.sub)} ${lift.name}`; },
+    /** The mid station choice (ride.mid, or null to hide it). */
+    mid(m) {
+      mid.hidden = !m;
+      if (!m) return;
+      mid.querySelector('#mdTitle').textContent = m.kind === 'chain' ? `Tëschestatioun · ${m.name}` : `Statioun · ${m.name}`;
+      mid.querySelector('#mdLeft').textContent = m.at ? `de Zuch steet · weider no ${Math.ceil(m.left)} s` : `nach ${Math.ceil(m.left)} s`;
+      mid.querySelector('#midOut').classList.toggle('sel', m.choice === 'out');
+      mid.querySelector('#midStay').classList.toggle('sel', m.choice !== 'out');
+    },
+    show(lift) { if (!lift) mid.hidden = true; box.hidden = !lift; if (lift) box.querySelector('#rName').textContent = `${kindName(lift.kind, lift.sub)} ${lift.name}`; },
     set({ left, share, view, down = false }) {
       const m = Math.floor(left / 60), sec = Math.ceil(left % 60);
       box.querySelector('#rLeft').textContent = left > 0.5 ? `nach ${m ? `${m} min ` : ''}${sec} s bis ${down ? 'ënnen' : 'uewen'} · ${view === 'window' ? 'Fënster' : 'Vu baussen'}` : down ? 'Ënnen!' : 'Uewen!';

@@ -379,13 +379,22 @@ export function createLiftSite(path) {
   site.stops = [];
   for (const [s, name] of path.src.stops || []) {
     if (s < 30 || s > len - 30) continue;
+    if (path.tunnel && path.ground(s) - path.cableY(s) >= 4) continue;          // mid stations: a stop underground has no platform on the snow (the train passes it)
     const q = path.at(s, {});
     const fx = q.dx, fz = q.dz, rx = -q.dz, rz = q.dx;
     const parts = [];
     parts.push({ a0: -14, a1: 14, b0: bOut + 0.1, b1: bOut + 3.2, y0: 0.0, y1: 0.55, col: COL.concrete, solid: false, deck: true });
     parts.push({ a0: -4, a1: 4, b0: bOut + 2.2, b1: bOut + 3.3, y0: 0.55, y1: 3.0, col: COL.timber, solid: true });
     parts.push({ a0: -4.3, a1: 4.3, b0: bOut + 1.0, b1: bOut + 3.5, y0: 3.0, y1: 3.35, col: COL.snow, solid: false });
-    site.stops.push({ s, name, x: q.x, z: q.z, fx, fz, rx, rz, parts, rect: { a0: -14, a1: 14, b0: bOut + 0.1, b1: bOut + 3.5 },
+    // mid stations (28 Nov 2026): a yellow mat on the platform (boarding up / down here, like the ends'), the loading line on the up lane,
+    // where he stands after getting off (the platform), the waiting spot facing up the line
+    const zone = { a0: -3, a1: 3, b0: bOut + 0.7, b1: bOut + 2.3 };
+    parts.push({ ...zone, y0: 0.55, y1: 0.57, col: COL.gate, solid: false, deck: true, zoneMark: true });
+    const toW = (a, b) => ({ x: q.x + fx * a + rx * b, z: q.z + fz * a + rz * b });
+    const zc2 = toW(0, (zone.b0 + zone.b1) / 2), ld = toW(0, side), of = toW(0, bOut + 1.5), heading = Math.atan2(fz, fx);
+    site.stops.push({ s, name, x: q.x, z: q.z, fx, fz, rx, rz, parts, rect: { a0: -14, a1: 14, b0: bOut + 0.1, b1: bOut + 3.5 }, zone, isStop: true,
+      wait: { x: zc2.x, z: zc2.z, heading }, load: { x: ld.x, z: ld.z, heading }, off: { x: of.x, z: of.z },
+      inZone(x, z) { const l = this.toLocal(x, z, {}); return l.a >= zone.a0 && l.a <= zone.a1 && l.b >= zone.b0 && l.b <= zone.b1; },
       toWorld(a, b, out = {}) { out.x = q.x + fx * a + rx * b; out.z = q.z + fz * a + rz * b; return out; },
       toLocal(x, z, out = {}) { const dx = x - q.x, dz = z - q.z; out.a = dx * fx + dz * fz; out.b = dx * rx + dz * rz; return out; } });
   }
@@ -719,8 +728,10 @@ export function createLiftWorld(paths, opts = {}) {
     const site = sites.get(index);
     if (!site) return null;
     // ride down: the way out of the BOTTOM station after a descent, from the return side (-b) where he got off
+    // (mid stations: `end` = a stop of site.stops: the way out of its platform, outwards on the +b side)
+    const stopEnd = end && typeof end === 'object' ? end : null;
     const down = end === 'bottom' && !!site.down;
-    const top = down ? site.bottom : site.top, from = down ? site.down.off : site.off, side = down ? -1 : 1;
+    const top = stopEnd ? stopEnd : down ? site.bottom : site.top, from = stopEnd ? stopEnd.off : down ? site.down.off : site.off, side = down ? -1 : 1;
     if (down) pisteStarts = null;
     const fg = height(top.x, top.z);          // (down: the parts stand on the frame's ground, also where the snow falls away below it)
     // (a valley station stands in the forest more often: the walk out keeps a crown's width from the trunks)
@@ -737,7 +748,7 @@ export function createLiftWorld(paths, opts = {}) {
     // out of them (the exit itself must be outside every lane)
     const own = new Set();
     inLowLane(from.x, from.z, height, 2.6, -1, own);
-    if (site.path.kind === 'drag' || site.path.kind === 'carpet') own.add(index);
+    if (site.path.kind === 'drag' || site.path.kind === 'carpet' || stopEnd) own.add(index);
     // the candidates: straight lines out of the station in 24 directions, and points down a piste that starts at this top
     const candidates = [];
     for (const ang of ANGLES) {
@@ -840,6 +851,14 @@ export function createLiftWorld(paths, opts = {}) {
     }
     return null;
   }
+  /** Mid stations: { index, stop } for the stop platform's boarding mat that holds (x, z), or null. */
+  function stopAt(x, z) {
+    for (const it of near(x, z, 6)) {
+      if (it.t !== 'frame' || !it.f.isStop) continue;
+      if (it.f.inZone(x, z)) return { index: it.index, stop: it.f };
+    }
+    return null;
+  }
   /** Ride down: the lift whose TOP descent mat holds (x, z), or null. */
   function descentAt(x, z) {
     for (const it of near(x, z, 6)) {
@@ -867,7 +886,7 @@ export function createLiftWorld(paths, opts = {}) {
     }
     return top;
   }
-  return { sites, inStation, inBuilding, inLowLane, hit, treeBlocked, exitOf, boardingAt, descentAt, keepBuilding: (i) => keep[i] !== false, nearPylon, deckTop };
+  return { sites, inStation, inBuilding, inLowLane, hit, treeBlocked, exitOf, boardingAt, descentAt, stopAt, keepBuilding: (i) => keep[i] !== false, nearPylon, deckTop };
 }
 
 /** Where lifts share ground (twin drag lifts, a line passing a neighbour's station): a station part standing in another lift's

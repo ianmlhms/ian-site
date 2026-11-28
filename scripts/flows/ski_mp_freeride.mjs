@@ -182,6 +182,23 @@ export const flow = {
         h.expect(emmaAtMax === null || !!emmaAtMax.ride, `${rid}: max (relay) sees emma riding too (${JSON.stringify(R.lift.emmaAtMax)})`);
         await shot(emma, `${rid}.lift`);
 
+        // 28 Nov 2026: the piste map on a lift (online free ride too): the ride goes on underneath, the others still see him in his carrier
+        h.step(`${rid}: the host opens the piste map on the lift: the ride goes on, the others still see him in his carrier`);
+        {
+          const m0 = await me(F.host);
+          if (m0.ride) {
+            await F.host.evaluate(() => window.__ski.showRideMap());
+            h.eq(await F.host.evaluate(() => document.documentElement.dataset.skiRideMap), "1", `${rid}: the host's map is open on the lift`);
+            await sleep(1500);
+            const [m1, atEmma] = await Promise.all([me(F.host), seenBy(F.emma, "tester")]);
+            h.expect(!m1.ride || m1.s > m0.s + 3, `${rid}: the host's lift ride went on under the map (${m0.s.toFixed(0)} -> ${m1.s.toFixed(0)} m)`);
+            h.expect(!m1.ride || (!!atEmma && !!atEmma.ride && atEmma.lift === m0.lift), `${rid}: emma still sees the host riding lift ${m0.lift} (${JSON.stringify(atEmma && { ride: atEmma.ride, lift: atEmma.lift })})`);
+            await shot(host, `${rid}.lift-map`);
+            await F.host.evaluate(() => window.__ski.closeRideMap());
+            h.eq(await F.host.evaluate(() => document.documentElement.dataset.skiRideMap || ""), "", `${rid}: closed again`);
+          }
+        }
+
         h.step(`${rid}: emma skips the ride: the others snap her to the top (no slide)`);
         const jumps0 = (await seenBy(F.host, "Emma")).jumps;
         const epoch0 = await F.emma.evaluate(() => window.__skiMp.epoch);

@@ -35,6 +35,11 @@ export const CHAIR = Object.freeze({ open: 0.45, glide: 1.9, belt: 1.4, ahead: 0
  *  they close behind him. A T-bar / platter: he glances back at the bar coming, takes it, it pulls him up to speed over PULL s. A chair:
  *  the bar swings down BAR s after leaving the station and up again BAR s before the top. */
 export const CABIN = Object.freeze({ open: 0.8, close: 0.6, gap: 0.15, walkIn: 0.85, out: 0.9, accel: 1.6 });
+/** Mid stations (28 Nov 2026): the choice "Hei erausgoen" / "Weiderfueren" shows `lead` s before a mid station (a train's stop, or the end of
+ *  a section that the next section of the same lift carries on from); at a stop the train waits `dwell` s (the default: keep riding, like
+ *  sitting on in the real cabin), at least `dwellMin` s, brakes at `brake` m/s2, an exit takes `outAfter` s of standing before the doors-
+ *  less train lets him out, `accel` s to pull away again. Chained sections are at most `chain` m apart (a shared station). */
+export const MID = Object.freeze({ lead: 9, dwell: 6, dwellMin: 1.4, brake: 5, outAfter: 0.8, accel: 2.5, chain: 12 });
 const PULL = 0.8, BAR = Object.freeze({ downAfter: 0.9, upBefore: 1.6, swing: 0.9 });
 const DRAG_BACK = 1.8;                // R8e: m the rider of a platter / T-bar is pulled behind the spring box (the rod ~20 deg off the vertical)
 /** R8e: how far behind the spring box he rides: the rod ~22 deg off the vertical whatever the rope's height over the track. */
@@ -178,6 +183,9 @@ export function riderAt(path, s, height, out = {}, down = false) {
 
 /** Lift lines round: the kinds with doors (the player's cabin: carriers.js createCarrier doorSide), the walk points round them. */
 const DOORED = new Set(['gondola', 'cable']);
+/** Mid stations: a stop's frame (lift-site.js site.stops: origin at the stop, `a` up the line) seen like a bottom end's (a = -s up the line),
+ *  so the cabin's door spot code works at a stop too. */
+function stopFrame(st) { const f = st.frame; return { ...f, toWorld: (a, b, out = {}) => f.toWorld(a + st.s, b, out) }; }
 /** The spot on the platform beside a cabin's door (station frame f, a along the line from the end; side +1 = the up lane's outer side,
  *  -1 = the return side): { x, z, heading (facing the cabin), cam (a camera spot outside, looking at the door) }. */
 function doorSpotOf(path, f, a, side) {
@@ -205,9 +213,13 @@ function rodHand(w, cx, cy, cz, hip) {
  */
 // R8e (3V QA: a cable car boarded with no cabin at the bottom station): shuttle = lifts.js shuttleBoard(): the boarding waits until the
 // scheduled up-track cabin has come down and docked (the cabin drawn coming in), never a cabin out of nowhere
-export function createRide({ lift, path, site, height, factor = RIDE.factor, from = null, startU = null, exitAt = null, shuttle = null }) {
+export function createRide({ lift, path, site: siteIn, height, factor = RIDE.factor, from = null, startU = null, exitAt = null, shuttle = null, through = false, chainNext = null, stops = null, fromStop = null }) {
   const k = path.kind;
-  const [s0, s1] = rideSpan(path);
+  const [s0Line, s1] = rideSpan(path);
+  // Mid stations: boarding at a train's stop (the frame, the waiting spot and the loading line of the stop stand in for the bottom's) /
+  // a ride that carries on from the section before (`through`: it starts on the carrier, no boarding) / the end offers a next section
+  const s0 = fromStop ? fromStop.s : s0Line;
+  const site = fromStop ? { ...siteIn, bottom: stopFrame(fromStop), load: fromStop.load, wait: fromStop.wait, chair: null, queue: null } : siteIn;
   const speed = path.spec.speed * factor;
   const carry = CARRY.has(k);
   const start = from || site.wait;
@@ -238,6 +250,10 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   const CP = k === 'chair' && site.chair ? chairPlan() : null;
   if (CP) { u0 = CP.u0; approach = CP.approach; tArrive = CP.tArrive; }
   let phase = 'board', t = 0, s = sLoad, skipped = false, tRide = 0, alight = null, vNow = 0;
+  let dwell = null, choice = null, restart = 1e9;
+  const stopList = (stops || []).filter((q) => q.s > s0 + 1).sort((a, b) => a.s - b.s);
+  const nextStop = () => (skipped ? null : stopList.find((q) => !q.passed && q.s > s + 0.02) || null);
+  if (through) { phase = 'ride'; tRide = 0; t = tArrive; }
   const pose = { roll: 0 };
   // lift fixes: his carrier crawls through the stations like the lift's others (see rideSpeedAt)
   const speedEnv = { k, path, speed, s1, crawl: crawl0, cab: !!cab, vs: CP ? CP.vs : 0 };
@@ -261,16 +277,34 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     get carrierU() {
       if (phase === 'board') return path.shuttle ? path.upU(cabin(t).s) : boardU(t);
       if (phase === 'ride') return path.upU(s);
-      if (phase === 'alight' && alight && alight.t < alight.tHold) return path.upU(s1);           // (a cabin stays docked while he gets out)
+      if (phase === 'through') return path.upU(s1);
+      if (phase === 'alight' && alight && alight.t < alight.tHold) return path.upU(alight.holdS === undefined ? s1 : alight.holdS);           // (a cabin stays docked while he gets out)
       return null;
     },
     get canSkip() { return phase === 'ride' && tRide > 0.6; },
+    /** Mid stations: the choice that shows before a mid station (null = none yet): { kind: 'stop' | 'chain', name, at (the train stands),
+     *  left (s to go: at a stop until the default carries on), choice ('out' | 'stay' | null) }. */
+    get mid() {
+      if (phase !== 'ride') return null;
+      if (dwell) return { kind: 'stop', name: dwell.stop.name, at: true, left: Math.max(0, MID.dwell - dwell.t), choice };
+      const nx = nextStop();
+      if (nx && nx.s - s <= speed * MID.lead) return { kind: 'stop', name: nx.name, at: false, left: (nx.s - s) / speed, choice };
+      if (chainNext && !skipped && s1 - s <= speed * MID.lead) return { kind: 'chain', name: chainNext.name, at: false, left: Math.max(0, (s1 - s) / speed), choice, next: chainNext };
+      return null;
+    },
+    /** 'out' = get out at the next mid station, 'stay' (the default) = keep riding. */
+    choose(c) { if (phase !== 'ride' || (c !== 'out' && c !== 'stay')) return false; choice = c; return true; },
+    get through() { return phase === 'through'; },
+    get chainNext() { return chainNext; },
+    get dwelling() { return !!dwell; },
     /** After launch: a chair's boarding gate, 0 closed .. 1 open (lifts.js setGate), and the plan (tests). */
     get gate() { return CP && phase === 'board' ? CP.gate(t) : 0; },
     get chairPlan() { return CP; },
     /** Lift lines round (tests): the cabin plan { tDock, tEnter, tArrive, door } or null. */
     get cabinPlan() { return cab; },
     get exit() { return alight ? alight.exit : null; },
+    /** Mid stations: the name of the stop he got out at (null: he rode to the top). */
+    get stopName() { return alight ? alight.stopName : null; },
     step(dt) {
       t += dt;
       if (phase === 'board' && t >= tArrive) { phase = 'ride'; tRide = 0; }
@@ -278,17 +312,30 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
         tRide += dt;
         // after launch: a chair leaves the loading line at the station's crawl and speeds up to the ride speed over CHAIR.accel s;
         // lift lines round: a cabin pulls away (and slows into the top station), a drag bar pulls him up to speed
-        const v = rideSpeedAt(speedEnv, tRide, s);
-        vNow = v;
-        s = Math.min(s1, s + v * dt);
-        if (s >= s1 && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) beginAlight();
+        if (dwell) {
+          // a train standing at a mid station: out (after outAfter s), on (the answer, or the default after MID.dwell s)
+          dwell.t += dt; vNow = 0;
+          const stop = dwell.stop;
+          if (choice === 'out' && dwell.t >= MID.outAfter) { dwell = null; choice = null; beginAlight(stop); }
+          else if ((choice === 'stay' && dwell.t >= MID.dwellMin) || dwell.t >= MID.dwell) { dwell = null; choice = null; restart = 0; }
+        } else {
+          let v = rideSpeedAt(speedEnv, tRide, s);
+          restart += dt;
+          if (restart < MID.accel) v *= Math.max(0.06, ease(restart / MID.accel));
+          const nx = nextStop();
+          if (nx) v = Math.min(v, Math.max(0.5, Math.sqrt(2 * MID.brake * Math.max(0, nx.s - s))));
+          vNow = v;
+          s = Math.min(s1, s + v * dt);
+          if (nx && s >= nx.s - 0.02) { s = nx.s; nx.passed = true; dwell = { stop: nx, t: 0 }; vNow = 0; }
+          else if (s >= s1 && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) { if (chainNext && !skipped && choice !== 'out') { phase = 'through'; choice = null; } else beginAlight(); }
+        }
       } else if (phase === 'alight') {
         alight.t += dt;
         if (alight.t >= alight.total) phase = 'done';
       }
       return ride.done;
     },
-    skip() { if (phase !== 'ride') return false; skipped = true; s = s1; return true; },
+    skip() { if (phase !== 'ride') return false; skipped = true; s = s1; dwell = null; return true; },
     /** Where the carrier and the rider are now: riderAt() + { onCarrier, walk (m walked: the gait), pose }. */
     where() { return place(); },
     /** A skier state for the figure (skier-model.js pose: ride = 'sit' | 'carry' | 'drag' | 'belt' | '' (on his skis)). */
@@ -306,11 +353,11 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     wire: () => [KIND_CODE[k], lift.index, Math.round(s * 10) / 10],
     down: false,
   };
-  function beginAlight() {
+  function beginAlight(stop = null) {
     phase = 'alight';
-    const inCar = riderAt(path, s1, height, {});
-    const off = site.off;
-    const ex = (exitAt && exitAt()) || { x: off.x, z: off.z, heading: inCar.heading };
+    const inCar = riderAt(path, stop ? stop.s : s1, height, {});
+    const off = stop ? stop.off : site.off;
+    const ex = (stop ? stop.exitAt && stop.exitAt() : exitAt && exitAt()) || { x: off.x, z: off.z, heading: inCar.heading };
     const tOut = k === 'drag' || k === 'carpet' ? 0.5 : RIDE.getOut;
     // the way out: straight, or down the piste that starts at the station (exit.via)
     const way = [off, ...(ex.via || []), ex];
@@ -321,7 +368,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     // lift lines round: a cabin: the doors open first (tDoor), he walks out through them (tOut), they close behind him (held till tHold)
     const doored = DOORED.has(k), tDoor = doored ? CABIN.open : 0, tOut2 = doored ? CABIN.out : tOut;
     const door = doored ? doorSpot(site.top, -Math.min(UNLOAD[site.key], path.len * 0.2), 1) : null;
-    alight = { t: 0, inCar, off, exit: ex, tOut: tDoor + tOut2, tDoor, door, tHold: doored ? tDoor + tOut2 + 0.1 + CABIN.close : 0, tGo, way, cum, tClick: carry ? RIDE.clickIn : 0, total: tDoor + tOut2 + tGo + RIDE.turn + (carry ? RIDE.clickIn : 0) };
+    alight = { t: 0, inCar, off, exit: ex, tOut: tDoor + tOut2, tDoor, door, tHold: doored ? tDoor + tOut2 + 0.1 + CABIN.close : stop ? tDoor + tOut2 + tGo : 0, holdS: stop ? stop.s : undefined, stopName: stop ? stop.name : null, tGo, way, cum, tClick: carry ? RIDE.clickIn : 0, total: tDoor + tOut2 + tGo + RIDE.turn + (carry ? RIDE.clickIn : 0) };
   }
   /** Lift lines round: a chair's bar, 1 up .. 0 down: down BAR.downAfter s after leaving, up BAR.upBefore s before the top. */
   function barK() {
@@ -332,11 +379,11 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   function place() {
     const w = pose;
     w.onCarrier = false; w.walk = 0; w.glide = 0; w.boardCam = null; w.doorCam = null; w.doorK = 0; w.grab = false; w.barK = 1;
-    if (phase === 'ride' || (phase === 'board' && t >= tArrive)) {
+    if (phase === 'ride' || phase === 'through' || (phase === 'board' && t >= tArrive)) {
       riderAt(path, s, height, w);
       w.onCarrier = true; w.pose = POSE_OF[k];
       w.barK = barK(); w.barDown = w.barK < 0.5;
-      if (cab && phase === 'ride' && tRide < 1.2) w.doorCam = cab.cam;                  // (the camera eases out of the door view)
+      if (cab && phase === 'ride' && tRide < 1.2 && !through) w.doorCam = cab.cam;                  // (the camera eases out of the door view)
       return w;
     }
     if (phase === 'board' && CP) {

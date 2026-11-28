@@ -39,7 +39,7 @@ import { createRun } from './game.js';
 import { createBot } from './bot.js';
 import { encodeGhost, decodeGhost, ghostAt } from './ghost.js';
 import { createStore, recordRun, withLast, pisteKey, createBoards, formatTime } from './progress.js';
-import { createUi } from './ui.js';
+import { createUi, DIFF_LB } from './ui.js';
 import { createAudio } from './audio.js';
 import { createPisteMap } from './map.js';
 import { readMpContext, mpResort, createMp } from './net/index.js';
@@ -610,7 +610,7 @@ async function boot() {
   // ---- round 6: lift rides ----
   let ride = null, carrier = null, rideView = 'chase', rideCam = null, skipping = false;
   let approach = null;                                                       // easier boarding: being walked in (startApproach)
-  const rideHud = createRideHud(hud.el, { onSkip: () => skipRide(), onView: () => toggleRideView() });
+  const rideHud = createRideHud(hud.el, { onSkip: () => skipRide(), onView: () => toggleRideView(), onMap: () => (rideMap ? closeRideMap() : showRideMap()), onMid: (c) => midChoose(c) });
   const outfitOpen = (o) => modes.outfitOpen(o);
   const starsText = (p) => { const m = modes.pisteInfo(p).mask; return [1, 2, 4].map((b) => (m & b ? '★' : '☆')).join(''); };
   /** The piste the map opens on: the saved one / the resort's start piste if open, else the open piste whose top is nearest to it. */
@@ -696,7 +696,7 @@ async function boot() {
   }
   function showMap() {
     if (approach) return;                                                     // (being walked in: a moment)
-    if (ride) { hud.toast(ride.down ? 'Am Lift: d\'Kaart gëtt et ënnen' : 'Am Lift: d\'Kaart gëtt et uewen'); return; }
+    if (ride) { showRideMap(); return; }                                      // 28 Nov: on a lift the map is an overlay, the ride goes on underneath
     // round 6: over a free ride the map is a pause overlay ("Weiderfueren" goes on where the skier stood)
     const resumable = game.screen === 'ski' && game.mode === MODES.freeride && game.phase === 'running' && !!modes.freeRun;
     game.resume = resumable ? { state: { ...game.state }, piste: game.piste } : null;
@@ -1067,6 +1067,7 @@ async function boot() {
     stepApproach(0);
     return true;
   }
+  const RIDE_PISTE_M = 90;                      // 28 Nov: pistes that start within this of the lift's top stand out on the ride map
   const LINE_WAIT = 6;                         // s at most he waits at the head of the free lane
   function stepApproach(dt, skip = false) {
     const a = approach;
@@ -1112,7 +1113,9 @@ async function boot() {
     const path = view.pathOf(lift.index), site = view.siteOf(lift.index);
     if (!path || !site) { hud.toast('Dëse Lift fiert net'); return; }
     const st = game.state;
-    const inZone = down ? !!(site.down && site.down.inZone(st.x, st.z)) : site.inZone(st.x, st.z);
+    // mid stations: standing on a train stop's mat boards the train there (the stop's own frame stands in for the bottom's)
+    const stopB = !guided && !down && modes.liftStop && lift.kind === 'train' ? modes.liftStop : null;
+    const inZone = stopB ? stopB.inZone(st.x, st.z) : down ? !!(site.down && site.down.inZone(st.x, st.z)) : site.inZone(st.x, st.z);
     if (!inZone) {                                                            // easier boarding: guided in from the catchment
       if (guided) return;
       if (st.speed > BOARDING.FAST) { hud.toast('Ze séier: brems fir anzesteigen', 1600); return; }
@@ -1127,13 +1130,17 @@ async function boot() {
       const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * 1.6);
       ride = createDescent({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null,
         exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, null, null, 'bottom') });
+    } else if (stopB) {
+      const stopRec = { s: stopB.s, name: stopB.name, frame: stopB, wait: stopB.wait, load: stopB.load, off: stopB.off };
+      ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: null, shuttle: null, fromStop: stopRec, stops: stopsFor(lift, height, tree),
+        exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list) });
     } else {
       // the next carrier of the lift's own loop that reaches the loading line at least 1.6 s from now picks him up
       const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
       const after = crowd && npcLive ? crowd.lineInfo(lift.index).after : 0;          // lift lines: after the group ahead of him
       const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * Math.max(1.6, after));
       ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
-        exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list) });
+        chainNext: modes.lifts.sectionAfter(lift), stops: stopsFor(lift, height, tree), exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list) });
     }
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub, doorSide: path.sign, src: path.src });      // (the door on the boarding side)
     if (path.shuttle && !down) { const sw = view.shuttleBoard(lift.index); if (sw && sw.wait > 2) hud.toast(`D'Kabin kënnt (${Math.ceil(sw.wait)} s)`, 2200); }
@@ -1164,7 +1171,102 @@ async function boot() {
     if (carrier) carrier.place(w);
     document.documentElement.dataset.skiRidePhase = ride.phase;
     streamer.focus(w.x + Math.cos(w.heading) * 120, w.z + Math.sin(w.heading) * 120);
+    if (ride.through && !skipping) { transferRide(); return; }
     if (ride.done && !skipping) arrive();
+  }
+  /** Mid stations: a lift's stops with the way out of each platform (lift-site.js exitOf with the stop's frame). */
+  function stopsFor(lift, height, tree) {
+    return modes.lifts.stopsOf(lift).map((q) => ({ ...q, passed: false, exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list, null, q.frame) }));
+  }
+  /** Mid stations: "Hei erausgoen" ('out') / "Weiderfueren" ('stay', the default) at the next mid station. */
+  function midChoose(c) {
+    if (!ride || skipping || !ride.choose || !ride.choose(c)) return;          // (a ride DOWN has no mid stations)
+    rideHud.mid(ride.mid);
+  }
+  /** Mid stations: the section ended where the next one of the same lift begins and he stayed in: a short fade, then the next section's
+   *  carrier carries him on (no boarding, no getting out: he sits on like in the real cabin). */
+  async function transferRide() {
+    const prev = ride, next = prev && prev.chainNext;
+    if (!next || skipping) return;
+    skipping = true;
+    const fade = fader();
+    fade.classList.add('on');
+    await new Promise((res) => setTimeout(res, 320));
+    const view = ride === prev ? buildLifts() : null;
+    const path = view && view.pathOf(next.index), site = view && view.siteOf(next.index);
+    if (ride !== prev || !path || !site) { fade.classList.remove('on'); skipping = false; if (ride === prev) arrive(); return; }
+    if (lifts) { lifts.setRide(prev.lift.index, null); lifts.setGate(prev.lift.index, 0); }
+    if (carrier) { carrier.dispose(); carrier = null; }
+    const height = standHeight, tree = (x, z) => !!scatter.hit(x, z, 0.4, -1e9, quality.treeDensity);
+    ride = createRide({ lift: next, path, site, height, through: true, chainNext: modes.lifts.sectionAfter(next), stops: stopsFor(next, height, tree), exitAt: () => modes.lifts.world.exitOf(next.index, height, tree, pistes.list) });
+    carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub, doorSide: path.sign, src: path.src });
+    explore.rode(next);
+    modes.liftRidden(next);
+    modes.rideStart(next);
+    rideHud.show(next);
+    rideCam = null;
+    document.documentElement.dataset.skiRide = path.kind;
+    document.documentElement.dataset.skiRideDir = 'up';
+    document.documentElement.dataset.skiRideThrough = String(Number(document.documentElement.dataset.skiRideThrough || 0) + 1);
+    skipping = false;
+    stepRide(0);
+    if (rideMap) refreshRideMap();
+    fade.classList.remove('on');
+    mark('ride');
+  }
+
+  // ---------------- the map on a lift ride (28 Nov 2026) ----------------
+  // Like on the real lift you look at the piste map to plan where to go at the top. The ride goes on underneath (the lift does not stop,
+  // game.screen stays 'ski': the 3D view, the camera and the ride clock run as before, so closing the map is no camera jump); the map
+  // is the map only: your marker moves along the lift, the lift is highlighted, its top is "Hei kënns du un", the pistes that start there
+  // stand out. No lists, no fast travel and no teleport on the lift (tapping the ground says so).
+  let rideMap = null;
+  function rideMapTexts() {
+    const down = !!ride.down, l = ride.lift, at = down ? l.bottom : l.top;
+    const starts = pistes.list.filter((p) => Math.hypot(p.top.x - at.x, p.top.z - at.z) < RIDE_PISTE_M).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    const next = ride.chainNext;
+    const title = `Am Lift: ${l.name}`;
+    const where = `${down ? 'Ënnen' : 'Uewen'} op ${Math.round(at.y)} m`;
+    const text = `${where} · ${starts.length ? `Pisten hei: ${starts.slice(0, 4).map((p) => p.name).join(', ')}${starts.length > 4 ? ' …' : ''}` : 'vun der Statioun fiers du eraus'}${next ? ` · Weiderfueren mam ${next.name}` : ''}`;
+    return { starts, title, text, at };
+  }
+  function refreshRideMap() {
+    if (!rideMap || !ride) return;
+    const down = !!ride.down, l = ride.lift, T = rideMapTexts();
+    rideMap.screen.el.querySelector('.sub').textContent = `Am Lift: ${l.name}`;
+    rideMap.base = T;
+    rideMap.screen.setInfo(T.title, T.text);
+    rideMap.map.setRide({ lift: down ? { ...l, top: l.bottom, bottom: l.top } : l, starts: T.starts, label: 'Hei kënns du un', sub: `${Math.round(T.at.y)} m`, fit: true });
+  }
+  function showRideMap() {
+    if (rideMap || !ride || skipping || game.screen !== 'ski') return;
+    const screen = ui.showRideMap({ resort, name: ride.lift.name, onClose: () => closeRideMap() });
+    const T = rideMapTexts();
+    let hintT = 0;
+    const info = (title, text, ms = 0) => { screen.setInfo(title, text); clearTimeout(hintT); if (ms) hintT = setTimeout(() => { if (rideMap && rideMap.base) screen.setInfo(rideMap.base.title, rideMap.base.text); }, ms); };
+    const map = createPisteMap({ canvas: screen.canvas, resort, imageUrl: core.root + resort.map.file, root: core.root, height: field.farHeight, classes: core.classes, pistes,
+      onPick: (p) => info(p.name, `${DIFF_LB[p.diff]} · ${(p.length / 1000).toFixed(1)} km · ${Math.round(p.src.drop)} m erof`, 4000),
+      onTapWorld: () => info('Net um Lift', 'Teleportéieren geet net, wärend s de um Lift bass.', 2600) });
+    screen.zoomButtons.forEach((b) => b.addEventListener('click', () => map.zoomBy(b.dataset.z === 'in' ? 1.5 : 1 / 1.5)));
+    rideMap = { screen, map, base: T };
+    const w = ride.where();
+    map.setPlayer(w.x, w.z, w.heading);
+    refreshRideMap();
+    document.documentElement.dataset.skiRideMap = '1';
+  }
+  function closeRideMap() {
+    if (!rideMap) return;
+    const m = rideMap;
+    rideMap = null;
+    m.screen.close();
+    document.documentElement.dataset.skiRideMap = '';
+    canvas.focus({ preventScroll: true });
+  }
+  function rideMapTick() {
+    if (!rideMap) return;
+    if (!ride) { closeRideMap(); return; }
+    const w = ride.where();
+    rideMap.map.movePlayer(w.x, w.z, w.heading);
   }
   function rideCamera1(dt) {
     const w = ride.where();
@@ -1221,6 +1323,7 @@ async function boot() {
     if (!ride) return;
     const r = ride;
     ride = null; skipping = false;
+    closeRideMap();
     if (lifts) { lifts.setRide(r.lift.index, null); lifts.setGate(r.lift.index, 0); }
     if (carrier) { carrier.dispose(); carrier = null; }
     rideHud.show(null);
@@ -1232,6 +1335,7 @@ async function boot() {
     if (!ride) return;
     const r = ride;
     ride = null; skipping = false;
+    closeRideMap();
     if (lifts) { lifts.setRide(r.lift.index, null); lifts.setGate(r.lift.index, 0); }
     if (carrier) { carrier.dispose(); carrier = null; }
     rideHud.show(null);
@@ -1243,7 +1347,7 @@ async function boot() {
     game.hold = true;                                                          // R7-B: 0 km/h until the player steers or pushes
     game.phase = 'running';
     input.setEnabled(true); input.showTouch(input.isTouch() || matchMedia('(pointer: coarse)').matches);
-    hud.toast(r.down ? `${r.lift.name}: ënnen op ${Math.round(r.lift.bottom.y)} m` : `${r.lift.name}: uewen op ${Math.round(r.lift.top.y)} m`);
+    hud.toast(r.stopName ? `${r.lift.name} · ${r.stopName}: ${Math.round(game.state.y)} m` : r.down ? `${r.lift.name}: ënnen op ${Math.round(r.lift.bottom.y)} m` : `${r.lift.name}: uewen op ${Math.round(r.lift.top.y)} m`);
     document.documentElement.dataset.skiRide = '';
     document.documentElement.dataset.skiRideDir = '';
     document.documentElement.dataset.skiRidePhase = '';
@@ -1279,6 +1383,8 @@ async function boot() {
     if (replay.active) { if (action === 'menu') replay.close(); return; }
     if (action === 'photo') { openPhoto(); return; }
     if (mp && mp.onAction(action)) return;
+    if (rideMap) { if (action === 'map' || action === 'menu') closeRideMap(); return; }          // the map on a lift: M / Esc close it, nothing else reaches the ride
+    if (action === 'midout' || action === 'midstay') { midChoose(action === 'midout' ? 'out' : 'stay'); return; }
     if (action === 'weather') { const m = env.cycleWeather(); hud.toast(`Wieder: ${WEATHER_LABEL[m]}${m === 'random' ? ` (${WEATHER_LABEL[env.state.weatherId]})` : ''}`); }
     else if (action === 'time') { const m = env.cycleTime(); if (modes.clock && m !== 'random') modes.clock.set(startHourFor(m)); hud.toast(`Zäit: ${TIME_LABEL[m]}${m === 'random' ? ` (${TIME_LABEL[env.state.timeId]})` : ''}`); }
     else if (action === 'reset') { if (game.screen === 'ski' && game.phase === 'running') respawn('Zréck op d\'Pist'); }
@@ -1616,7 +1722,7 @@ async function boot() {
         if ((game.phase === 'running' || game.phase === 'lift') && !replay.active) { explore.tick(st, HUD_EVERY); modes.goalTick(st, HUD_EVERY, explore.disc.count); }
         if (avalanches) avalanches.hudTick(st, { freeride: game.mode === MODES.freeride && !isRace(), running: game.phase === 'running' && !game.paused });
         if (course && lastCourse) courseHud.set(lastCourse, st, camYaw);
-        if (ride) rideHud.set({ left: ride.left, share: ride.share, view: rideView, down: !!ride.down });
+        if (ride) { rideHud.set({ left: ride.left, share: ride.share, view: rideView, down: !!ride.down }); rideHud.mid(ride.mid); rideMapTick(); }
       }
     }
   }
@@ -1757,7 +1863,7 @@ async function boot() {
     // round 4A
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
-    goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), goDown: (id) => goFree(null, { kind: 'liftdown', lift: id }), boardLift, skipRide, toggleRideView, get ride() { return ride; }, get carrier() { return carrier; }, get rideView() { return rideView; }, get spawn() { return spawn; },
+    goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), goDown: (id) => goFree(null, { kind: 'liftdown', lift: id }), boardLift, skipRide, toggleRideView, showRideMap, closeRideMap, midChoose, get rideMap() { return rideMap; }, get ride() { return ride; }, get carrier() { return carrier; }, get rideView() { return rideView; }, get spawn() { return spawn; },
     get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-B (flows): stand still at (x, z) like after a lift (0 km/h until an input), the scatter for the tree checks

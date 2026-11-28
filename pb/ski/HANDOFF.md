@@ -2540,3 +2540,55 @@ Tools (surgical, no re-bake): `scripts/ski/prune_pistes.py <rid> --remove ids --
 - **Killy** (lifts 83 -> 78, pistes 234 -> 200): removed lifts Rosolin I/II + Champagny (glacier summer T-bars, dismantled 2022, not on the map), Termignon 1/2 (summer only, not on the map). Removed 34 pistes not on the map (Col Pers (+Variante), Les Grands Vallons, Vallons de la Sache, Vallée Perdue, Couloir de la Table d'orientation, Couloir de petite Balme, Anciens téléskis de Grande Balme, Parking Ski d'été, Trolles, Cognon, Semanmille, Saxifrage, Termignon, Triffollet, Roches, Signal Bas, Chemin des Côves, Chemin vers le Lavachet, Retour Lavachet, Accès Merles, Leisse x2, Mont Blanc, Pylônes, Pays Désert (Schwaarz) x2, Cugnaï (Schwaarz) and the connectors that only led there). Recoloured: Myrtilles + Pitots -> green, Rabotch -> red, Combe Folle -> black.
 - **3 Vallées** (lifts 166 -> 167, pistes 472 -> 461): added chair Châtelet (OSM way 29422053, disused tag after the 17 Feb 2026 avalanche, reopens 26/27; row built with bake.build_lifts on the patched way). Removed 11 off-piste couloirs / routes the sector maps do not show (Couloir Emile Allais, sous les Câbles, des Belges, Turcs, Jockeys, Itinéraire du Mont Vallon, Caron-Lac du Lou, Lac de Lou par la Masse, Bouchet-Lory, Tétras / Bouc Blanc (Schwaarz) variants). Recoloured: Tovets (+Variante) -> red, Allée -> red, Pralinette -> green, Accès UCPA -> blue, Plan du Lac -> blue (Lumiplay / les3vallees.com official colours). Kept: Grand Couloir, Couloir Tournier, Roches Grises / Freeride Lab (orange "ski & challenge" zones on the map), Armoise (piste non damée), Pylones, Liberty Ride.
 - **Not done / open**: Chenus gondola bottom (moved to the Courchevel 1850 snow front in 2025): OSM way 24281401 still has the old line, so no trustworthy geometry; the new Mottaret / Lac Bleu rope tow / Olaf-Balou-Némo carpets / Roc 1 belt and the Killy Tapis Balme 1+2, Brinzei / Bergerie are not in OSM (need manual geometry). Names of ~100 game pistes differ from the official ones (Boulevard X = "Bd X", Léo Lacroix / Paturages "haut / bas" ...): left as is. Killy "Coupe du Monde" (the start piste) and "Descente" are not named on the map (race lines near Stade Olympique), kept. The panorama / map base images are painted without pistes, so nothing to re-bake.
+## Lift map + mid stations (28 Nov 2026; Ian, on the iPad: "open the map while riding a lift" and "get out at the mid station / keep going")
+- **1. The piste map on a lift** (every lift class, up and down, online free ride too). `main.js showRideMap / closeRideMap / refreshRideMap / rideMapTick`: while `ride`
+  exists, M / Esc / the ride panel's big «🗺 Kaart» button (`createRideHud onMap`, 48 px high, in the ride panel so it is reachable on touch; the minimap tap too) open
+  `ui.showRideMap` = an overlay. **The lift does NOT pause** (decided: a real lift never stops for you; `game.screen` stays `'ski'`, `game.phase` `'lift'`, the 3D view,
+  the camera, the ride clock, the others and the online wire run as before; this is also why closing it is no camera jump: measured 0.00 m). Only the map is shown (no list
+  tabs, no fast travel, no challenge start, no `explore.attachMap`): `map.js` mode `'ride'`: your orange marker moves along the lift (`movePlayer`, the HUD tick 10 Hz, nothing
+  recentres: you can pan / zoom), the lift is highlighted yellow, its top = ring + pill «Hei kënns du un» + its height (on a ride DOWN: the bottom), a dashed orange line from
+  you to it, the pistes that begin within 90 m of the arrival (`RIDE_PISTE_M`) get a yellow halo + a thicker line (`setRide({lift, starts, label, sub, fit})`, opens on the
+  whole line), the card top left «Am Lift: <name>» / «Uewen op 2689 m · Pisten hei: …» (+ «Weiderfueren mam <next section>»). A tap on a piste names it (colour, km, drop; never a
+  teleport); a tap on the ground says «Net um Lift / Teleportéieren geet net, wärend s de um Lift bass.» (**teleport disabled**, nothing moves). M / Esc / «Weiderfueren ✕»
+  close it; the ride ending (`arrive`, `dropRide`) closes it by itself. While it is open only M / Esc reach the game (Enter / L do not skip the ride underneath). Works over the
+  boarding walk too (`ride.phase 'board'`). `ui.css?v=26`; `ZOOM_HTML` / `LEGEND_HTML` in ui.js are shared with the normal map.
+- **2. Mid stations** (`modes/liftride.js MID`, `ride.mid`, `ride.choose('out' | 'stay')`, `createRide({ chainNext, stops, through, fromStop })`; `panel.js createRideHud().mid()`).
+  The data has `stops` on ONE lift only (below); all other multi-section lifts are separate lifts in the data that share a station, so two kinds of mid station:
+  - **chain** (`freeride.js sectionAfter(lift)`: same kind chair / gondola / cable, the next section's bottom <= `CHAIN_M` 12 m from this top at the same height): 9 s before the
+    shared station the choice shows: big buttons «Hei erausgoen» [X] / «Weiderfueren» [K] (56 px high) above the ride panel. Default (nobody answers) = he **sits on**: the ride
+    ends in phase `'through'`, `main.js transferRide` fades out 0.32 s and builds the next section's `createRide({ through: true })` (starts on the carrier: no boarding, no getting
+    out) with its own carrier; the lift counts as ridden (`explore.rode`, `modes.liftRidden / rideStart`), the HUD and an open ride map follow. X = off at this section's top
+    exactly as before (cabin doors, exit). «Iwwersprangen» (skip) never carries on: it ends the ride at the top as always. Boarding the next section from the shared station
+    (its bottom zone) and the ride DOWN from it (this section's descent mat, where `canRideDown`) were already there.
+  - **stops** (a train's `stops`, `lift-site.js site.stops`): the train **brakes** (`MID.brake` 5 m/s2) and stands `MID.dwell` 6 s at every served stop (`ride.dwelling`), the
+    choice shows 9 s ahead and while it stands; no answer = on after the dwell, K = on at once (>= 1.4 s), X = he gets out onto the platform (`beginAlight(stop)`: the train stays
+    docked while he walks out) and on to `exitOf(index, ..., stopFrame)` (new: `exitOf`'s `end` may be a stop frame: same rules as a top exit, the platform is his own lane).
+    Stops whose platform is underground (tunnel) get none. **Boarding at a stop** (up): every served stop has a yellow mat on its platform (`stop.zone / wait / load / off`,
+    `world.stopAt`, `lifts.catchAt` -> `{stop}` -> `modes.liftStop`, HUD button «Astegen: Gornergrat Bahn · <stop>»); `createRide({ fromStop })` boards the train there and rides on to
+    the top (later stops still count). The toast after getting out at a stop is «Gornergrat Bahn · Riffelberg: 2582 m». Ride DOWN from a stop is NOT built (the platform stands on
+    the up lane's side only; a down platform needs the other track's side).
+- **Which lifts are mid stations** (11 resorts, `node scripts/ski/midstation-check.mjs`): stops: **only Zermatt "Gornergrat Bahn" (rack railway) has `stops` in the data**: 5
+  (Legendär @605 m, Findelbach @1400, Landtunnel @2865, Riffelberg @6125, Rotenboden @7525); Legendär (637 m from the nearest piste) and Findelbach (260 m) have no piste within
+  `STOP_PISTE_M` 150 m, so the train **passes them** (a player who got out there would stand in the valley with no piste: no valid exit); the other three are served and have a
+  valid exit. Chains (real multi-section lifts, modelled as separate lifts sharing a station): killy 1 (TSD6 Bollin -> Fresse), 3vallees 6 (Pas du Lac 1/2, Rhodos 1/2, Saulire
+  Express 1/2, Olympe 1/2/3, Bruyères 1/2), zermatt 2 (Kumme 1/2, Matterhorn Express 1/2), arlberg 3 (Auenfeldjet -> Weibermahd, Flexenbahn -> Trittkopfbahn II, Trittkopfbahn I ->
+  II), kronplatz 4 (Olang I/II, Kronplatz I -> II, Pedagà -> Piz de Plaies, Ried -> Gipfelbahn), vialattea 6 (Serra Granet 1/2, Gondrans 1/2, Cesana-Ski Lodge 1/2, Fraiteve 1 ->
+  2, Garnel 1/2, Sportinia 1/2), obertauern 1 (Zehnerkarbahn I/II), livigno 2 (Livigno-Tagliede -> Tagliede - Costaccia, Carosello 3000 I/II), davos 2 (Schiferbahn 1/2, Carjöl ->
+  Carjöler Rank), laax 6 (Laax - Larnags, Arena Express Flims - Plaun - Scansinas - Nagens, FlemXpress Flims - Foppa - Startgels - Segnes - Nagens Sura / Cassons), soelden 2
+  (Schwarze Schneid, Rotkogl) = 35 links. Pairs 20-45 m apart (3V Orelle -> Orelle-Caron, Vallugabahn I / II, Kronplatz Miara -> Col Toron, Laax Murschetg -> Crap Sogn Gion ...)
+  are two separate stations: no choice there.
+- **Exit check** (`node scripts/ski/midstation-check.mjs [resort]`, the game's code in Node, 0 failed over all 11 resorts): per served stop: the waiting spot is in its mat and clear
+  of walls / buildings, `stopAt` / `catchAt` find it, an exit exists (not the fallback, walkable, outside every station and building, 15 m clear ahead, facing downhill, a piste
+  <= 150 m from it); a ride up through all stops staying in, one that gets out at each stop (ends on its exit < 130 m from the platform), boarding at each stop rides on to the
+  top, no carrier jump; per chain: the next section's zone is valid, staying in ends `'through'`, the next section's `through` ride runs to its top, the two carriers' places
+  differ by < 40 m (under the fade), X gets out at the shared station.
+- **Flows**: `ski-lift-map` (Killy gondola incl. the boarding walk, chair (+ open / close x8: DOM nodes), drag lift, ride down; Zermatt cable car + funicular: the button's size and
+  place, open over the ride, the ride goes on, the marker follows, the lift highlighted, a tap = no teleport, M / Esc / resume close it, no camera jump, arriving with the map
+  open) and `ski-midstation` (Killy Bollin -> Fresse: default / K / X, the shared station's boarding up / down; Zermatt train: choice, it stands, default carries on, X out onto a
+  valid exit, boarding at the stop; Kumme 1 -> 2 in cabins), both Chromium + WebKit; `ski-ride-down` (the old "no map on the lift" assertion changed), `ski-mp-freeride` (+ the host
+  opens the map on the lift, the others still see him riding). Shots (look at them): `~/Library/Caches/ski-work/lift-map-mid/`.
+- **Side effect**: the first section of a chain no longer ends at its top when nobody answers (he rides on into the next one): a flow that rides a chain for real and expects the
+  first section's top must press X (or skip). Keys X / K are new (input.js ACTION_KEYS `midout` / `midstay`; X / K do nothing outside a mid-station choice).
+- **Not done / not tested**: ride DOWN boarding at a train stop; a choice during a ride DOWN through a chain (down always gets off at the bottom of its section); the real iPad (touch
+  targets measured in Chromium: 121 x 48 px map button, 243 x 56 px choice buttons); online with real people (only the in-process hub flow); the chase camera at a stop exit sits
+  close to the station walls (the existing camera guard keeps it out of them).

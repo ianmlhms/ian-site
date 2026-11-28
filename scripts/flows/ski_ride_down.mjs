@@ -3,7 +3,7 @@
  *   list      the map's lift list: "Cesana-Ski Lodge 1" has an "⬇ Erof" button; a drag lift has none
  *   top       Erof = fast travel onto the top station's descent mat: the HUD button says "Erof: …", L boards
  *   ride      in a cabin on the DOWN lane, going down, facing downhill; the wire state carries the direction (code 12); the HUD says
- *             "bis ënnen"; the day clock moves on by the ride time; the map stays shut on the lift ("ënnen")
+ *             "bis ënnen"; the day clock moves on by the ride time; the map opens as an overlay on the lift (the ride goes on)
  *   bottom    off at Cesana (the bottom station), standing still, skis on; the ride counted
  *   chair     a chairlift's descent with "Iwwersprangen" (Enter): seated, off at its bottom
  * Shots (SKI_RIDE_DOWN_SHOTS=dir, else the flow shots): boarding at the top, mid-ride, arrival. Zero page errors. */
@@ -96,7 +96,10 @@ export const flow = {
     h.expect(wire[0] === 12 && wire[1] >= 0, `wire [${wire.join(", ")}]`);
     await page.keyboard.press("m");
     await h.pause(300);
-    h.expect(await page.evaluate(() => document.documentElement.dataset.skiScreen === "ski"), "no map on the lift");
+    h.expect(await page.evaluate(() => document.documentElement.dataset.skiScreen === "ski" && document.documentElement.dataset.skiRideMap === "1" && !!window.__ski.ride), "the map is an overlay on the lift (28 Nov: the ride goes on underneath, the screen stays the game)");
+    await page.keyboard.press("m");
+    await h.pause(200);
+    h.expect(await page.evaluate(() => !document.documentElement.dataset.skiRideMap), "M closes it again");
 
     h.step("off at Cesana, standing still");
     await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 120000 });

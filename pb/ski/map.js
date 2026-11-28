@@ -73,6 +73,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   // round 4A (modes): stars per piste id (mask), locked piste ids, the snow park line, the lifts of the free ride and the picked one
   let marks = { stars: new Map(), locked: new Set() }, mode = 'piste', park = null, lifts = [], liftSel = null, player = null;
   let fitScale = 1;
+  let ride = null;                  // 28 Nov: the map opened on a lift ride: { lift, starts: pistes that begin at the top, label }
   // round 7-C: the discovery (softer ink on the undiscovered cells), the teleport pin
   let fog = null, pin = null, tapWorld = onTapWorld;
   // map clarity: no recentring while the map opens on the skier (showMap's piste / lift picks run in the same task), animation
@@ -384,9 +385,20 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       for (const p of pistes.list) if (marks.locked.has(p.id)) g.stroke(gd.piste.get(p).path);
       g.setLineDash([]);
     }
+    // ---- the pistes that start at the top of the lift being ridden: a warm halo under a thicker line
+    if (ride && ride.starts.length) {
+      sheetTransform(sz, k);
+      for (const p of ride.starts) {
+        const q = gd.piste.get(p);
+        if (!q) continue;
+        g.strokeStyle = '#ffffff'; g.lineWidth = (lw * 2.7 + 7) / s; g.stroke(q.path);
+        g.strokeStyle = '#ffc400'; g.globalAlpha = 0.85; g.lineWidth = (lw * 2.7 + 3) / s; g.stroke(q.path); g.globalAlpha = 1;
+        g.strokeStyle = DIFF[p.diff].css; g.lineWidth = lw * 1.5 / s; g.stroke(q.path);
+      }
+    }
     // ---- lifts
     const liftW = clamp(0.85 + m * 3.6, 0.95, 2.4);          // the pistes lead, the lifts stay thin on the whole map
-    const picked = mode === 'freeride' && liftSel ? gd.lift.get(resort.lifts[liftSel.index]) : null;
+    const picked = (mode === 'freeride' || ride) && liftSel ? gd.lift.get(resort.lifts[liftSel.index]) : null;
     if (picked) { g.strokeStyle = LIFT_PICK; g.lineWidth = (liftW + 9) / s; g.globalAlpha = 0.9; g.stroke(picked.path); g.globalAlpha = 1; }
     for (const q of gd.lift.values()) if (onScreen(q, sz)) { g.strokeStyle = '#ffffffd9'; g.lineWidth = (liftW + 1.7) / s; g.stroke(q.path); }
     for (const q of gd.lift.values()) {
@@ -433,6 +445,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     drawLabels(sz, m, lw);
     drawStars(sz, m);
     drawPin(sz);
+    drawRide(sz);
     drawPlayer(sz);
     if (relief) drawCompass(sz); else drawScale(sz);
     drawOverview(sz);
@@ -544,6 +557,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     const taken = createTaken();
     const me = player ? worldToScreen(player.x, player.z, sz) : null;
     if (me) taken.add([me[0] - 26, me[1] - 46, me[0] + 26, me[1] + 20]);
+    if (ride) { const [tx, ty] = worldToScreen(ride.lift.top.x, ride.lift.top.z, sz); taken.add([tx - 80, ty - 66, tx + 80, ty + 44]); }
     // no label under the buttons, the legend, the inset, the compass or the card lying over the map
     taken.add([sz.w - 60, sz.h - 62 - ovSpace(sz), sz.w, sz.h - 4 - ovSpace(sz)]);
     if (relief) { const [tx, ty] = toScreen(sheet.w / 2, 0, sz), fs = clamp(sheet.w * s * 0.03, 12, 78); taken.add([tx - sheet.w * s * 0.21, ty, tx + sheet.w * s * 0.21, ty + fs * 2.1]); }
@@ -690,6 +704,33 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       g.beginPath(); g.moveTo(x - 9, y); g.lineTo(x + 9, y); g.moveTo(x, y - 9); g.lineTo(x, y + 9); g.stroke();
       g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.stroke();
     }
+  }
+
+  /** 28 Nov 2026 (the map on a lift ride): the top station of the lift he rides, a ring and the pill "Hei kënns du un", and the way he
+   *  has still to go (dashed orange along the line, from him up to the top). */
+  function drawRide(sz) {
+    if (!ride) return;
+    const l = ride.lift;
+    const [tx, ty] = worldToScreen(l.top.x, l.top.z, sz);
+    if (player) {
+      const [px, py] = worldToScreen(player.x, player.z, sz);
+      g.setLineDash([7, 6]); g.lineCap = 'round'; g.strokeStyle = '#ffffff'; g.lineWidth = 6; g.beginPath(); g.moveTo(px, py); g.lineTo(tx, ty); g.stroke();
+      g.strokeStyle = YOU; g.lineWidth = 3; g.stroke(); g.setLineDash([]);
+    }
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,.35)'; g.shadowBlur = 6;
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(tx, ty, 13, 0, Math.PI * 2); g.fill();
+    g.shadowBlur = 0;
+    g.fillStyle = YOU; g.beginPath(); g.arc(tx, ty, 9, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(tx, ty, 3.4, 0, Math.PI * 2); g.fill();
+    g.restore();
+    g.font = `800 13px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const t1 = ride.label, w = Math.max(textWidth(t1, `800 13px ${FONT}`), textWidth(ride.sub || '', `600 11px ${FONT}`)) + 20, h = ride.sub ? 36 : 24;
+    let bx = clamp(tx - w / 2, 6, sz.w - w - 6), by = ty - 22 - h;
+    if (by < 6) by = ty + 20;
+    g.fillStyle = 'rgba(255,255,255,.96)'; g.strokeStyle = YOU; g.lineWidth = 2; roundRect(g, bx, by, w, h, 8); g.fill(); g.stroke();
+    g.fillStyle = '#b34400'; g.font = `800 13px ${FONT}`; g.fillText(t1, bx + w / 2, by + (ride.sub ? 12 : h / 2));
+    if (ride.sub) { g.fillStyle = INK; g.font = `600 11px ${FONT}`; g.fillText(ride.sub, bx + w / 2, by + 26); }
   }
 
   /** A world heading (rad, x east, z south) as a screen direction at a place: the direction a step that way goes on the map. */
@@ -879,6 +920,9 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       if (l && onPickLift) { liftSel = l; quietFocus = true; try { onPickLift(l); } finally { quietFocus = false; } draw(); }
       const at = world || (l ? [l.bottom.x, l.bottom.z] : null);
       if (tapWorld && at) tapWorld(at[0], at[1], l || null);
+    } else if (mode === 'ride') {
+      const p = pickAt(px, py);                                    // on a lift ride: a tap only says what the piste is (no teleport)
+      if (p && onPick) onPick(p); else if (!p && tapWorld) tapWorld(0, 0);
     } else if (mode === 'piste') {
       const p = pickAt(px, py), l = liftLineAt(px, py, 10);
       // the finger right on a lift's line, nearer than any piste: the lift (its card), else the piste
@@ -1008,6 +1052,31 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       draw();
     },
     centerOnPlayer, fitAll,
+    /** (tests) the marker's place and what the ride overlay shows. */
+    get you() { return player ? { x: player.x, z: player.z, heading: player.heading } : null; },
+    get rideState() { return ride ? { lift: ride.lift.index, starts: ride.starts.map((p) => p.id), label: ride.label, sub: ride.sub } : null; },
+    /** 28 Nov 2026: the map over a lift ride (null = none). lift = the net's entry (top, bottom, index), starts = the pistes that begin at its
+     *  top (drawn with a halo), label / sub = the pill at the top station. Opens on the whole line. */
+    setRide(info) {
+      ride = info ? { lift: info.lift, starts: info.starts || [], label: info.label || '', sub: info.sub || '' } : null;
+      if (info) { liftSel = info.lift; mode = 'ride'; }
+      else if (mode === 'ride') mode = 'piste';
+      const sz = size();
+      if (info && info.fit && sz.w) {                      // the whole line (and where he is) in view, at once
+        const l = info.lift, pts = [[l.top.x, l.top.z], [l.bottom.x, l.bottom.z]];
+        if (player) pts.push([player.x, player.z]);
+        const c = pts.map(([x, z]) => sheet.to(x, z)), xs = c.map((q) => q[0]), ys = c.map((q) => q[1]), k = sheet.k;
+        const bw = Math.max(...xs) - Math.min(...xs) + 900 * k, bh = Math.max(...ys) - Math.min(...ys) + 900 * k;
+        view = clampView({ x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...ys) + Math.max(...ys)) / 2, s: Math.max(fitScale, Math.min(sz.w / bw, sz.h / bh)) });
+      }
+      draw();
+    },
+    /** The skier on the lift: moves his marker, nothing recentres (he can look round the map while the carrier goes). */
+    movePlayer(x, z, heading) {
+      if (!player) return;
+      player.x = x; player.z = z; if (Number.isFinite(heading)) player.heading = heading;
+      requestDraw();
+    },
     /** 'relief' (the panorama) | 'flat' (the plan). */
     setView, get view() { return sheet ? sheet.id : null; },
     selectLift(l, center = false) { liftSel = l; if (center && l) focusBox(Math.min(l.top.x, l.bottom.x), Math.min(l.top.z, l.bottom.z), Math.max(l.top.x, l.bottom.x), Math.max(l.top.z, l.bottom.z), 1400); else draw(); },
