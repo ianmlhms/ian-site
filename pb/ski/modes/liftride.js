@@ -12,7 +12,7 @@
  *           in. Then he stands still (main.js holds him at 0 km/h until the player steers or pushes)
  * The ride state that goes on the wire (multiplayer: a friend on the same lift sits in his own chair) is { lift index, s, kind } while
  * he is on the carrier. The camera: 'chase' = third person beside / behind, 'window' = from the rider's eyes along the line. */
-import { LIFT_SPEC, carrierBox } from '../lift-path.js';
+import { LIFT_SPEC, carrierBox, CARPET_FACTOR } from '../lift-path.js';
 import { BOARD, UNLOAD, stationCrawl } from '../lift-site.js';
 
 export const RIDE = Object.freeze({
@@ -25,6 +25,8 @@ export const RIDE = Object.freeze({
   stepOut: 0.7, getIn: 0.55, clickIn: 1.3, barDrop: 0.9, getOut: 0.6, turn: 0.6,
   wait: 2.5,                 // s at most the rider waits for the next carrier (beyond that the lift catches up)
 });
+/** Standing lifts (28 Nov 2026): a magic carpet runs at its belt's speed (lift-path.js CARPET_FACTOR; lifts.js runs the belt texture at it). */
+const factorOf = (path, factor) => (path.kind === 'carpet' ? factor * CARPET_FACTOR / RIDE.factor : factor);
 /** After launch: chair boarding (liftride.js chairPlan): s the gate takes to open, m/s skating through it and on the belt, m he stands
  *  ahead of the seat, s standing at the line, s sitting down, the chair's crawl (m/s) for the last slowFor s before him (+ a ramp),
  *  s to speed up to the ride speed after. */
@@ -85,7 +87,7 @@ export function rideSpeedAt(env, tRide, s) {
  *  gondola / detachable chair counts, else the analytic time). */
 export function rideSeconds(path, factor = RIDE.factor, site = null) {
   const [s0, s1] = rideSpan(path);
-  const D = Math.max(0, s1 - s0), v = path.spec.speed * factor;
+  const D = Math.max(0, s1 - s0), v = path.spec.speed * factorOf(path, factor);
   const crawl = site ? stationCrawl(site) : null;
   if (crawl) {
     const env = { k: path.kind, path, speed: v, s1, crawl, cab: path.kind !== 'chair', vs: path.kind === 'chair' ? ((path.seats || 4) >= 4 ? CHAIR.vsDetach : CHAIR.vsFixed) : 0 };
@@ -220,7 +222,7 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
   // a ride that carries on from the section before (`through`: it starts on the carrier, no boarding) / the end offers a next section
   const s0 = fromStop ? fromStop.s : s0Line;
   const site = fromStop ? { ...siteIn, bottom: stopFrame(fromStop), load: fromStop.load, wait: fromStop.wait, chair: null, queue: null } : siteIn;
-  const speed = path.spec.speed * factor;
+  const speed = path.spec.speed * factorOf(path, factor);
   const carry = CARRY.has(k);
   const start = from || site.wait;
   const load = site.load;
@@ -345,6 +347,8 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
       const st = { ...base, x: w.x, y: w.y, z: w.z, heading: w.heading, vx: Math.cos(w.heading) * moving, vz: Math.sin(w.heading) * moving, vy: 0, speed: k === 'drag' && phase === 'ride' ? speed : w.glide || 0,
         grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
       st.dragHand = k === 'drag' && (w.onCarrier || w.grab) && w.hand ? w.hand : null;      // R8e: the hand on the rod (skier-model.js poseDrag)
+      // standing lifts (28 Nov 2026): on a carpet the skis lie on the belt: its pitch here (skier-model.js: a plane through his feet)
+      if (k === 'carpet' && w.onCarrier) st.beltPitch = Math.atan(path.slope(Math.max(0, Math.min(path.len, s)))); else delete st.beltPitch;
       if (w.onCarrier) { st.rideLift = lift.index; st.rideS = s; st.rideKind = KIND_CODE[k]; }
       else { delete st.rideLift; delete st.rideS; delete st.rideKind; }
       return st;
@@ -574,7 +578,7 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
 export function createDescent({ lift, path, site, height, factor = RIDE.factor, from = null, startU = null, exitAt = null }) {
   const k = path.kind, D = site.down;
   const sT = D.sTop, sB = Math.min(D.sBottom, sT - 1);
-  const speed = path.spec.speed * factor;
+  const speed = path.spec.speed * factorOf(path, factor);
   const carry = CARRY.has(k);
   const start = from || D.wait, load = D.load;
   const seatAt0 = riderAt(path, sT, height, {}, true);

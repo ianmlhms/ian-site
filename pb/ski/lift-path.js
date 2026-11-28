@@ -75,6 +75,11 @@ export function carrierBox(kind, seats = 4, sub = '') {
 /** A chair's width by its seat count (carriers.js builds the same width). */
 export const chairWidth = (seats) => Math.max(1.6, Math.min(4.2, (seats || 4) * 0.52));
 const SHUTTLE = new Set(['cable', 'train', 'carpet']);
+/** Standing lifts (28 Nov 2026; Ian: "carpets carry him the whole way at belt speed"): a magic carpet rides at this many times its real
+ *  belt speed (not the lifts' x4: short lines), and lifts.js runs its belt texture at the same speed, so he stands still on the belt. */
+export const CARPET_FACTOR = 2;
+/** Standing lifts: a magic carpet's belt runs this high over the snow (its supports, lifts.js ribbon, the rider: skier-model.js). */
+export const BELT_TOP = 0.18;
 /** Ride down (Ian, Via Lattea Cesana: "you can't go down with the gondola"): like the real ones, chairs, gondolas (funitels), cable
  *  cars and trains can be boarded at the top to ride DOWN; drag lifts and carpets never. */
 export const DESCENT_CLASSES = new Set(['chair', 'gondola', 'cable', 'train']);
@@ -143,7 +148,7 @@ export function createLiftPath(src, height) {
   if (kind === 'train' || kind === 'carpet') {
     // the track lies on the ground (a support every 10 m keeps the rail on the snow); an underground funicular dives into the hill
     // from its stations and runs TUNNEL_DEPTH m under the lowest ground above it (the profile smoothed, so the carriage rides calmly)
-    const lift = kind === 'carpet' ? 0.18 : 0.35;
+    const lift = kind === 'carpet' ? BELT_TOP : 0.35;
     supports = [];
     const step = kind === 'carpet' ? 2 : 10;
     for (let s = 0; s < len; s += step) supports.push({ s, y: ground(s) + lift });

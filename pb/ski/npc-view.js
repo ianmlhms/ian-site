@@ -13,6 +13,8 @@ import { riderAt } from './modes/liftride.js';
 
 const THREE = window.THREE;
 const TEX_W = 1024;
+/** Standing lifts (28 Nov 2026): the climb (rad) the drag-lift pose is baked on (a typical T-bar track). */
+const DRAG_BAKE_PITCH = 0.3;
 
 /** The states the poses are baked from (flat snow, heading +x); p >= BOARD_POSE: the same pose on a snowboard. */
 function poseState(p) {
@@ -43,12 +45,17 @@ export function bakeFigure(detail) {
   const rows = Math.ceil((POSE_COUNT * 2 * V) / TEX_W);
   const data = new Float32Array(TEX_W * rows * 4);
   const flat = (x, z, out) => { out.x = 0; out.y = 1; out.z = 0; return out; };
-  const ground = () => 0;
+  // standing lifts (28 Nov 2026): the drag pose is baked on a DRAG_BAKE_PITCH climb (skis / board on that snow, the body upright); the
+  // rider is pitched by the track's slope minus it, so his skis lie on the track and the body leans only a few degrees
+  const tanBake = Math.tan(DRAG_BAKE_PITCH);
+  const climb = (x) => x * tanBake;
+  const flatGround = () => 0;
   const v = new THREE.Vector3(), nm = new THREE.Matrix3();
   const visibleUp = (o) => { for (let q = o; q && q !== group; q = q.parent) if (!q.visible) return false; return true; };
   for (let p = 0; p < POSE_COUNT; p++) {
     const st = poseState(p);
     if ((p >= BOARD_POSE) !== model.board) model.setBoard(p >= BOARD_POSE);      // 28 Nov 2026: the board poses (skis + poles fold away)
+    const ground = st.ride === 'drag' ? climb : flatGround;
     for (let i = 0; i < 50; i++) model.pose(st, flat, i * 0.1 + p * 10, ground);     // settles every smoothed driver of pose()
     group.updateMatrixWorld(true);
     let base = 0;
@@ -259,7 +266,8 @@ export function createNpcView({ scene, height, level = 'medium' }) {
         if (l.kind === 'drag') {
           riderAt(l.path, c.s, height, rideOut);
           const fx = Math.cos(rideOut.heading), fz = Math.sin(rideOut.heading);
-          const pitch = -Math.atan((height(rideOut.x - fx, rideOut.z - fz) - height(rideOut.x + fx, rideOut.z + fz)) / 2) * 0.6;
+          // standing lifts: the skis were baked on a DRAG_BAKE_PITCH climb; the rest of the track's slope pitches the figure
+          const pitch = Math.atan((height(rideOut.x + fx, rideOut.z + fz) - height(rideOut.x - fx, rideOut.z - fz)) / 2) - DRAG_BAKE_PITCH;
           e.set(0, -rideOut.heading, pitch); q.setFromEuler(e);
           m4.compose(v3.set(rideOut.x, rideOut.y, rideOut.z), q, s3.set(s.scale, s.scale, s.scale));
         } else {

@@ -649,6 +649,13 @@ async function boot() {
   // ---- round 6: lift rides ----
   let ride = null, carrier = null, rideView = 'chase', rideCam = null, skipping = false;
   let approach = null;                                                       // easier boarding: being walked in (startApproach)
+  /* Standing lifts (28 Nov 2026; Ian, iPad: "you always get teleported to the bottom station"): the skier moved continuously, but the
+   * CAMERA cut at every hand-over (the guided walk's end snapped the chase camera, the ride camera took over in one frame, the station
+   * frame / the chase camera took over again at the exit). camEase(): from the last frame's camera to whatever the new source wants,
+   * over CAM_EASE s. Not after a fast travel / a skip (those fade). */
+  const CAM_EASE = 1.1, CAM_JUMP = 1.2;                                     // s; m in one frame (beside his own move) = a jump
+  let camLast = null, camFrom = null;
+  const camEase = (dur = CAM_EASE) => { if (camLast) camFrom = { ...camLast, t: 0, dur }; };
   const rideHud = createRideHud(hud.el, { onSkip: () => skipRide(), onView: () => toggleRideView(), onMap: () => (rideMap ? closeRideMap() : showRideMap()), onMid: (c) => midChoose(c) });
   const outfitOpen = (o) => modes.outfitOpen(o);
   const starsText = (p) => { const m = modes.pisteInfo(p).mask; return [1, 2, 4].map((b) => (m & b ? '★' : '☆')).join(''); };
@@ -1112,18 +1119,20 @@ async function boot() {
   }
   const RIDE_PISTE_M = 90;                      // 28 Nov: pistes that start within this of the lift's top stand out on the ride map
   const LINE_WAIT = 6;                         // s at most he waits at the head of the free lane
+  const HURRY = 1.7;                           // standing lifts: a second press during the walk: the rest of it this much faster (no jump)
   function stepApproach(dt, skip = false) {
     const a = approach;
-    a.t += dt;
-    if (skip && a.line && crowd) crowd.clearZone(a.lift.index);          // (a second press: in at once; the group still there goes)
+    // standing lifts (28 Nov 2026; Ian: "teleported to the bottom station"): a second press no longer puts him on the spot at once: the
+    // rest of the walk goes HURRY x faster and the group still in the zone goes (no wait at the head of the free lane)
+    if (skip) { a.hurry = true; if (a.line && crowd) crowd.clearZone(a.lift.index); }
+    a.t += dt * (a.hurry ? HURRY : 1);
     // m = metres along the way: to the wait point, (the wait), the last steps into the zone
     let m, k;
-    if (skip) { m = a.L; k = 1; }
-    else if (a.t < a.d1) { k = a.t / a.d1; m = (a.L > a.Lw ? k * k * (3 - 2 * k) * 0.82 + k * 0.18 : k * k * (3 - 2 * k)) * a.Lw; }
+    if (a.t < a.d1) { k = a.t / a.d1; m = (a.L > a.Lw ? k * k * (3 - 2 * k) * 0.82 + k * 0.18 : k * k * (3 - 2 * k)) * a.Lw; }
     else if (a.t3 === null) {
       const info = a.line && crowd ? crowd.lineInfo(a.lift.index) : null;
       a.waited += dt;
-      if (!info || info.clearIn <= 0.05 || a.waited >= LINE_WAIT) { if (a.waited >= LINE_WAIT && crowd) crowd.clearZone(a.lift.index); a.t3 = a.t; }
+      if (a.hurry || !info || info.clearIn <= 0.05 || a.waited >= LINE_WAIT) { if ((a.hurry || a.waited >= LINE_WAIT) && crowd) crowd.clearZone(a.lift.index); a.t3 = a.t; }
       m = a.Lw; k = 0.85;
     }
     if (m === undefined) { const f = Math.min(1, (a.t - a.t3) / Math.max(0.01, a.d3)); m = a.Lw + (a.L - a.Lw) * f * f * (3 - 2 * f); k = a.L > a.Lw ? 0.85 + 0.15 * f : 1; }
@@ -1133,13 +1142,14 @@ async function boot() {
     const x = A.x + (B.x - A.x) * f, z = A.z + (B.z - A.z) * f;
     const hSeg = Math.atan2(B.z - A.z, B.x - A.x), d = (h0, h1, w) => h0 + Math.atan2(Math.sin(h1 - h0), Math.cos(h1 - h0)) * Math.max(0, Math.min(1, w));
     const heading = k > 0.85 && m > a.L - 0.8 ? d(hSeg, a.h1, (m - (a.L - 0.8)) / 0.8) : d(a.h0, hSeg, a.t / 0.35);
-    const done = skip || (a.t3 !== null ? a.t - a.t3 >= a.d3 : a.t >= a.d1 && a.L <= a.Lw);
+    const done = a.t3 !== null ? a.t - a.t3 >= a.d3 : a.t >= a.d1 && a.L <= a.Lw;
     const moving = !done && (a.t < a.d1 || a.t3 !== null);
     const v = moving ? 1.6 : 0;
     game.state = { ...createSkierState(x, z, heading, standHeight(x, z)), vx: Math.cos(heading) * v, vz: Math.sin(heading) * v, speed: v, walk: m };
     if (done) {
       approach = null;
       document.documentElement.dataset.skiApproach = '';
+      camEase();                                                             // (placeAt snaps the chase camera: no cut)
       placeAt(x, z, a.h1);
       game.phase = 'running';
       input.setEnabled(true);
@@ -1194,6 +1204,7 @@ async function boot() {
     chPrompt.show(null);
     game.phase = 'lift'; game.hold = false;
     rideCam = null; skipping = false;
+    camEase();                                                               // standing lifts: the ride camera takes over without a cut
     input.setEnabled(false); input.showTouch(false);
     rideHud.show(lift);
     stepRide(0);
@@ -1325,7 +1336,9 @@ async function boot() {
     const off = { x: want.x - w.x, y: want.y - w.y, z: want.z - w.z, tx: want.tx - w.x, ty: want.ty - w.y, tz: want.tz - w.z, fov: want.fov };
     // (after launch: a chair's boarding camera eases into the ride camera as he sits down, no cut)
     // (lift lines round: a cabin's door view eases into the ride camera too, no cut)
-    if (rideView === 'window' || !rideCam || (rideCam.onCarrier !== w.onCarrier && ride.kind !== 'chair' && !w.doorCam && !rideCam.door)) rideCam = { off, onCarrier: w.onCarrier, door: !!w.doorCam };
+    const handOver = !!rideCam && rideView !== 'window' && rideCam.onCarrier !== w.onCarrier && ride.kind !== 'chair' && !w.doorCam && !rideCam.door;
+    if (handOver) camEase();                                                   // standing lifts: onto / off the carrier, no cut
+    if (rideView === 'window' || !rideCam || handOver) rideCam = { off, onCarrier: w.onCarrier, door: !!w.doorCam };
     else rideCam.door = !!w.doorCam;
     if (w.doorCam && rideView !== 'window') rideCam.off = off;                // (the door view stands still on the platform)
     else if (rideCam.off !== off) { const k = 1 - Math.exp(-dt * 3); for (const key of Object.keys(off)) rideCam.off[key] += (off[key] - rideCam.off[key]) * k; }
@@ -1362,6 +1375,7 @@ async function boot() {
   /** R8b (3V QA: a stale "Funiculaire …" ride line stayed on the HUD): a ride cut short by a fast travel / teleport / challenge / park
    *  start ends cleanly (no carrier, no ride HUD, the lift's own loop takes its carrier back). */
   function dropRide() {
+    camFrom = null;                                                          // (a fast travel / teleport: a cut behind the fade)
     if (approach) { approach = null; document.documentElement.dataset.skiApproach = ''; if (game.phase === 'approach') game.phase = 'running'; input.setEnabled(true); }
     if (!ride) return;
     const r = ride;
@@ -1386,6 +1400,7 @@ async function boot() {
     const ex = r.exit || (r.down ? modes.lifts.bottomExit(r.lift, (x, z) => surface.height(x, z)) || modes.lifts.boardAt(r.lift) : modes.lifts.startAt(r.lift, (x, z) => surface.height(x, z)));
     const spot = { x: ex.x, z: ex.z, heading: ex.heading };
     if (modes.freeRun) modes.freeRun.moved(spot);
+    camEase();                                                                 // standing lifts: from the ride camera into the chase camera
     placeAt(spot.x, spot.z, spot.heading);
     game.hold = true;                                                          // R7-B: 0 km/h until the player steers or pushes
     game.phase = 'running';
@@ -1695,6 +1710,22 @@ async function boot() {
       let cam = game.camPose || (riding ? rideCamera1(dt) : rpOn && !fpNow ? replay.camera(dt, time) : fpNow ? fp.update(view, dt, time, (x, z, o) => surface.normal(x, z, o), (x, z) => surface.height(x, z)) : chase.update(view, dt, time));      // camPose: a fixed view (flows)
       if (!game.camPose && !riding && !fpNow && !rpOn && game.screen === 'ski') cam = stationFrame(cam, view, dt);      // R8e: standing under a roof
       if (!game.camPose && !riding && !fpNow && !rpOn && game.screen === 'ski') cam = lookCam({ ...cam }, { x: view.x, y: view.y + 1.2, z: view.z }, false);
+      // standing lifts: a hand-over of the camera (camEase) eases from where it was (kept relative to him: he may be moving) to the new view
+      if (camFrom && (game.camPose || rpOn || photo.active || game.screen !== 'ski')) camFrom = null;
+      // (walked in / on a lift: a camera that jumps on its own (a guard pulling it in past a station post) eases there too)
+      if (!camFrom && camLast && !game.camPose && !fpNow && !rpOn && (game.phase === 'approach' || riding)) {
+        const ox = view.x - camLast.sx, oy = view.y - camLast.sy, oz = view.z - camLast.sz;
+        if (Math.hypot(cam.x - camLast.x - ox, cam.y - camLast.y - oy, cam.z - camLast.z - oz) > CAM_JUMP) camEase(0.5);
+      }
+      if (camFrom) {
+        camFrom.t += dt;
+        const k = Math.min(1, camFrom.t / camFrom.dur), e = 1 - (1 - k) * (1 - k) * (1 - k), f = camFrom, ox = view.x - f.sx, oy = view.y - f.sy, oz = view.z - f.sz;
+        const m = (a, b) => a + (b - a) * e;
+        cam = { ...cam, x: m(f.x + ox, cam.x), y: m(f.y + oy, cam.y), z: m(f.z + oz, cam.z), tx: m(f.tx + ox, cam.tx), ty: m(f.ty + oy, cam.ty), tz: m(f.tz + oz, cam.tz), fov: m(f.fov, cam.fov) };
+        if (!game.camPose && !fpNow) cam.y = Math.max(cam.y, surface.height(cam.x, cam.z) + 0.5);
+        if (k >= 1) camFrom = null;
+      }
+      camLast = { x: cam.x, y: cam.y, z: cam.z, tx: cam.tx, ty: cam.ty, tz: cam.tz, fov: cam.fov, sx: view.x, sy: view.y, sz: view.z };
       document.documentElement.dataset.skiLook = `${look.yaw.toFixed(2)},${look.pitch.toFixed(2)}`;
       camera.position.set(cam.x, cam.y, cam.z);
       camera.lookAt(cam.tx, cam.ty, cam.tz);

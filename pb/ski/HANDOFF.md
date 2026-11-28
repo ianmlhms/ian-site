@@ -2685,3 +2685,30 @@ text list; the maps were read piece by piece (crops, zoom). OSM stays the geomet
   Missing: the 2025 Snowpark Mottolino chair (not in OSM, no number on the map).
 - Kids ropes / carpets / the unnamed small drags are not drawn on piste maps; they stay (listed as unverified in the report).
 - Checks: `reach-check`, `deadend-check`, `cloud-size-test`, goals checks, `check_site` green; flow `ski-official` (Chromium + WebKit): data assertions + the Mutkogl bottom station shot.
+## Standing lifts (28 Nov 2026; Ian, iPad: "on a T-bar the skis stay level, they stick into the mountain" + "on the carpets / the loading belt you are always teleported to the bottom station")
+- **Skis on the snow** (skier-model.js `slopeUnder`, `plantStanding`, `poseDrag(t, ground, heading, hand, pull)`, `poseBoardDrag(...)`): on a drag lift
+  (T-bar, J-bar, platter, rope tow: pose 'drag') and on a carpet's belt (pose 'belt') the body stays upright (leaning back on the bar / a little forward
+  on the belt), each ski takes the pitch AND roll of the ground at its own tip / tail / edges, the knee takes the height (`legLift`, -0.15 .. 0.5 m), the
+  boot follows its ski; the board: its pitch / roll under its middle, the feet at its height, the boots pitched with it. Before: the skis were pitched by
+  the slope with the WRONG sign (`atan2(along, n.y)` is negative on a climb): on Killy's 24 deg "3000" platter the ski tips were 0.9 m deep in the snow
+  (probe below), the board likewise. A carpet rider (`state.beltPitch` from liftride.js: the belt's own pitch) stands on a plane through his feet, level
+  across; a friend on a carpet (no beltPitch on the wire) on the snow + `BELT_TOP` (lift-path.js, 0.18 m). The ghost (no ground) uses the plane by the
+  normal. 'skisdown' / 'clickin' (top of a cabin ride) are planted like the free ride now.
+- **The others** (npc-view.js): the drag pose is baked on a 0.3 rad climb (`DRAG_BAKE_PITCH`), the rider pitched by the track's slope minus that (was:
+  the whole figure 0.6 x the slope with level skis: 40 % in the snow). Same pose texture size, same draw calls.
+- **No teleport** (the skier never jumped: every hand-over of the CAMERA cut): main.js `camEase(dur)` eases from the last frame's camera (kept relative
+  to him) to the new source over 1.1 s at: the end of the guided walk (placeAt snapped the chase camera), the start of a ride (the ride camera took over
+  in one frame), onto / off the carrier for drag lifts / carpets / trains (rideCamera1 re-initialised `rideCam`), the arrival at the exit (placeAt again).
+  While walked in or on a lift, a camera that jumps > 1.2 m in a frame on its own (a guard pulling it past a station post) eases over 0.5 s. A fast
+  travel / map teleport / «Bei de Lift» / a skip still cut behind their fade (`dropRide` clears the ease). The SECOND press during the walk no longer puts
+  him on the spot: it hurries the rest of the walk (x1.7) and clears the group in the zone (`HURRY`; ski-boarding checks it).
+- **Carpets** (rideable since R7-B, lift-path.js class 'carpet', >= 15 m): ridden at `CARPET_FACTOR` (2) x the real 1.4 m/s = 2.8 m/s (was x4 = 5.6 m/s
+  on a belt whose texture ran at 1.4 m/s: he slid over it); lifts.js runs the carpet belts' texture at the same speed (`ribbon(..., uvLen)`), the chair
+  loading belts stay at 1.4 (CHAIR.belt). `lifts.shuttleBoard` returns null for a carpet (it is in lift-path.js SHUTTLE for its track, but a carpet is no
+  jig-back: boarding waited up to a whole "cabin cycle", ~30 s, for a cabin that does not exist when he had not stood in the zone before).
+- **Checks**: flow `ski-standing-lift` (Chromium + WebKit; SKI_STANDING_RESORTS default killy,arlberg): the steepest drag lift on skis and on a board
+  pressed from ~12 m out (skier < 1.2 m / camera < 1.5 m a frame, skis / board on the track), the longest carpet the whole way (continuous, belt speed,
+  skis on the drawn belt, standing at the top). `ski-boarding`: the second press hurries, no jump. Probe `scripts/ski/standing-lift-probe.mjs` (every
+  frame: skier / camera jumps, ski clearance; `--board`, `--shots DIR` side views + the carpet sequence, `--root DIR` = an old checkout for "before").
+- Shots ~/Library/Caches/ski-work/lift-standing/{before,after,after-board}/ (side views of the steepest T-bars / platters of Killy, Arlberg, Obertauern +
+  the carpets; `carpet-*-sheet.png` = belt, carried, off the top, out).

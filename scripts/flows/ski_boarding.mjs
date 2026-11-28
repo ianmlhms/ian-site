@@ -3,7 +3,7 @@
  *   near      placed ~12 m from the boarding spot (not in the zone), standing: the Astegen button shows
  *   press     one press (the button by touch / click): he is walked / slid in along a clear way (never through a station part), then
  *             boards: the ride's board phase starts within a few seconds
- *   skip      a second press during the walk goes straight to the spot
+ *   skip      a second press during the walk hurries it (28 Nov 2026: no longer straight to the spot, that read as a teleport)
  *   fast      in the catchment at 30 km/h: the button shows, a press does NOT board (toast "Ze séier")
  *   far       30 m away: no button
  *   top       next to a descent mat (top): "Erof" shows, a press boards the ride down
@@ -90,8 +90,21 @@ export const flow = {
           // (this lift's button: right after the fast travel to the spawn the spawn lift's button may still show)
           await page.waitForFunction((id) => window.__ski.modes.liftAt && window.__ski.modes.liftAt.id === id && !document.getElementById("liftBtn").hidden, id, { timeout: 8000 });
           // (the walk lasts ~1.5 s at the test's x2: the second press goes in straight from the page, the first starts the walk)
-          const skip = await page.evaluate(() => { const S = window.__ski; S.boardLift(); const a = S.game.phase; S.boardLift(); return { first: a, second: S.game.phase }; });
-          h.expect(skip.first === "approach" && skip.second === "lift", `${rid} chair: a second press skips the walk in (${skip.first} -> ${skip.second})`);
+          // standing lifts (28 Nov 2026; Ian: "teleported to the bottom station"): the second press hurries the walk, it never jumps
+          const skip = await page.evaluate(async () => {
+            const S = window.__ski;
+            S.boardLift();
+            const a = S.game.phase, p0 = { x: S.state.x, z: S.state.z };
+            S.boardLift();
+            const b = S.game.phase, jump = Math.hypot(S.state.x - p0.x, S.state.z - p0.z), t0 = performance.now();
+            let last = { x: S.state.x, z: S.state.z }, step = 0;
+            while (S.game.phase === "approach" && performance.now() - t0 < 8000) {
+              await new Promise((r) => requestAnimationFrame(r));
+              step = Math.max(step, Math.hypot(S.state.x - last.x, S.state.z - last.z)); last = { x: S.state.x, z: S.state.z };
+            }
+            return { first: a, second: b, jump: +jump.toFixed(2), step: +step.toFixed(2), then: S.game.phase, ms: Math.round(performance.now() - t0) };
+          });
+          h.expect(skip.first === "approach" && skip.second === "approach" && skip.jump < 0.3 && skip.step < 1.2 && skip.then === "lift", `${rid} chair: a second press hurries the walk in, no jump (${JSON.stringify(skip)})`);
           await page.evaluate(() => window.__ski.goFree());
           await page.waitForFunction(() => window.__ski.game.phase === "running" && !window.__ski.ride, null, { timeout: 30000 });
           const fast = await page.evaluate((s) => {

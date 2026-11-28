@@ -10,7 +10,7 @@
  * underground funiculars run in a lit tunnel tube. */
 const THREE = window.THREE;
 
-import { createLiftPath, chairWidth } from './lift-path.js';
+import { createLiftPath, chairWidth, CARPET_FACTOR, BELT_TOP } from './lift-path.js';
 import { createLiftWorld, frames, stationCrawl, HALL_SLOW, SITE_COLOURS } from './lift-site.js';
 import { carrierGeometry, bubbleGeometry, BUBBLE, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
@@ -199,10 +199,10 @@ export function createLifts({ scene, resort, height, env = null }) {
       const w = l.sub === 'rope' ? 0.9 : 1.25, lat = l.sign * (l.sub === 'rope' ? l.side - 0.45 : l.side);
       ribbon(trackParts, l, lat, w, 0.012, 0, l.len, 3);          // R8b: 1.2 cm (polygon offset keeps it on top): skis no longer sink into it
     }
-    if (kind === 'carpet') ribbon(beltParts, l, 0, 0.9, 0.18, 0, l.len, 1.5);
+    if (kind === 'carpet') ribbon(beltParts, l, 0, 0.9, BELT_TOP, 0, l.len, 1.5, 2 * CARPET_FACTOR);      // standing lifts: the belt runs at the ride speed
     if (l.tunnel) tunnelTube(tunnelParts, l);
   }
-  function ribbon(out, l, lat, w, lift, s0, s1, step) {
+  function ribbon(out, l, lat, w, lift, s0, s1, step, uvLen = 2) {
     const n = Math.max(2, Math.ceil((s1 - s0) / step));
     const pos = [], uv = [];
     for (let k = 0; k <= n; k++) {
@@ -211,7 +211,7 @@ export function createLifts({ scene, resort, height, env = null }) {
       const rx = -q2.dz, rz = q2.dx;
       for (const side of [-1, 1]) {
         const x = q2.x + rx * (lat + side * w / 2), z = q2.z + rz * (lat + side * w / 2);
-        pos.push(x, height(x, z) + lift, z); uv.push(side < 0 ? 0 : 1, s / 2);
+        pos.push(x, height(x, z) + lift, z); uv.push(side < 0 ? 0 : 1, s / uvLen);
       }
     }
     const idx = [];
@@ -724,7 +724,7 @@ export function createLifts({ scene, resort, height, env = null }) {
    *  cabin dt s from now (docked once there) }. The schedule is the scenery's, so the cabin you wait for is the one coming down. */
   function shuttleBoard(index) {
     const l = byIndex.get(index);
-    if (!l || !l.shuttle) return null;
+    if (!l || !l.shuttle || l.kind === 'carpet') return null;           // (a carpet is no jig-back: its belt never waits)
     const t0 = lastT || 0, T = (l.docks[1] - l.docks[0]) / (l.spec.speed * SHUTTLE_FACTOR), cycle = 2 * (T + DWELL);
     const u = shuttlePhase(l, t0), wait = u < DWELL ? 0 : cycle - u;
     return { wait, at: (dt) => (dt >= wait ? { s: l.docks[0], up: true } : shuttleS(l, t0 + dt)) };
