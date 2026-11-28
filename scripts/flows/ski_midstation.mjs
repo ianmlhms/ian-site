@@ -184,6 +184,7 @@ export const flow = {
       await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 20000 });
       m = await mid();
       h.expect(m.ride.name === zt.gbn && (await page.evaluate(() => window.__ski.state.ride === "carry")), `stayed in the cabin: now on ${m.ride.name}, standing`);
+      await h.pause(1200);
       await shot("12-gondola-through");
     }
     h.eq(errors.length, 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(" | ")}` : ""}`);
