@@ -7,6 +7,7 @@
  * The choice is saved (localStorage pb_ski_cam = 'fp' | 'chase'). Three draw calls: one merged mesh per ski, one merged pole mesh. */
 import { FIRST_PERSON as FP } from './config.js';
 import { handParts } from './fp-hands.js';
+import { plankGeometry, SKI_MAIN, SKI_TAIL, BOARD_FULL, BOARD } from './skier-model.js';
 
 const THREE = window.THREE;
 const KEY = 'pb_ski_cam';
@@ -38,15 +39,26 @@ function merge(list) {
   return out;
 }
 
-/** One ski along +x (tip at +x), centred on the boot; a turned-up tip. */
+/** One ski along +x (tip at +x), centred on the boot: the third person's shaped plank (skier-model.js; sidecut, the shovel, the tail
+ *  kick), a stripe down the middle, the binding, the boot. */
 function skiGeometry(look) {
-  const L = 1.72 * (look.length || 1), W = SKI_WIDTH * (look.width || 1);
-  const parts = [];
-  const body = new THREE.BoxGeometry(L * 0.86, 0.022, W); body.translate(-L * 0.07, 0.011, 0); parts.push(coloured(body, look.base));
-  const stripe = new THREE.BoxGeometry(L * 0.5, 0.024, W * 0.32); stripe.translate(0.05, 0.012, 0); parts.push(coloured(stripe, look.art));
-  const tip = new THREE.BoxGeometry(L * 0.14, 0.02, W * 0.94); tip.rotateZ(0.42); tip.translate(L * 0.43, 0.04, 0); parts.push(coloured(tip, look.tip));
-  const binding = new THREE.BoxGeometry(0.3, 0.05, W * 0.9); binding.translate(0, 0.045, 0); parts.push(coloured(binding, 0x2b2f36));
+  const L = look.length || 1, W = look.width || 1;
+  const secs = [...SKI_TAIL.slice(0, -1), ...SKI_MAIN].map(([x, y, w, h]) => [x * L, y, w * W, h]);
+  const shovel = secs.length - 6;
+  const parts = [plankGeometry(secs, 3, (i, c) => (i >= shovel ? look.tip : c === 1 && i > 2 ? look.art : look.base), 0x16171a)];
+  const binding = new THREE.BoxGeometry(0.34, 0.04, SKI_WIDTH * W * 0.85); binding.translate(0, 0.045, 0); parts.push(coloured(binding, 0x2b2f36));
   const boot = new THREE.BoxGeometry(0.32, 0.16, 0.11); boot.translate(0.02, 0.13, 0); parts.push(coloured(boot, 0x16171a));
+  return parts;
+}
+/** 28 Nov 2026: the snowboard along +x (the nose), the toe edge at +z: the plank, the bindings and both boots across it. */
+function boardGeometry(look) {
+  const parts = [plankGeometry(BOARD_FULL, 3, (i, c) => { const x = (BOARD_FULL[i][0] + BOARD_FULL[i + 1][0]) / 2; return Math.abs(x) > 0.6 ? look.tip : c === 1 ? look.art : look.base; }, 0x16171a)];
+  for (const [x, yaw] of [[BOARD.foot, BOARD.front], [-BOARD.foot, BOARD.back]]) {
+    const plate = new THREE.BoxGeometry(0.13, 0.02, 0.25); plate.translate(0, 0.023, 0);
+    const high = new THREE.BoxGeometry(0.12, 0.16, 0.022); high.rotateX(-0.22); high.translate(0, 0.1, -0.118);
+    const boot = new THREE.BoxGeometry(0.11, 0.15, 0.3); boot.translate(0, 0.1, 0.02);
+    for (const [g, hex] of [[plate, 0x2b2f36], [high, 0x2b2f36], [boot, 0x16171a]]) { g.rotateY(yaw); g.translate(x, 0, 0); parts.push(coloured(g, hex)); }
+  }
   return parts;
 }
 
@@ -60,10 +72,16 @@ export function createFirstPerson({ scene, overlay, look }) {
     mesh.position.z = side * SKI_GAP; mesh.frustumCulled = false;
     skis.add(mesh);
   }
-  let skiHalfWidth = 0;
+  let skiHalfWidth = 0, boardOn = false;
   function buildSkis(lk) {
-    skiHalfWidth = SKI_WIDTH * (lk.width || 1) / 2;
-    for (const mesh of skis.children) { mesh.geometry.dispose(); mesh.geometry = merge(skiGeometry(lk)); }
+    boardOn = !!lk.board;
+    skiHalfWidth = boardOn ? BOARD.halfWidth : SKI_WIDTH * (lk.width || 1) / 2;
+    skis.children.forEach((mesh, i) => {
+      mesh.geometry.dispose();
+      mesh.geometry = boardOn ? (i ? new THREE.BufferGeometry() : merge(boardGeometry(lk))) : merge(skiGeometry(lk));
+      mesh.position.z = boardOn ? 0 : (i ? 1 : -1) * SKI_GAP;
+      mesh.visible = !boardOn || i === 0;
+    });
   }
   buildSkis(look);
   // poles in camera space (built along -y from the grip at the origin, moved each frame onto the hands)
@@ -79,7 +97,11 @@ export function createFirstPerson({ scene, overlay, look }) {
     }
     for (const [g, hex] of handParts(side, [side * 0.365, -0.385, -0.59])) poleParts.push(coloured(g, hex));      // R8c: gloves + sleeves (fp-hands.js); R8d: on R8b's lower / wider grips
   }
-  const poles = new THREE.Mesh(merge(poleParts), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  // 28 Nov 2026: on the snowboard no poles: the gloves lower and wider, out for balance
+  const handsOnly = () => merge([-1, 1].flatMap((side) => handParts(side, [side * 0.44, -0.47, -0.55]).map(([g, hex]) => coloured(g, hex))));
+  const poleGeo = merge(poleParts);
+  let boardHands = null;
+  const poles = new THREE.Mesh(poleGeo, new THREE.MeshLambertMaterial({ vertexColors: true }));
   poles.name = 'ski-fp-poles'; poles.frustumCulled = false; poles.visible = false; poles.renderOrder = 9;
   scene.add(poles);
   const streak = document.createElement('div');
@@ -145,7 +167,7 @@ export function createFirstPerson({ scene, overlay, look }) {
   function afterCamera(camera, s, streakOn) {
     poles.position.copy(camera.position);
     poles.quaternion.copy(camera.quaternion);
-    if (s && s.tuck > 0.5) poles.rotateX(-0.9 * s.tuck);           // tucked: the poles go under the arms
+    if (s && s.tuck > 0.5 && !boardOn) poles.rotateX(-0.9 * s.tuck);           // tucked: the poles go under the arms
     const k = streakOn && s ? smoothstep(FP.streakFrom, 30, s.speed) * 0.32 : 0;
     streak.style.opacity = k > 0.005 ? k.toFixed(3) : '0';
     if (k > 0.005) streak.style.transform = `rotate(${((Math.random() - 0.5) * 2.4).toFixed(2)}deg) scale(${(1.02 + Math.random() * 0.02).toFixed(3)})`;
@@ -159,7 +181,12 @@ export function createFirstPerson({ scene, overlay, look }) {
   return {
     update, afterCamera, setOn, snap() { yaw = null; },
     get on() { return on; },
-    setLook(lk) { buildSkis(lk); skis.visible = on; },
+    setLook(lk) {
+      buildSkis(lk); skis.visible = on;
+      if (boardOn && !boardHands) boardHands = handsOnly();
+      poles.geometry = boardOn ? boardHands : poleGeo;
+    },
+    get board() { return boardOn; },
     meshes: { skis: () => skis, poles },
   };
 }

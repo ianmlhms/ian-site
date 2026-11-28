@@ -6,15 +6,13 @@
  * a cabin, two walking steps, on a drag lift) are baked once from skier-model.js pose() into a float texture; the vertex shader blends
  * two of them per instance (aPose = pose A, pose B, blend, outfit) and paints the outfit's colours (OUTFITS) into the jacket / accent /
  * trousers / helmet / ski parts. No name tags. A skier who appears or goes close to the camera grows / shrinks in 0.25 s (no pop). */
-import { createSkierModel, OUTFITS } from './skier-model.js';
+import { createSkierModel, OUTFITS, slotOutfitIndex } from './skier-model.js';
 import { POSE, POSE_COUNT, OUTFIT_COUNT } from './npc.js';
 import { NPC } from './config.js';
 import { riderAt } from './modes/liftride.js';
 
 const THREE = window.THREE;
 const TEX_W = 1024;
-/* skier-model.js colour slots (Object.keys(M) order) -> the outfit colour each takes: 1 jacket, 2 accent, 3 trousers, 4 helmet, 5 skis */
-const SLOT_TO_OUTFIT = [1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 5, 5, 5, 5, 5, 5];
 
 /** The states the poses are baked from (flat snow, heading +x). */
 function poseState(p) {
@@ -39,6 +37,7 @@ export function bakeFigure(detail) {
   const group = model.root;
   const meshes = [];
   group.traverse((o) => { if (o.isMesh && o.geometry.userData.slots) meshes.push(o); });
+  const slotMap = model.slots.map(slotOutfitIndex);          // colour slot -> the outfit colour it takes (0 = its own)
   const V = meshes.reduce((n, m) => n + m.geometry.attributes.position.count, 0);
   const rows = Math.ceil((POSE_COUNT * 2 * V) / TEX_W);
   const data = new Float32Array(TEX_W * rows * 4);
@@ -74,7 +73,7 @@ export function bakeFigure(detail) {
       pos[k * 3] = data[t]; pos[k * 3 + 1] = data[t + 1]; pos[k * 3 + 2] = data[t + 2];
       const tn = (V + k) * 4; nrm[k * 3] = data[tn]; nrm[k * 3 + 1] = data[tn + 1]; nrm[k * 3 + 2] = data[tn + 2];
       col[k * 3] = C.getX(i); col[k * 3 + 1] = C.getY(i); col[k * 3 + 2] = C.getZ(i);
-      slot[k] = SLOT_TO_OUTFIT[sl[i]] || 0;
+      slot[k] = slotMap[sl[i]] || 0;
     }
     for (let i = 0; i < g.index.count; i++) idx.push(g.index.getX(i) + base);
     base += g.attributes.position.count;
@@ -88,7 +87,10 @@ export function bakeFigure(detail) {
   geometry.setAttribute('aSlot', new THREE.BufferAttribute(slot, 1));
   geometry.setIndex(idx);
   geometry.computeBoundingSphere();
-  const tex = new THREE.DataTexture(data, TEX_W, rows, THREE.RGBAFormat, THREE.FloatType);
+  // 28 Nov 2026: half floats: ~1 mm at the figure's 2 m, half the memory of the float texture
+  const half = new Uint16Array(data.length);
+  for (let i = 0; i < data.length; i++) half[i] = THREE.DataUtils.toHalfFloat(data[i]);
+  const tex = new THREE.DataTexture(half, TEX_W, rows, THREE.RGBAFormat, THREE.HalfFloatType);
   tex.minFilter = THREE.NearestFilter; tex.magFilter = THREE.NearestFilter; tex.generateMipmaps = false; tex.needsUpdate = true;
   return { geometry, tex, V, triangles: idx.length / 3 };
 }

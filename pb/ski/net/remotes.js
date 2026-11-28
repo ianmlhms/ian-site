@@ -25,41 +25,16 @@ export const outfitOf = (o) => (typeof o === 'string' && OUTFITS.some((x) => x.i
 export const MEET_GAP_MS = 2000;
 
 /* ---------- one skinned mesh per skier ---------- */
-let sharedMat = null;
-const identity = new THREE.Matrix4();
-/** The figure of skier-model.js with its per-bone meshes folded into one SkinnedMesh: the bones are the figure's own groups (pose()
- *  keeps moving them), every vertex follows exactly one bone (weight 1). */
+/** The figure of skier-model.js as ONE SkinnedMesh (skier-model.js `skinned`: the bones are the figure's own groups, pose() keeps
+ *  moving them, every vertex follows exactly one bone; a hidden group (the poles in a cabin, the skis of a snowboarder) collapses).
+ *  28 Nov 2026: it was folded here before; the model's own skinned mode also hides those groups (a snowboard friend shows no skis). */
 function createRemoteFigure(outfit) {
-  const model = createSkierModel({ outfit });
+  const model = createSkierModel({ outfit, skinned: true });
   model.setBlob(false);
-  const bones = [], parts = [];
-  model.root.traverse((o) => { if (o.isMesh && o.geometry.userData.slots) parts.push(o); });
-  for (const m of parts) { bones.push(m.parent); }
-  const pos = [], nrm = [], col = [], si = [], sw = [], idx = [];
-  let base = 0;
-  parts.forEach((m, bi) => {
-    const g = m.geometry, P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
-    for (let i = 0; i < P.count; i++) {
-      pos.push(P.getX(i), P.getY(i), P.getZ(i)); nrm.push(N.getX(i), N.getY(i), N.getZ(i)); col.push(C.getX(i), C.getY(i), C.getZ(i));
-      si.push(bi, 0, 0, 0); sw.push(1, 0, 0, 0);
-    }
-    for (let i = 0; i < g.index.count; i++) idx.push(g.index.getX(i) + base);
-    base += P.count;
-    m.parent.remove(m); g.dispose();
-  });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
-  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
-  geo.setIndex(idx);
-  if (!sharedMat) sharedMat = new THREE.MeshLambertMaterial({ vertexColors: true });
-  const mesh = new THREE.SkinnedMesh(geo, sharedMat);
-  mesh.bind(new THREE.Skeleton(bones, bones.map(() => identity.clone())), identity);
-  mesh.frustumCulled = false;            // culled by hand (the bind-pose bounds sit at the world origin)
+  let mesh = null;
+  model.root.traverse((o) => { if (o.isSkinnedMesh) mesh = o; });
+  model.root.traverse((o) => { if (o.isMesh && o !== mesh && o.geometry.userData.slots) { o.geometry.dispose(); o.parent.remove(o); } });      // (the per-bone copies: not needed here)
   mesh.castShadow = true;
-  model.root.add(mesh);
   return { model, mesh };
 }
 
@@ -160,6 +135,7 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
       sphere.center.set(st.x, st.y + 0.9, st.z);
       const visible = d < VIEW_DIST && frustum.intersectsSphere(sphere);
       r.model.setVisible(visible);
+      if (!!st.board !== r.model.board) r.model.setBoard(!!st.board);              // 28 Nov 2026: he rides a snowboard (wire flag 8)
       if (visible) r.model.pose(st, (x, z, out) => surface.normal(x, z, out), time, (x, z) => surface.height(x, z));
       // the name tag over the helmet (R7-D: laid out together below, no overlaps; free ride: far friends keep a tag with the distance)
       v3.set(st.x, st.y + 2.15, st.z).applyMatrix4(camera.matrixWorldInverse);

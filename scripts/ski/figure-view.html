@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Skier figure viewer (dev)</title>
+<style>html,body{margin:0;background:#cfd8e3}canvas{display:block}</style>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js" crossorigin="anonymous"></script>
+</head>
+<body>
+<script type="module">
+/* Developer page (28 Nov 2026, skier look round): the skier figure of pb/ski/skier-model.js in its poses on flat snow, a grid of tiles,
+ * for close-up before / after shots (scripts/ski/figure-shots.mjs drives it). window.renderSheet({ tiles, detail, outfit, board, ski }). */
+import { createSkierModel } from '/pb/ski/skier-model.js';
+const THREE = window.THREE;
+const W = 1600, H = 900;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(W, H);
+renderer.shadowMap.enabled = true;
+renderer.setScissorTest(true);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xd7e2ee);
+const hemi = new THREE.HemisphereLight(0xdfeaff, 0x8f9db3, 0.95); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff3e0, 2.1); sun.position.set(4, 7, 3); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 20 });
+scene.add(sun, sun.target);
+const snow = new THREE.Mesh(new THREE.PlaneGeometry(40, 40).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xf4f7fb }));
+snow.receiveShadow = true; scene.add(snow);
+const cam = new THREE.PerspectiveCamera(30, 1, 0.05, 100);
+const flat = (x, z, o) => { o.x = 0; o.y = 1; o.z = 0; return o; };
+const ground = () => 0;
+const STATES = {
+  ski: { speed: 12, tuck: 0.12 },
+  carveR: { speed: 14, edge: 0.9, tuck: 0.1 },
+  carveL: { speed: 14, edge: -0.9, tuck: 0.1 },
+  tuck: { speed: 20, tuck: 1 },
+  plough: { speed: 3, brake: 1, tuck: 0 },
+  stand: { speed: 0, tuck: 0, vx: 0 },
+  jump: { speed: 12, grounded: false, air: 0.5, y: 0.8 },
+  crash: { speed: 6, crash: 0.95 },
+  sit: { ride: 'sit', y: 0.45 },
+  cabin: { ride: 'stand' },
+  carry: { ride: 'carry', walk: 0.6 },
+  drag: { ride: 'drag', speed: 3 },
+  push: { speed: 1.2, tuck: 0, push: 1 },
+};
+const base = () => ({ x: 0, y: 0, z: 0, heading: 0, speed: 10, edge: 0, tuck: 0.12, brake: 0, stop: 0, grounded: true, air: 0, crash: 0, landed: 0, vx: 10, vy: 0, vz: 0, ride: '', walk: 0 });
+let models = [];
+window.renderSheet = function renderSheet({ tiles, detail = 'full', outfit = 'rout', board = false, ski = null, cols = 5 }) {
+  for (const m of models) scene.remove(m.root);
+  models = [];
+  const rows = Math.ceil(tiles.length / cols), tw = Math.floor(W / cols), th = Math.floor(H / rows);
+  renderer.setScissorTest(false); renderer.setClearColor(0xd7e2ee); renderer.clear(); renderer.setScissorTest(true);
+  tiles.forEach((tile, i) => {
+    const m = createSkierModel({ outfit: tile.outfit || outfit, detail: tile.detail || detail });
+    if (ski || tile.ski) m.setSki(tile.ski || ski);
+    if ((tile.board ?? board) && m.setBoard) m.setBoard(true);
+    m.setBlob(false);
+    scene.add(m.root); models.push(m);
+    const st = { ...base(), ...STATES[tile.pose] };
+    for (let k = 0; k < 60; k++) m.pose(st, flat, k * 0.05, ground);
+    for (const o of models) o.root.visible = o === m;
+    const a = (tile.yaw ?? 35) * Math.PI / 180, d = tile.dist ?? 3.6, h = tile.h ?? 1.0, ty = tile.ty ?? 0.85;
+    cam.position.set(Math.cos(a) * d, h + (tile.camY ?? 0.4), Math.sin(a) * d);
+    cam.lookAt(0, ty, 0);
+    cam.aspect = tw / th; cam.updateProjectionMatrix();
+    const x = (i % cols) * tw, y = H - (Math.floor(i / cols) + 1) * th;
+    renderer.setViewport(x, y, tw, th); renderer.setScissor(x, y, tw, th);
+    renderer.render(scene, cam);
+  });
+  let tris = 0;
+  return { ok: true, tris };
+};
+window.figureReady = true;
+</script>
+</body>
+</html>

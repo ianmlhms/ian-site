@@ -2374,3 +2374,25 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   (30), flows `ski-goals` and `ski-daily` (the page's Date is pinned per scenario; each of the three kinds is played for real), `ski-challenges` follows the new tab.
 - **Not done / open**: no lifts-ridden history for old saves; "All Pisten" in the big areas (3 Vallées 347) is a long goal on purpose; the 11 area names in `picker.js INFO` are the
   single source for the Ziler tab / daily text (`areaTitle`); the Ziler tab is the fifth tab (12 px labels so it fits 340 px).
+
+## Skier look (28 Nov 2026; Ian: "a much better-looking skier")
+- **skier-model.js**: the same bones (groups) and poses, new parts: lathed shapes (jacket in colour bands: body, chest stripe, yoke over the
+  shoulders, zip, stand-up collar with trim; tapered limbs; trousers that flare over the boot cuff; helmet dome + an open lower shell; goggles =
+  frame + a two-tone mirrored lens (lensTop / lens slots) + strap; a neck gaiter in the trousers colour), padded gloves with gauntlets (accent),
+  extruded two-tone ski boots with buckles + power strap, poles with grip, basket and tip. Skis are lofted planks (`plankQuads`: sidecut,
+  shovel, tail kick, dark sidewalls / base, plate + toe / heel pieces); the ski types' top-sheet patterns are painted CELLS of the top
+  (`SKI_ART`, slots `cell<mask>`, recoloured by setSki) instead of 30 stacked boxes (they z-fought and showed as bumps); the tail is its own
+  group, the park ski swaps it for the twin tip. A `stance` group sits between `lean` and the legs / torso (identity on skis).
+- **Budget** (`node scripts/ski/figure-stats.mjs`): full 5194 -> 4446 triangles (player, ghost, online friends: still 1 skinned draw call
+  each), mid (near others) 1828 -> 1824, low (crowd) 437 -> 332. NPC pose texture now half floats (0.89 -> 0.48 MB with the same poses).
+  In-game (`scripts/ski/skier-shots.mjs`, Killy, Mëttel, GPU, same spots, before = `--before 8db6fd3d`): draw calls identical at every shot
+  (carve 119 / 126, chase 144, first person 162, crowd 150, station 142, chair 163), triangles 1-9k lower each.
+- **npc-view.js**: the slot -> outfit colour map comes from the slot names (`slotOutfitIndex`, `model.slots`), no hand-kept index list.
+- **remotes.js**: a friend is `createSkierModel({ skinned: true })` (the per-bone copies dropped): hidden groups collapse like the local
+  skier's (poles in a cabin were drawn before).
+- **firstperson.js**: the skis are the same lofted plank (stripe, tip colour, binding, boot).
+- Tools: `scripts/ski/figure-view.html` + `figure-shots.mjs` (close-up contact sheets of every pose / detail / outfit, ski + board),
+  `figure-stats.mjs`, `skier-shots.mjs` (in-game shots + numbers, `--board`, `--before SHA`). Shots: ~/Library/Caches/ski-work/skier/
+  (before/, v1-v4/ = the iterations, before-game/ vs after-game/).
+- Open: the figure's self-shadow shows a little sawtooth on the round shoulder caps on Mëttel / Héich (shadow-map resolution, as before
+  on the old spheres); faces are covered by gaiter + goggles on purpose (a strip of skin between them).
