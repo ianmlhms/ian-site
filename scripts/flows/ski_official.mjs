@@ -15,9 +15,14 @@ const GONE = {
   soelden: ["35", "7b", "mini", "abfahrt-zur-pension-waldesru", "22-black", "gaislachalm", "gaislachalm-2", "gaislachalm-3", "gaislachalm-variante"],
   laax: ["laax-46", "laax-80", "laax-62-inoffiziell"],
   davos: ["5a-rennpiste"],
-  livigno: [],
+  livigno: ["stambecco", "freeride-cross", "ski-cross", "genziana", "cervo", "gipeto", "bambi", "crocifisso", "lepre", "volpe", "nera-red"],
+  killy: ["grand-stade", "stade-de-lognan-competitions"],
+  "3vallees": ["bleue", "bleue-2", "chemin-facile", "sainte-agathe"],
 };
 const COLOUR = {
+  livigno: { canalino: "black", kl: "red" },
+  killy: { "mangard-blue": "red", "melezes-blue": "red", "traversee-du-rogoney-red": "blue" },
+  "3vallees": { "roches-grises": "black", "freeride-lab": "red", "pralong-green": "blue", "variante-blue": "red" },
   laax: { "nagens-alp-nagens": "red", "siala-west-blue": "black", "sogn-martin-plaun-black": "blue", "nagens-sogn-martin-plaun": "red" },
   davos: { verbindungsweg: "red", "brama-rot-blue": "red", "rinerhorn-11": "red", "rinerhorn-11-variante": "red" },
 };
@@ -54,6 +59,10 @@ export const flow = {
         h.eq(p && p[1], col, `${rid}: ${id} has the colour of the official map`);
       }
     }
+    const nm = (rid, id) => (rows[rid].pistes.find((q) => q[0] === id) || [])[3];
+    h.eq(nm("killy", "savonnette"), "Savonette", "Killy: Savonette carries the name of the map");
+    h.eq(nm("3vallees", "goitschel"), "Marielle Goitschel", "3 Vallées: Marielle Goitschel carries the official name");
+    h.eq(nm("3vallees", "arolles-black"), "Arolle", "3 Vallées: the black Arolle is no longer called Arolles");
     const mut = rows.soelden.lifts.find((l) => l[0] === "Mutkogl");
     h.expect(mut && mut[2] === 859, `Sölden: the rebuilt Mutkogl T-bar is 859 m (${mut && mut[2]})`);
     const planon = rows.livigno.lifts.find((l) => l[0] === "Planon Skilift");

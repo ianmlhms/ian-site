@@ -1,7 +1,7 @@
-{"season": "2026/27 (SkiPassion Livigno map via skiresort.info)",
- "source": "https://www.skiresort.info/ski-resort/livigno/trail-map",
- "remove_pistes": [],
- "recolour": {},
- "set": {},
+{"season": "2026/27 (livigno.eu / skipasslivigno.com / carosello3000.com / mottolino.com piste tables + official piste map PDF, 28 Nov 2026)",
+ "source": "https://www.livigno.eu/en/skiing-livigno (table of all slopes by lift, name + colour), https://www.carosello3000.com/en/winter/pistes-and-fun-parks/livigno-ski-pistes, https://www.mottolino.com/en/winter/ski-area/lifts-and-slopes/slopes/ (numbers 1-27), https://www.livigno.eu/hubfs/Mappa%2050x70-2026_2027-3mm%20abb.pdf",
+ "remove_pistes": ["stambecco", "freeride-cross", "ski-cross", "genziana", "cervo", "gipeto", "bambi", "crocifisso", "lepre", "volpe", "nera-red"],
+ "recolour": {"canalino": "black", "kl": "red"},
+ "set": {"cuna-bella": {"name": "Cunabella"}, "cuna-bella-variante": {"name": "Cunabella (Variante)"}, "bella-vista": {"name": "Bellavista"}, "bella-vista-variante": {"name": "Bellavista (Variante)"}, "kl": {"name": "K.L."}, "pian-della-vlope-1": {"name": "Pian della Volpe 1"}},
  "remove_lifts": [],
  "lift_set": {"Planon Skilift": {"ref": "2"}, "Mottolino Gondola": {"seats": 10}}}

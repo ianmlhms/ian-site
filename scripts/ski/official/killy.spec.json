@@ -1,0 +1,9 @@
+{"season": "2026/27 (Tignes - Val d'Isère piste map 2026-2027, tignes.net)",
+ "source": "~/Library/Caches/ski-work/official-maps/killy/inventory.json; names that differ only in spelling / suffix are renamed to the map's name",
+ "remove_pistes": ["grand-stade", "stade-de-lognan-competitions"],
+ "recolour": {"mangard-blue": "red", "melezes-blue": "red", "traversee-du-rogoney-red": "blue"},
+ "set": {"savonnette": {"name": "Savonette"}, "lanche": {"name": "Lanches"}, "pavot": {"name": "Pavots"}, "asters": {"name": "Aster"},
+         "plan-milet": {"name": "Plan Millet"}, "guerlain-chicherit": {"name": "G. Chicherit"}, "pissaillas": {"name": "Pisaillas"},
+         "epilobes": {"name": "Epilobe"}, "beau-plan": {"name": "Beauplan"}, "glacier-blue": {"name": "Glaciers"}, "mangard-blue": {"name": "Mangard (2)"}, "melezes-blue": {"name": "Mélèzes (4)"}, "traversee-du-rogoney-red": {"name": "Traversée du Rogoney (2)"}},
+ "remove_lifts": [],
+ "lift_set": {}}

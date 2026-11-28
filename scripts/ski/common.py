@@ -76,6 +76,7 @@ RESORTS = {
             "pylones", "pays-desert", "pays-desert-variante", "cugnai",
             "verbindung-cugnai", "verbindung-leisse", "verbindung-leisse-leisse", "verbindung-schlepplift-termi",
             "verbindung-schlepplift-termi-2", "verbindung-termignon",
+            "grand-stade", "stade-de-lognan-competitions",      # 28 Nov 2026 (names / colours round): not on the 2026/27 map
         ),
         "landmarks": [
             # Barrage du Chevril / de Tignes (OSM way 30195773, 181 m, 1953): the arch along the middle of the OSM outline, convex towards
@@ -99,6 +100,7 @@ RESORTS = {
                      "couloir-emile-allais", "couloir-sous-les-cables", "couloir-des-belges", "turcs",
                      "jockeys", "itineraire-du-mont-vallon", "caron-lac-du-lou", "le-lac-de-lou-par-la-masse",
                      "bouchet-lory", "tetras-black", "bouc-blanc-black",
+                     "bleue", "bleue-2", "chemin-facile", "sainte-agathe",      # 28 Nov 2026 (names / colours round): not on the official lists
                  ),
                  "villages": [
                      ("Courchevel 1850", 6.6345, 45.4150, 850, "chalet"), ("Courchevel Moriond", 6.6480, 45.4235, 450, "chalet"), ("Courchevel Village", 6.6310, 45.4300, 380, "chalet"),
@@ -289,6 +291,7 @@ RESORTS = {
         "dem": ["lombardia-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "tree_line": 2200.0, "derived_forest": 2050.0,       # inner Alps, valley floor 1816 m: larch / arolla pine only on the shady lower slopes
         "buildings": "villages",
+        "reserved_ids": ("stambecco", "freeride-cross", "ski-cross", "genziana", "cervo", "gipeto", "bambi", "crocifisso", "lepre", "volpe", "nera-red"),   # 28 Nov 2026: not on the official lists (official_apply.py; board rows stay)
         "start": "Mottolino",                    # the long red from the Mottolino top station down into the village
         "lift_strip_numbers": True, "mixed_twins": True,
         "lift_names": {204017643: "San Rocco I", 204017644: "San Rocco II"},
