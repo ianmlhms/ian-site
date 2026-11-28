@@ -2425,3 +2425,27 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   skier-shots.mjs --board; the close-up sheets are in ~/Library/Caches/ski-work/skier/v4/fig-board*.png).
 - Open: no grab / trick names specific to the board; goofy stance not offered; the ride DOWN boarding keeps the ski carry poses for the board
   (board in the hand); a board NPC's beginner "plough" is a heel-side skid blended with the carve poses (a little shrink in the blend).
+
+## Flat streets + picker pictures (28 Nov 2026)
+- **Road beds**: the village streets of every resort now lie on ground that is level ACROSS the street (Ian / Courchevel: streets banked sideways like the 5 m terrain).
+  `scripts/ski/road_beds.py` (`flatten_roads`, called from `bake.py` after the grooming and BEFORE the station pads, so a pad wins): the kept streets of
+  roads.json (the very polylines the game draws) are sampled every 2.5 m, their height profile smoothed over ~12 m and agreed between streets that meet (6 m),
+  every 5 m node takes the height of its nearest street sample (flat out to half width + 4 m, smooth step over 10 m back into the slope), never more than
+  5 m of cut / fill, nothing under pistes (groomed mask) or inside a house footprint (`ground` of the houses is fixed: move <= 1.2 m per m from the wall).
+- **`scripts/ski/rebed.py <rid> ...`** re-bakes ONLY that: it runs bake.py, then puts every other file and every other key of resort.json back as it was
+  (a full re-bake of the old resorts drifts: piste order / ids, buildings, classes differ from what is live, which would rename pistes / boards). It takes the
+  new `t/*.bin`, `far.bin`, `shadow-*.webp` and `resort.json["tiles"]`. Measured before: `SKI_NO_BEDS=1 bake.py` gives tiles / far / shadows byte-identical to the
+  committed ones in all 11 resorts, so the diff is the beds alone. Bake log shows `road beds: ... nodes moved`.
+- **Check** `node scripts/ski/bed-check.mjs [--resorts a,b] [--data DIR] [--near x,z,r] [--worst]`: cross slope of every street (height at +-half width
+  along the normal). Mean / p90 before -> after: 3vallees 4.2 / 10.8 -> 1.4 / 3.4 deg, arlberg 5.7 / 14.4 -> 1.5 / 3.7, killy 3.3 / 8.6 -> 1.2 / 3.0, kronplatz 6.6 / 18.3
+  -> 1.3 / 3.3, zermatt 7.6 / 19.0 -> 2.0 / 5.2, vialattea 6.5 / 14.5 -> 1.5 / 3.8, davos 4.9 / 12.5 -> 1.4 / 3.5, laax 5.9 / 13.8 -> 1.8 / 4.6, soelden 6.3 / 17.0 ->
+  1.5 / 3.8, livigno 4.4 / 11.2 -> 1.1 / 2.9, obertauern 4.0 / 9.5 -> 1.1 / 2.8. The rest (p99 ~12 deg) are streets squeezed between a house and a slope
+  that stays steep, streets beside a groomed piste (the piste keeps its surface) and junction corners. Data size: +8 ... +52 KB per resort (+0.1-0.4 %, killy
+  8468 -> 8476 KB, arlberg 19832 -> 19884 KB). pistes / lifts / buildings / classes / map / SQL unchanged (no Supabase change).
+- Re-baked (terrain only): killy, 3vallees, zermatt, arlberg, kronplatz, vialattea, obertauern, livigno, davos, laax, soelden. Before / after shots:
+  ~/Library/Caches/ski-work/streets-flat/{before,after}/ (3vallees Courchevel 1850 spot, chase / eye / side / top). ground-check Chromium 11 / 11 green (streets 0 cm,
+  rays 6 mm, terrain cracks 0). **New resort**: after a normal `bake.py` nothing more to do (the beds are part of it); for a live resort use `rebed.py`.
+- **Picker pictures**: all resorts except Laax and Soelden re-rendered (current far forests, new stations), `IMG_VERSION` 4. Poses (x,z,above,tx,tz,above2,fov), shot
+  with `--size 1200x806` (the page header strip is 56 px: `picker_images.py rid=png:1` keeps the bottom 16:10), `--wait 20000` (houses need the time): killy, 3vallees,
+  zermatt, arlberg, kronplatz, vialattea as before; obertauern 5600,3200,150,3900,4100,60,55; livigno 7500,2200,330,6000,6000,0,50; davos 2500,17500,350,6000,15000,200,55
+  (the old poses of these three were not written down, new ones look at the same places). `picker_images.py` now blurs 1.0 / 1.6 / 2.2 px when a picture does not fit 80 KB.

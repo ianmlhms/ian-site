@@ -11,7 +11,7 @@ import io
 import os
 import sys
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(REPO, "pb", "ski", "img")
@@ -38,7 +38,7 @@ def encode(im, width):
         small.save(buf, "WEBP", quality=q, method=6)
         if buf.tell() <= MAX_BYTES:
             return buf.getvalue(), q
-    raise SystemExit(f"cannot get {width} px under {MAX_BYTES} bytes")
+    return None, 0
 
 
 def main():
@@ -49,6 +49,12 @@ def main():
         im = crop_16_10(Image.open(path).convert("RGB"), float(fy or 0.5))
         for width in SIZES:
             data, q = encode(im, width)
+            for blur in (1.0, 1.6, 2.2):                # too detailed for 80 KB (far forests): soften a little, like Laax's picture
+                if data is not None:
+                    break
+                data, q = encode(im.filter(ImageFilter.GaussianBlur(blur * width / 640)), width)
+            if data is None:
+                raise SystemExit(f"cannot get {width} px under {MAX_BYTES} bytes")
             name = f"{rid}-{width}.webp"
             with open(os.path.join(OUT, name), "wb") as f:
                 f.write(data)
