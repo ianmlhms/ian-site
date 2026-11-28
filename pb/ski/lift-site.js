@@ -904,7 +904,7 @@ export function createLiftWorld(paths, opts = {}) {
  *     mounts (part lists identical); round7b-test checks the drawn world's carriers against every kept part. */
 const CUT_MARGIN = 0.5;                         // m of vertical clearance between a neighbour's carrier and a part that keeps the part
 const FLATTEN = [1.2, 0.8, 0.5, 0.3];            // m a grazed gable / terminal shell may be cut down to (tallest that clears the neighbour's carriers)
-const ROOF_RAISE = [0.5, 1.0, 1.6, 2.2];       // m a roof may go up to clear a neighbour's carriers (a shared station's canopy)
+const ROOF_RAISE = [0.5, 1.0, 1.6, 2.2, 3.0, 4.0, 5.2, 7, 9, 12];       // m a roof may go up to clear a neighbour's carriers (a shared station's canopy)
 const TOUCH = 0.16;                             // m: two parts closer than this in all three axes hold each other
 const pruneCache = new WeakMap();               // lift src -> per frame { n, cut: [indices], added: [parts], shift: [[index, dy0, dy1]] }
 
@@ -966,37 +966,57 @@ function pruneCrossings(sites) {
     for (let j = Math.floor(z0 / G); j <= Math.floor(z1 / G); j++) for (let i = Math.floor(x0 / G); i <= Math.floor(x1 / G); i++) for (const q of probes.get(gk(i, j)) || []) if (q.owner !== site && q.x > x0 && q.x < x1 && q.z > z0 && q.z < z1) out.push(q);
     return out;
   };
-  for (const site of list) {
-    for (const f of frames(site)) {
-      const near = probesNear(site, f);
-      if (!near.length) continue;
-      const g = site.path.ground(f.s);                                          // the frame's own ground (lifts.js seats it there)
-      for (const p of f.parts) {
-        if (p.deck || p.cut || (!p.solid && !p.cap)) continue;
-        if (!near.some((q) => hits(f, g, p, q))) continue;
-        if (p.roof && !p.shift) {                 // a roof the neighbour's carriers graze: raised over them (with all on it) if it can be
-          // (1.5 m spare each way: the decision is made on the far grid, the drawn world's ropes may sit a little higher or lower)
-          const dy = ROOF_RAISE.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1.5, y1: p.y1 + d + 1.5 }, q)));
-          if (dy) { raiseRoof(f, p, dy); continue; }
-        }
-        if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // lift fixes: a big shape (terminal shell, hall gable) the neighbour's carriers graze: the whole roof goes up over them
-          const rf = f.parts.find((q) => q.roof && !q.cut && !q.shift);
-          const dy = rf && ROOF_RAISE.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1, y1: p.y1 + d + 1 }, q)) && !near.some((q) => hits(f, g, { ...rf, y0: rf.y0 + d - 1, y1: rf.y1 + d + 1 }, q)));
-          if (dy) { raiseRoof(f, rf, dy); if (!near.some((q) => hits(f, g, p, q))) continue; }
-        }
-        if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // station look: a gable the neighbour grazes stays as a flat roof (0.3 m) if it can
-          // (lift fixes: the tallest roof that fits under the neighbour's carriers, 1.2 / 0.8 / 0.5 / 0.3 m, not always a slab)
-          const fit = FLATTEN.map((h) => ({ ...p, y1: p.y0 + Math.min(h, p.y1 - p.y0) })).find((low) => !near.some((q) => hits(f, g, low, q)));
-          if (fit) { shiftPart(p, 0, fit.y1 - p.y1); continue; }
-        }
-        p.cut = true; p.solid = false;
-        for (const cp of f.parts) if (cp.cap && !cp.shell && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0 && cp.a0 > p.a0 - 0.6 && cp.a1 < p.a1 + 0.6 && cp.b0 > p.b0 - 0.6 && cp.b1 < p.b1 + 0.6) cp.cut = true;   // (only what sits on it and is no bigger; a terminal shell is tested on its own: a cut corner post / the dark liner under it must not take it along)
+  /** Decides one frame: every part a neighbour's carriers graze is raised / flattened / cut (RAISES = the roof lifts to try). */
+  const pruneFrame = (site, f, RAISES) => {
+    const near = probesNear(site, f);
+    if (!near.length) return;
+    const g = site.path.ground(f.s);                                          // the frame's own ground (lifts.js seats it there)
+    for (const p of f.parts) {
+      if (p.deck || p.cut || (!p.solid && !p.cap)) continue;
+      if (!near.some((q) => hits(f, g, p, q))) continue;
+      if (p.roof && !p.shift) {                 // a roof the neighbour's carriers graze: raised over them (with all on it) if it can be
+        // (1.5 m spare each way: the decision is made on the far grid, the drawn world's ropes may sit a little higher or lower)
+        const dy = RAISES.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1.5, y1: p.y1 + d + 1.5 }, q)));
+        if (dy) { raiseRoof(f, p, dy); continue; }
       }
-      // a station hut that had to go (twin drag lifts, a chair's operator hut in the next lift's lane) moves to a free spot: across the
-      // line on the return side, or further back / forward (hut, its snow and its window move together)
-      const hut = f.parts.find((p) => p.hut);
-      if (hut && hut.cut && site.ends.includes(f)) relocateHut(site, f, g, near, hits);
+      if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // lift fixes: a big shape (terminal shell, hall gable) the neighbour's carriers graze: the whole roof goes up over them
+        const rf = f.parts.find((q) => q.roof && !q.cut && !q.shift);
+        const dy = rf && RAISES.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1, y1: p.y1 + d + 1 }, q)) && !near.some((q) => hits(f, g, { ...rf, y0: rf.y0 + d - 1, y1: rf.y1 + d + 1 }, q)));
+        if (dy) { raiseRoof(f, rf, dy); if (!near.some((q) => hits(f, g, p, q))) continue; }
+      }
+      if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // station look: a gable the neighbour grazes stays as a flat roof (0.3 m) if it can
+        // (lift fixes: the tallest roof that fits under the neighbour's carriers, 1.2 / 0.8 / 0.5 / 0.3 m, not always a slab)
+        const fit = FLATTEN.map((h) => ({ ...p, y1: p.y0 + Math.min(h, p.y1 - p.y0) })).find((low) => !near.some((q) => hits(f, g, low, q)));
+        if (fit) { shiftPart(p, 0, fit.y1 - p.y1); continue; }
+      }
+      p.cut = true; p.solid = false;
+      for (const cp of f.parts) if (cp.cap && !cp.shell && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0 && cp.a0 > p.a0 - 0.6 && cp.a1 < p.a1 + 0.6 && cp.b0 > p.b0 - 0.6 && cp.b1 < p.b1 + 0.6) cp.cut = true;   // (only what sits on it and is no bigger; a terminal shell is tested on its own: a cut corner post / the dark liner under it must not take it along)
     }
+    // a station hut that had to go (twin drag lifts, a chair's operator hut in the next lift's lane) moves to a free spot: across the
+    // line on the return side, or further back / forward (hut, its snow and its window move together)
+    const hut = f.parts.find((p) => p.hut);
+    if (hut && hut.cut && site.ends.includes(f)) relocateHut(site, f, g, near, hits);
+  };
+  const snap = new Map();                       // frame -> its parts as they were before the pruning (for the second look below)
+  for (const site of list) for (const f of frames(site)) snap.set(f, { parts: f.parts.map((q) => ({ ...q })), rect: { ...f.rect } });
+  for (const site of list) for (const f of frames(site)) pruneFrame(site, f, ROOF_RAISE);
+  // second look (lift fixes 2, 28 Nov 2026): a station END left without any roof of its own, and with no other lift's end of the same
+  // station within 16 m that has one (Zermatt Matterhorn Express 1 / 2, Plan Maison, Davos Parsennbahn 1, Arlberg Vallugabahn II: another
+  // lift's cabins run through the hall at roof height) gets its hall roof back, raised as high as it takes to clear them (ROOF_RAISE_TALL)
+  const isRoof = (p) => !p.deck && !p.hide && (p.roof || p.shape === 'gableA' || p.shape === 'gableB' || (p.shape === 'shell' && p.shell));
+  const roofy = (f) => f.parts.some((p) => !p.cut && isRoof(p));
+  const centre = (f) => f.toWorld(0, 0, {});
+  const endsOf = list.flatMap((site) => site.ends.map((f) => ({ site, f })));
+  for (const e of endsOf) {
+    if (roofy(e.f) || !snap.get(e.f).parts.some(isRoof)) continue;
+    const c = centre(e.f);
+    if (endsOf.some((o) => o.f !== e.f && o.site !== e.site && roofy(o.f) && Math.hypot(centre(o.f).x - c.x, centre(o.f).z - c.z) < 16)) continue;
+    const before = { parts: e.f.parts.slice(), rect: { ...e.f.rect } };
+    const s0 = snap.get(e.f);
+    e.f.parts = s0.parts.map((q) => ({ ...q }));
+    Object.assign(e.f.rect, s0.rect);
+    pruneFrame(e.site, e.f, ROOF_RAISE_TALL);
+    if (!roofy(e.f)) { e.f.parts = before.parts; Object.assign(e.f.rect, before.rect); }
   }
   for (const site of list) for (const f of frames(site)) if (f.parts.some((q) => q.cut)) dropFloating(f);
   for (const site of list) mountWheels(site);

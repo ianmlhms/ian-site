@@ -191,11 +191,13 @@ export function createNpcView({ scene, height, level = 'medium' }) {
   const m4 = new THREE.Matrix4(), mc = new THREE.Matrix4(), ml = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YZX');
   const v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), frustum = new THREE.Frustum(), pv = new THREE.Matrix4(), sphere = new THREE.Sphere(new THREE.Vector3(), 1.3);
   const fades = new Map();                      // id -> { f, last: draw record } (grow in / shrink out near the camera)
+  const nearCand = [];
   const recs = [];                              // this frame's draw records
   const recPool = [];
   const rec = () => { const r = recPool.pop() || { m: new Float32Array(16) }; recs.push(r); return r; };
   const stats = { near: 0, crowd: 0, riders: 0, cars: 0, ms: 0, triangles: 0 };
   const rideOut = {};
+  const seen = new Set();                       // (draw(): the ids listed this frame)
   let shadowsOn = false, enabled = true;
 
   /** Places one figure record: world matrix + pose + outfit + its distance (for the near / crowd split). */
@@ -213,7 +215,7 @@ export function createNpcView({ scene, height, level = 'medium' }) {
     pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(pv);
     const cx = camera.position.x, cz = camera.position.z;
-    const seen = new Set();
+    seen.clear();
     const inView = (x, y, z, r = 1.3) => { sphere.center.set(x, y + 0.9, z); sphere.radius = r; return frustum.intersectsSphere(sphere); };
     // skiers, the queues, the walkers
     for (const o of list) {
@@ -228,9 +230,14 @@ export function createNpcView({ scene, height, level = 'medium' }) {
       const f = fd ? fd.f : 1;
       let pitch = 0;
       if (o.kind !== 'walk' && d < 160) {                                // (farther: a few pixels, flat is fine)
-        const fx = Math.cos(o.heading), fz = Math.sin(o.heading);
-        const hb = height(o.x - fx, o.z - fz), hf = height(o.x + fx, o.z + fz);
-        pitch = -Math.atan((hb - hf) / 2);
+        // the slope under him changes slowly: two ground reads only after 1.2 m of travel (or a turn), else last frame's pitch
+        const moved = Math.abs(o.x - last.px) + Math.abs(o.z - last.pz);
+        if (!(moved < 1.2) || !(Math.abs(o.heading - last.ph) < 0.2)) {
+          const fx = Math.cos(o.heading), fz = Math.sin(o.heading);
+          const hb = height(o.x - fx, o.z - fz), hf = height(o.x + fx, o.z + fz);
+          last.slope = -Math.atan((hb - hf) / 2); last.px = o.x; last.pz = o.z; last.ph = o.heading;
+        }
+        pitch = last.slope;
       }
       last.cut = !!o.cut; last.x = o.x; last.y = o.y; last.z = o.z; last.heading = o.heading; last.pitch = pitch; last.a = o.poseA; last.b = o.poseB; last.k = o.blend; last.o = o.outfit; last.s = o.scale || 1;
       if (!inView(o.x, o.y, o.z)) continue;
@@ -291,16 +298,18 @@ export function createNpcView({ scene, height, level = 'medium' }) {
     }
     nCars = 0;
     stats.riders = riders;
-    // the nearest few get the finer figure
-    let nearLeft = cfg.near;
-    const byD = recs.slice().sort((a, b) => a.d - b.d);
+    // the nearest few get the finer figure (only the ones inside nearRadius compete: a small sort, not the whole crowd)
     const M = meshes;
     M.near.n = 0; M.crowd.n = 0;
-    for (const r of byD) {
-      const k = nearLeft > 0 && r.d < NPC.nearRadius && M.near.n < CAP.near ? 'near' : 'crowd';
-      const T = M[k];
-      if (T.n >= CAP[k]) continue;
-      if (k === 'near') nearLeft--;
+    nearCand.length = 0;
+    for (const r of recs) { r.near = false; if (r.d < NPC.nearRadius) nearCand.push(r); }
+    if (nearCand.length) {
+      nearCand.sort((a, b) => a.d - b.d);
+      for (let i = 0; i < nearCand.length && i < cfg.near && i < CAP.near; i++) nearCand[i].near = true;
+    }
+    for (const r of recs) {
+      const T = r.near ? M.near : M.crowd;
+      if (T.n >= CAP[r.near ? 'near' : 'crowd']) continue;
       T.mesh.instanceMatrix.array.set(r.m, T.n * 16);
       const a = T.aPose.array, i = T.n * 4;
       a[i] = r.a; a[i + 1] = r.b; a[i + 2] = r.k; a[i + 3] = r.o + (isGoofy(r.a, r.id, r.o) ? GOOFY_ADD : 0);

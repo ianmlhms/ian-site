@@ -279,12 +279,21 @@ export function createQueueSim(site, seed, index) {
   }
   /** The seat (chair) / spot order of a group: a deterministic shuffle of 0..count-1; a chair's first g seats (the group's) then from
    *  the farthest from the gate in (the first through the gate takes it: nobody crosses the file behind him). */
+  const orderMemo = new Map();                                      // (deterministic, read-only for the callers; asked every frame per group)
   function orderOf(k, count, g = count) {
+    const key = (k * 64 + count) * 64 + g;
+    let hit = orderMemo.get(key);
+    if (hit) return hit;
     const o = [];
     for (let i = 0; i < count; i++) o.push(i);
-    o.sort((a, b) => qrand(seed, index, k, a, 13) - qrand(seed, index, k, b, 13));
-    if (chair && maze.seatDepth) { const head = o.slice(0, g).sort((a, b) => maze.seatDepth(b) - maze.seatDepth(a)); return [...head, ...o.slice(g)]; }
-    return o;
+    const keys = [];
+    for (let i = 0; i < count; i++) keys.push(qrand(seed, index, k, i, 13));         // (one random per seat, not two per comparison)
+    o.sort((a, b) => keys[a] - keys[b]);
+    hit = o;
+    if (chair && maze.seatDepth) { const head = o.slice(0, g).sort((a, b) => maze.seatDepth(b) - maze.seatDepth(a)); hit = [...head, ...o.slice(g)]; }
+    if (orderMemo.size > 600) orderMemo.clear();
+    orderMemo.set(key, hit);
+    return hit;
   }
   const outfitOf = (k, m) => Math.floor(qrand(seed, index, k, m, 14) * 1000);
   const scaleOf = (k, m) => 0.9 + 0.16 * qrand(seed, index, k, m, 15);

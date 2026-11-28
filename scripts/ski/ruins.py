@@ -38,7 +38,7 @@ CONFIRMED = {
     334481488: "Sciovia Chardonet, Moncrons sector abandoned, not on the 2025/26 map",
     437427053: "Sciovia Scoiattolo, Moncrons sector abandoned, not on the 2025/26 map",
     770919064: "Sciovia Costapiana, Moncrons sector abandoned, not on the 2025/26 map",
-    239353856: "Pragelato Plan Conca del Sole chair, unused since ~2011-14 (Legambiente 2020)",
+    239353856: "Pragelato Plan Conca del Sole chair (now called Seggiovia Gourg), unused since ~2011-14 (Legambiente 2020); disused but NOT yet dismantled: Regione Piemonte DGR 31.1.2024 n. 17-8126 (BUR n. 6, 8.2.2024) lists it among the 4 \"impianti funiviari dismessi\" whose removal (LR 74/1989 art. 12) is only a compensation duty / to be paid from savings",
     239353854: "Pragelato Plan Belotte Piz platter, unused since ~2011-14 (Legambiente 2020)",
     261134871: "Pragelato Plan Cristallo platter, unused since ~2011-14 (Legambiente 2020)",
     261148443: "Pragelato Plan Smeraldo platter, unused since ~2011-14 (Legambiente 2020)",

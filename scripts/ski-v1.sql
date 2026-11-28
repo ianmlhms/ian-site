@@ -1947,6 +1947,8 @@ insert into public.ski_board_floors (board, min_ms, max_ms) values
   ('ski-vialattea-verbindung-baby-dx', 3000, null),
   ('ski-vialattea-verbindung-sessellift-garnel-3', 4000, null),
   ('ski-vialattea-verbindung-sessellift-nube-d-2', 7000, null),
+  ('ski-vialattea-verbindung-pariol-cesana', 35000, null),
+  ('ski-vialattea-34-vecchia', 47000, null),
   ('ski-vialattea-park', 750000, 999999),
   ('ski-zermatt-gran-pista-di-valtournenche', 152000, null),
   ('ski-zermatt-marmotte', 50000, null),

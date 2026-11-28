@@ -346,7 +346,10 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     o.x = qc.x - dz * off; o.z = qc.z + dx * off;
     // the bands are 3 m apart: where the line bends sharply the cross-section turns between two, so a near skier's own spot is tested
     // too (towards the line until clear, else not drawn this frame)
-    if (!raw && st && !bandFull(p, s) && solid(o.x, o.z, NPC.bodyR)) {
+    // (a spot that was clear last frame is tested every other frame: he moves 0.3 m a frame, the next test catches a hit at once)
+    let inside = false;
+    if (!raw && st && !bandFull(p, s) && !(st.clear && (st.alt = !st.alt))) { inside = solid(o.x, o.z, NPC.bodyR); st.clear = !inside; }
+    if (inside) {
       let ok = false;
       for (let k = 1; k <= 8 && !ok; k++) {
         const o2 = off - Math.sign(off) * k;
@@ -575,6 +578,24 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     // a busy lift's line put them on: that group, in those seats / spots, in those outfits (the ride-down ids are the old kind)
     const line = id < 5e5 ? lineOf(index) : null;
     if (line && line.maze.loop) return lineRiders(line, id, kind, seats, sub, share);
+    // the others are deterministic per carrier and asked every frame: computed once, copied from a packed record after that
+    const key = index * 4e6 + id;
+    const hit = riderMemo.get(key);
+    if (hit && hit.share === share) {
+      const n = hit.length / 7;
+      for (let k = 0; k < n; k++) { const o = riderBuf[k], j = k * 7; o.a = hit[j]; o.b = hit[j + 1]; o.y = hit[j + 2]; o.yaw = hit[j + 3]; o.pose = hit[j + 4]; o.outfit = hit[j + 5]; o.scale = hit[j + 6]; }
+      return n;
+    }
+    const n = ridersPlain(index, id, kind, seats, sub, share);
+    const rec = new Float64Array(n * 7);
+    rec.share = share;
+    for (let k = 0; k < n; k++) { const o = riderBuf[k], j = k * 7; rec[j] = o.a; rec[j + 1] = o.b; rec[j + 2] = o.y; rec[j + 3] = o.yaw; rec[j + 4] = o.pose; rec[j + 5] = o.outfit; rec[j + 6] = o.scale; }
+    if (riderMemo.size > 3000) riderMemo.clear();
+    riderMemo.set(key, rec);
+    return n;
+  }
+  const riderMemo = new Map();
+  function ridersPlain(index, id, kind, seats, sub, share) {
     const occ = NPC.occupancy[kind] || 0;
     const r = (k) => rand01(seed, index, id, k, 4242);
     if (r(1) >= occ * share) return 0;
@@ -583,7 +604,8 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       const S = Math.max(1, seats || 4), W = Math.max(1.6, Math.min(4.2, S * 0.52)), pitch = (W - 0.25) / S;
       const want = 1 + Math.floor(Math.pow(r(2), 1.6) * S);
       // which seats: a deterministic shuffle of the seat numbers
-      const order = [...Array(S).keys()].sort((x, y) => rand01(seed, index, id, x, 5) - rand01(seed, index, id, y, 5));
+      const keys = []; for (let x = 0; x < S; x++) keys.push(rand01(seed, index, id, x, 5));        // (one random per seat, not two per comparison)
+      const order = [...Array(S).keys()].sort((x, y) => keys[x] - keys[y]);
       for (let k = 0; k < Math.min(want, S, riderBuf.length); k++) {
         const o = riderBuf[n++];
         o.a = -0.05; o.b = (order[k] - (S - 1) / 2) * pitch; o.y = SEAT_Y.chair; o.yaw = 0; o.pose = POSE.sit + (isBoarder(r(80 + k)) ? BOARD_POSE : 0); o.outfit = Math.floor(r(10 + k) * OUTFIT_COUNT) % OUTFIT_COUNT; o.scale = lerp(0.92, 1.04, r(30 + k));
@@ -594,7 +616,8 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
           : [[4.4, 0.62], [3.0, -0.62], [1.5, 0.62], [0, -0.62], [-1.5, 0.62], [-3.0, -0.62], [-4.4, 0.62], [2.2, 0], [-2.2, 0]];
       const lo = kind === 'gondola' ? 1 : kind === 'cable' ? 4 : 3;
       const want = Math.min(spots.length, riderBuf.length, lo + Math.floor(r(2) * (spots.length - lo + 1)));
-      const order = [...spots.keys()].sort((x, y) => rand01(seed, index, id, x, 6) - rand01(seed, index, id, y, 6));
+      const keys = []; for (let x = 0; x < spots.length; x++) keys.push(rand01(seed, index, id, x, 6));
+      const order = [...spots.keys()].sort((x, y) => keys[x] - keys[y]);
       const y = kind === 'gondola' ? (sub === 'funitel' ? SEAT_Y.funitel : SEAT_Y.gondola) : kind === 'cable' ? SEAT_Y.cable : SEAT_Y.train;
       for (let k = 0; k < want; k++) {
         const o = riderBuf[n++], sp = spots[order[k]];
@@ -857,6 +880,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
         const before = st.av;
         st.av += (clamp(st.avT, -NPC.avoidMax, NPC.avoidMax) - st.av) * ease;
         const dAv = st.av - before, nx = o.x - Math.sin(o.heading) * dAv, nz = o.z + Math.cos(o.heading) * dAv;
+        if (dAv > -1e-6 && dAv < 1e-6) continue;                           // (settled: he is where the analytic part put him, already checked)
         if (!solid(nx, nz, NPC.bodyR)) { o.x = nx; o.z = nz; } else st.av = before;     // this frame's share now (the analytic part next frame)
       }
     }
@@ -868,6 +892,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
         const tx = d < NPC.stepAside && d > 1e-3 ? st.sx + dx / d * (NPC.stepAside - d) : 0, tz = d < NPC.stepAside && d > 1e-3 ? st.sz + dz / d * (NPC.stepAside - d) : 0;
         const k = 1 - Math.exp(-dt * (d < NPC.stepAside ? 6 : 0.4));
         const nx = st.sx + (clamp(tx, -2.2, 2.2) - st.sx) * k, nz = st.sz + (clamp(tz, -2.2, 2.2) - st.sz) * k;
+        if (Math.abs(nx - st.sx) < 1e-5 && Math.abs(nz - st.sz) < 1e-5) continue;      // (not moving: nothing to test)
         const bx = o.x - st.sx + nx, bz = o.z - st.sz + nz;
         if (!solid(bx, bz, NPC.bodyR) || o.kind === 'queue') { o.x = bx; o.z = bz; st.sx = nx; st.sz = nz; }
       }
