@@ -135,7 +135,8 @@ export function createRemotes({ scene, camera, surface, overlay, liftPath = () =
       sphere.center.set(st.x, st.y + 0.9, st.z);
       const visible = d < VIEW_DIST && frustum.intersectsSphere(sphere);
       r.model.setVisible(visible);
-      if (!!st.board !== r.model.board) r.model.setBoard(!!st.board);              // 28 Nov 2026: he rides a snowboard (wire flag 8)
+      if (!!st.board !== r.model.board) r.model.setBoard(!!st.board);
+      if (!!st.goofy !== r.model.goofy) r.model.setStance(!!st.goofy);      // goofy (wire flag 16)              // 28 Nov 2026: he rides a snowboard (wire flag 8)
       if (visible) r.model.pose(st, (x, z, out) => surface.normal(x, z, out), time, (x, z) => surface.height(x, z));
       // the name tag over the helmet (R7-D: laid out together below, no overlaps; free ride: far friends keep a tag with the distance)
       v3.set(st.x, st.y + 2.15, st.z).applyMatrix4(camera.matrixWorldInverse);

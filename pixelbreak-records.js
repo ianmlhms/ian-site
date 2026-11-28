@@ -357,9 +357,10 @@ window.addEventListener("message", (e) => {
 const RPC_WHITELIST = new Set([
   "park_gallery", "park_layout", "publish_park", "unpublish_park", "like_park",
   "submit_daily_score", "daily_board",
+  "ski_daily_submit", "ski_daily_board",      // Ski Alpen's Dagesfuerderung board (scripts/ski-daily-v1.sql)
 ]);
 // Writes (scores, publishing or liking a park) are refused in test mode; the read-only functions still work.
-const TEST_MODE_BLOCKED_RPC = new Set(["submit_daily_score", "publish_park", "unpublish_park", "like_park"]);
+const TEST_MODE_BLOCKED_RPC = new Set(["submit_daily_score", "ski_daily_submit", "publish_park", "unpublish_park", "like_park"]);
 const MAX_RPC_ARGS = 16;
 
 function rpcPost(id, data, error) {
@@ -376,7 +377,7 @@ async function rpcCall(call) {
   if (!isObject(args) || Object.keys(args).length > MAX_RPC_ARGS || !isSaveData(args)) {
     rpcPost(id, null, "bad-args"); return;
   }
-  if (["submit_daily_score", "daily_board"].includes(call.fn) && !fullAccount()) { rpcPost(id, null, "not signed in"); return; }
+  if (["submit_daily_score", "daily_board", "ski_daily_submit", "ski_daily_board"].includes(call.fn) && !fullAccount()) { rpcPost(id, null, "not signed in"); return; }
   if (!sb) { rpcPost(id, null, "offline"); return; }
   try {
     const { data, error } = await sb.rpc(call.fn, args);

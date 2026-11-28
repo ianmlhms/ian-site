@@ -7,7 +7,9 @@ import { matchSeed, resolveResort, resolveRuns } from './plan.js';
 import { createRace } from './race.js';
 import { createSession } from './session.js';
 import { createRemotes, packState, outfitOf, MEET_GAP_MS } from './remotes.js';
-import { sendSlot } from './wire.js';
+import { sendSlot, unpackState } from './wire.js';
+import { createSampleLog, logToClip } from './samplelog.js';
+import { createRecorder } from '../replay.js';
 import { createMpHud, resText } from './hud.js';
 import { createFreeMp } from './freeride.js';
 import { createSpectateMp } from './spectate.js';
@@ -74,6 +76,7 @@ export function createMp({ ctx, host }) {
   /* spectators (28 Nov 2026): a latecomer of this race watches. He joins the session (not the race): never in the roster, standings or boards,
    * no figure; the racers see only «👀 N». Everything he sends is ignored; he gets the states, the sync and everybody's results. */
   const spectators = new Set();
+  const runLogs = new Map();                       // racer id -> his run as received (net/samplelog.js: the winner's replay; reset at every run)
   session = createSession({
     code: ctx.code, me: ctx.me, roster: ctx.roster, name: nameOf.get(ctx.me),
     racing: () => race.phase === 'go',
@@ -91,6 +94,7 @@ export function createMp({ ctx, host }) {
       if (m.r !== race.run || !remotes.get(from)) return;
       const t = session.toLocal(from, Number(m.t));
       remotes.push(from, m.r, t === null ? performance.now() : t, m.a);
+      if (ctx.roster.some((p) => p.id === from)) { let lg = runLogs.get(from); if (!lg) runLogs.set(from, (lg = createSampleLog())); lg.push(Number(m.t), m.a); }
       return;
     }
     if (m.k === 'hi') { meet(from, outfitOf(m.o)); return; }
@@ -139,6 +143,8 @@ export function createMp({ ctx, host }) {
   async function prepare(r) {
     const token = ++local.prepToken;
     const p = pisteOf(r), plan = runs[r];
+    if (host.replay && host.replay.active) host.replay.close();      // a replay of the last run ends when the next one starts
+    runLogs.clear();
     mpHud.closeCard(); local.resultsCard = null; mpHud.bar('');
     local.goAt = null; local.spectate = null;
     env.setWeather(plan.weather, false); env.setTime(plan.time, false); env.snap();
@@ -188,7 +194,23 @@ export function createMp({ ctx, host }) {
       piste: pisteOf(r), table: race.runTable(r), stand: runs.length > 1 || final ? race.standings() : [], final, me: ctx.me,
       statusOf: (id) => (id === ctx.me ? 'here' : race.status(id)),
       foot: final ? 'Fäerdeg! «‹ Lobby» fir nach eng Kéier.' : 'Nächste Laf geet gläich un …',
+      buttons: replayButtons(r),
     });
+  }
+
+  /* ---------- replay (28 Nov 2026): my own run (the rolling recorder of main.js) and the winner's (what arrived over the links) ---------- */
+  function replayButtons(r) {
+    if (!host.replay) return [];
+    const out = [];
+    const mine = race.result(r, ctx.me);
+    if (mine && !mine.dnf) out.push({ id: 'replay', label: 'Replay', on: () => host.replay.open() });
+    const win = race.runTable(r).find((x) => x.place === 1 && x.res && !x.res.dnf && x.res.valid);
+    if (win && win.id !== ctx.me) {
+      const clip = logToClip(runLogs.get(win.id), { unpack: unpackState, makeRecorder: createRecorder });
+      const rem = remotes.get(win.id);
+      if (clip) out.push({ id: 'replay-winner', label: `Replay: ${win.name}`, on: () => host.replay.openClip(clip, { outfit: rem ? rem.outfit : undefined, name: win.name }) });
+    }
+    return out;
   }
 
   /* ---------- the live table ---------- */
@@ -230,7 +252,7 @@ export function createMp({ ctx, host }) {
     const slot = game.state ? sendSlot(local.lastSend, now, hz) : null;      // cleanup round: on the wall clock, not every n-th frame
     if (slot !== null) {
       local.lastSend = slot;
-      session.broadcast({ k: 's', r: race.run, t: Math.round(now), a: packState(game.state, game.run ? game.run.progress : 0, game.phase === 'finished', !!(host.board && host.board())) }, false);
+      session.broadcast({ k: 's', r: race.run, t: Math.round(now), a: packState(game.state, game.run ? game.run.progress : 0, game.phase === 'finished', !!(host.board && host.board()), !!(host.goofy && host.goofy())) }, false);
     }
     if (local.spectate) { const rem = remotes.get(local.spectate); if (!rem || !rem.state || rem.state.finished) nextSpectate(); }
   }
@@ -295,5 +317,7 @@ export function createMp({ ctx, host }) {
     window.__skiMp = { kind: 'race', race, session, remotes, runs, ctx, info: () => ({ run: race.run, phase: race.phase, coordinator: race.coordinator(), net: session.info(), standings: race.standings(), table: race.runTable(race.run) }) };
   }
 
-  return { kind: 'race', begin, frame, render, onFinish, onAction, viewState, get active() { return true; } };
+  /** The replay hides the other racers (they are drawn live, not at the replay's moment). */
+  function replayHide(on) { remotes.setVisible(!on); }
+  return { kind: 'race', begin, frame, render, onFinish, onAction, viewState, replayHide, get active() { return true; } };
 }

@@ -482,6 +482,10 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     for (const L of legs) L.ankle.rotation.y = 0;
     gearHidden = null;                                     // pose() shows / hides the poles again
   }
+  /** 28 Nov 2026: goofy stance on the snowboard (the right foot forward; regular = the left). The poses mirror: the body faces the other
+   *  edge, the bindings / arms swap roles and the toe edge is the -z one (poseBoardRide / poseBoardDrag read `sf`). */
+  let goofy = false;
+  function setStance(on) { goofy = !!on; }
   setSki(null);
   skiLookOf = () => skiLook || { base: (OUTFITS.find((x) => x.id === outfit) || OUTFITS[0]).ski };
   recolour();
@@ -726,63 +730,67 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
   /** Sideways on the board: the feet in the bindings (regular: the left foot forward), knees flexed, the body facing the toe edge
    *  (+z), the chest a little open to the nose, the head looking down the line. edge > 0 = toe side (turning right), < 0 = heel side
    *  (sitting back, arms over the toes). plough = a skid (the board across, on the heel edge). Pushing on a flat: the back foot steps. */
-  function poseBoardRide(state, t, edge, crouch, plough, air, popping) {
-    stance.rotation.set(0, -Math.PI / 2, 0);
+  function poseBoardRide(state, t, edgeIn, crouch, plough, air, popping) {
+    const sf = goofy ? -1 : 1;                         // goofy: the stance faces the other way, the toe edge is the -z one
+    const edge = edgeIn * sf;
+    stance.rotation.set(0, -sf * Math.PI / 2, 0);
     board.position.set(0, 0, 0); board.rotation.set(0, 0, 0);
     const toe = Math.max(0, edge), heel = Math.max(0, -edge) + plough * 0.6;
     const shuffle = state.grounded && (state.push || 0) > 0 && state.speed < 3.5 ? 1 : 0;
     const tuckAir = popping ? -0.05 : air * (1 - crouch) * 0.26;
     const baseH = 0.85 - crouch * 0.3 - heel * 0.12 - toe * 0.05;
     for (let i = 0; i < 2; i++) {
-      const L = legs[i];
-      legH[i] = baseH - tuckAir - (L.side > 0 ? toe * 0.04 : 0);
-      legLift[i] = L.side > 0 && shuffle ? 0.08 * Math.max(0, Math.sin(t * 7)) : 0;      // the back foot out of its binding, stepping
+      const L = legs[i], back = L.side * sf > 0;
+      legH[i] = baseH - tuckAir - (back ? toe * 0.04 : 0);
+      legLift[i] = back && shuffle ? 0.08 * Math.max(0, Math.sin(t * 7)) : 0;      // the back foot out of its binding, stepping
       legZ[i] = L.side * 0.115;
       setLeg(i, 0, L.side * BOARD.foot);
-      L.ankle.rotation.y = L.side < 0 ? BOARD.front : BOARD.back;
+      L.ankle.rotation.y = sf * (back ? BOARD.back : BOARD.front);
     }
     const hipY = baseH - tuckAir - 0.015;
     const [ta1, tkb] = solveLeg(hipY - ANKLE);
     torso.position.set(-(THIGH * Math.sin(ta1) + SHIN * Math.sin(ta1 - tkb)), hipY, 0);
-    torso.rotation.set(0, 0.4 - heel * 0.12, -(0.2 + crouch * 0.72 + heel * 0.34 - toe * 0.04 + air * 0.08 + shuffle * 0.1));
-    neck.rotation.set(0, 1.0 + heel * 0.1, 0.12 + crouch * 0.45 - heel * 0.1);
+    torso.rotation.set(0, sf * (0.4 - heel * 0.12), -(0.2 + crouch * 0.72 + heel * 0.34 - toe * 0.04 + air * 0.08 + shuffle * 0.1));
+    neck.rotation.set(0, sf * (1.0 + heel * 0.1), 0.12 + crouch * 0.45 - heel * 0.1);
     for (let i = 0; i < 2; i++) {
-      const A = arms[i], front = A.side < 0;
+      const A = arms[i], front = A.side * sf < 0;
       // the front arm out towards the nose, the back arm low over the tail; heel side: both reach over the toes; air: wide
       A.sh.rotation.set(-A.side * ((front ? 0.6 : 0.4) + air * 0.45), 0, (front ? 0.32 : 0.12) + heel * 0.8 + crouch * 0.55 - toe * 0.12);
       A.elbow.rotation.set(0, 0, 0.42 + crouch * 0.45 + Math.sin(t * 2.2 + i) * 0.03);
     }
-    if (smGrab > 0.35) reachHand(arms[1], boardWorld(0.02, 0.02, 0.135, lw));      // the grab: the back hand on the toe edge
+    if (smGrab > 0.35) reachHand(arms[goofy ? 0 : 1], boardWorld(0.02, 0.02, 0.135 * sf, lw));      // the grab: the back hand on the toe edge
   }
   /** Board on a drag lift: the front foot strapped, the free back foot on the board near it, sideways, leaning back on the bar. */
   /*  Standing lifts (28 Nov 2026): the board lies on the snow under it (pitch + roll from the ground at its nose, tail and edges), the
    *  feet go to it (the front one higher on a climb), the boots follow it; on a belt (pull false) he stands, hands low. */
   function poseBoardDrag(t, ground, heading, hand, pull = true) {
+    const sf = goofy ? -1 : 1, bi = goofy ? 0 : 1;      // sf: mirrored stance; bi: the arm that is the back (bar) hand
     tilt.rotation.set(0, 0, 0); tilt.position.set(0, 0, 0);
     lean.rotation.set(Math.sin(t * 1.7) * (pull ? 0.025 : 0.01), 0, 0);
-    stance.rotation.set(0, -Math.PI / 2, 0);
+    stance.rotation.set(0, -sf * Math.PI / 2, 0);
     slopeUnder(root.position.x, root.position.z, heading, 0.7, BOARD.halfWidth, ground, slope);
     board.position.set(0, 0, 0); board.rotation.set(slope.roll - lean.rotation.x, 0, slope.pitch);
     for (let i = 0; i < 2; i++) {
-      const L = legs[i], front = L.side < 0;
+      const L = legs[i], front = L.side * sf < 0;
       const footZ = L.side * (front ? BOARD.foot : BOARD.foot * 0.55);
-      legH[i] = 0.84; legLift[i] = clamp(-footZ * Math.tan(slope.pitch), -0.15, 0.5);   // (the stance's z is the board's -x)
+      legH[i] = 0.84; legLift[i] = clamp(-footZ * sf * Math.tan(slope.pitch), -0.15, 0.5);   // (the stance's z is the board's -x, goofy: +x)
       legZ[i] = L.side * 0.115;
       setLeg(i, 0, footZ);
-      L.ankle.rotation.y = front ? BOARD.front : 0;
-      L.ankle.rotation.x += slope.pitch;                                                // the boot with the board
+      L.ankle.rotation.y = front ? sf * BOARD.front : 0;
+      L.ankle.rotation.x += slope.pitch * sf;                                           // the boot with the board
     }
     root.updateMatrixWorld(true);
     const c = boardClear(ground);
     if (c < -0.002) { root.position.y -= c - 0.001; root.updateMatrixWorld(true); }
     lastClear = boardClear(ground);
     torso.position.set(-0.05, 0.84, 0);
-    torso.rotation.set(0, 0.55, pull ? 0.1 : -0.04);      // turned up the track, leaning back against the bar (a belt: upright)
-    neck.rotation.set(0, 0.9, -0.05);
-    arms[0].sh.rotation.set(0.35, 0, 0.3); arms[0].elbow.rotation.set(0, 0, 0.5);
-    if (pull) { arms[1].sh.rotation.set(-0.3, 0, 0.85); arms[1].elbow.rotation.set(0, 0, 1.0); }
-    else { arms[1].sh.rotation.set(-0.3, 0, 0.3); arms[1].elbow.rotation.set(0, 0, 0.5); }
-    if (pull && hand) reachHand(arms[1], hand);
+    torso.rotation.set(0, 0.55 * sf, pull ? 0.1 : -0.04);      // turned up the track, leaning back against the bar (a belt: upright)
+    neck.rotation.set(0, 0.9 * sf, -0.05);
+    const A0 = arms[1 - bi], A1 = arms[bi];
+    A0.sh.rotation.set(0.35 * sf, 0, 0.3); A0.elbow.rotation.set(0, 0, 0.5);
+    if (pull) { A1.sh.rotation.set(-0.3 * sf, 0, 0.85); A1.elbow.rotation.set(0, 0, 1.0); }
+    else { A1.sh.rotation.set(-0.3 * sf, 0, 0.3); A1.elbow.rotation.set(0, 0, 0.5); }
+    if (pull && hand) reachHand(A1, hand);
   }
   /** On a lift without riding it: strapped to the front foot on a chair, lying across on the footrest (like the skis), upright in
    *  the right hand in a cabin, held by its top edge walking. */
@@ -844,7 +852,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     // whole-body lean into the turn (and the slope's own side tilt), skis on edge
     // R8e: standing (the end of a hockey stop) the body is over the skis, the edges set by the knees (angulation), not leaning 35 deg
     const leanK = 0.35 + 0.65 * smoothstep(0.5, 5, state.speed);
-    lean.rotation.set(edge * 0.62 * leanK + Math.atan2(across, tmp.y) * 0.2 * (state.grounded ? 1 : 0) - (boarding ? plough * 0.22 : 0), 0, 0);
+    lean.rotation.set(edge * 0.62 * leanK + Math.atan2(across, tmp.y) * 0.2 * (state.grounded ? 1 : 0) - (boarding ? plough * 0.22 * (goofy ? -1 : 1) : 0), 0, 0);
     const skiEdge = edge * 0.45;
     const ride = state.ride || '';
     const popping = !state.grounded && (state.jumpCd || 0) > 0.3;          // just popped (jumpCooldown 0.6): legs long
@@ -852,7 +860,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     const boardStance = boarding && ride !== 'sit' && ride !== 'stand' && ride !== 'carry';
     if (boardStance) {
       poseBoardRide(state, t, edge, crouch, plough, air, popping);
-      if (!ride) root.rotation.y += plough * 1.15;                            // a skid: the board across, the rider facing down the line
+      if (!ride) root.rotation.y += plough * 1.15 * (goofy ? -1 : 1);                            // a skid: the board across, the rider facing down the line
     } else {
     stance.rotation.set(0, 0, 0);
     // legs
@@ -965,6 +973,8 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     }
     return out;
   }
+  /** 28 Nov 2026, tests: the boots in the board's frame [{ side, x (m along the board, + = the nose), z }] (goofy: the right foot, side +1, forward). */
+  function bootsOnBoard() { root.updateMatrixWorld(true); return legs.map((L) => { L.ankle.getWorldPosition(bwA); board.worldToLocal(bwA); return { side: L.side, x: bwA.x, y: bwA.y, z: bwA.z }; }); }
   /** R8e, tests: the largest distance (m) of a boot (ankle) from straight above its ski's binding, in the ski's frame, after the last pose. */
   function bootGap() {
     root.updateMatrixWorld(true);
@@ -972,5 +982,5 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
     for (let i = 0; i < 2; i++) { legs[i].ankle.getWorldPosition(bwA); skis[i].g.worldToLocal(bwA); m = Math.max(m, Math.hypot(bwA.x, bwA.z)); }      // in the ski's own frame (above the binding)
     return m;
   }
-  return { root: group, slots: SLOTS, pose, setOutfit, setSki, setBoard, get board() { return boarding; }, setFirstPerson, skiEnds, bootGap, gearPoints, debugSkis: () => skis.map((sk) => ({ g: r3(sk.g.rotation), gp: r3(sk.g.position), e: r3(sk.edge.rotation) })), get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
+  return { root: group, slots: SLOTS, pose, setOutfit, setSki, setBoard, get board() { return boarding; }, setStance, get goofy() { return goofy; }, setFirstPerson, skiEnds, bootGap, gearPoints, bootsOnBoard, debugSkis: () => skis.map((sk) => ({ g: r3(sk.g.rotation), gp: r3(sk.g.position), e: r3(sk.edge.rotation) })), get skiClearance() { return lastClear; }, get firstPerson() { return firstPerson; }, setBlob(on) { blob.visible = !!on && !ghost && !firstPerson; }, setVisible(v) { group.visible = v; } };
 }

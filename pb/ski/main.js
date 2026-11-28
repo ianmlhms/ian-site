@@ -553,12 +553,22 @@ async function boot() {
     scene, resort, rid, pistes, field, surface, store, hud, uiRoot: document.getElementById('ui'), input, env, audio, world, layout: parkLayout,
     root: core.root, outfits: OUTFITS, onRideUp: () => boardLift(), onProgressChanged: () => refreshMapMarks(), onSkis: () => openSkiCard(),
     onMap: () => onAction('map'),                                            // launch: a tap on the minimap opens the map (like M)
+    rider: () => ({ board: isBoard(), goofy: isGoofy() }),                    // 28 Nov 2026: the trick judge names board tricks (modes/park.js trickName)
     snowMaterial: () => snowMat,                                             // R7-D: the park's snow meshes share the terrain's material
   });
   // ---- round 6: ski types (physics per type; timed / scored runs use the reference set: modes/skis.js FAIRNESS) ----
   let skiType = DEFAULT_SKI;
   const fairNow = () => isRace() || game.mode === MODES.run || game.mode === MODES.park;
   const isBoard = () => !!(SKI_BY_ID.get(skiType) || {}).board;
+  let goofyStance = false;                                                   // 28 Nov 2026: goofy = the right foot forward (only drawn on the snowboard)
+  const isGoofy = () => goofyStance && isBoard();
+  function setStance(goofy, save = true) {
+    goofyStance = !!goofy;
+    skier.setStance(goofyStance); ghostModel.setStance(goofyStance);
+    document.documentElement.dataset.skiStance = goofyStance ? 'goofy' : 'regular';
+    if (save && !!store.get().goofy !== goofyStance) { store.set({ ...store.get(), goofy: goofyStance }); modes.cloud.push(store.get()); }
+    return true;
+  }
   function applySkiPhysics() { world.ski = skiParams(skiType, fairNow()); document.documentElement.dataset.skiPhysics = fairNow() ? 'fair' : skiType; }
   function setSki(id, save = true) {
     const t = SKI_BY_ID.get(id);
@@ -589,18 +599,35 @@ async function boot() {
   }
   // ---- replay + photo mode (28 Nov 2026) ----
   const recorder = createRecorder();
-  const replay = createReplay({ root: document.getElementById('ui'), surface, onClose: () => endOverlayPause() });
+  let replayLook = false;                                                    // the replay of ANOTHER racer (online race): his outfit / board on my figure, put back on close
+  const replay = createReplay({ root: document.getElementById('ui'), surface, onClose: () => {
+    if (replayLook) { replayLook = false; skier.setOutfit(outfit); skier.setBoard(isBoard()); skier.setStance(isGoofy()); }
+    if (mp && mp.replayHide) mp.replayHide(false);
+    endOverlayPause();
+  } });
   const photo = createPhoto({ root: document.getElementById('ui'), canvas, height: (x, z) => surface.height(x, z), blocked: (x, y, z) => camBlocked(x, y, z), renderNow: () => post.render(scene, camera), onClose: () => { game.camPose = photoPrevPose; photoPrevPose = null; endOverlayPause(); }, onToast: (t) => hud.toast(t, 1800) });
   let overlayPaused = false, overlayInput = false, photoPrevPose = null;
   function beginOverlayPause() { overlayPaused = game.paused; overlayInput = game.phase === 'running' || game.phase === 'countdown'; game.paused = true; input.setEnabled(false); }
   function endOverlayPause() { game.paused = overlayPaused; input.setEnabled(overlayInput && game.phase === 'running'); canvas.focus({ preventScroll: true }); }
   const overlayOk = () => game.screen === 'ski' && (game.phase === 'running' || game.phase === 'finished') && !ride && !skiCard && !replay.active && !photo.active;
   /** Replay of the last `seconds` (free ride: FREE_CLIP_S; after a timed run the whole buffer). */
-  function openReplay(seconds = FREE_CLIP_S) {
-    if (!overlayOk() || isRace()) return false;
+  function openReplay(seconds = FREE_CLIP_S, online = false) {
+    if (!overlayOk() || (isRace() && !online)) return false;                 // online: only from the race's results card (net/index.js)
     const clip = recorder.snapshot(seconds, game.state);
     if (!clip) { hud.toast('Nach näischt opgeholl', 1400); return false; }
     beginOverlayPause();
+    if (mp && mp.replayHide) mp.replayHide(true);                           // the other racers are live, not at the replay's moment
+    replay.open(clip, { camera: 'follow' });
+    return true;
+  }
+  /** 28 Nov 2026: a clip made from another racer's received states (net/samplelog.js): his outfit / board on the figure. */
+  function openReplayClip(clip, look = {}) {
+    if (!clip || !overlayOk() || !isRace()) return false;
+    beginOverlayPause();
+    if (mp && mp.replayHide) mp.replayHide(true);
+    replayLook = true;
+    if (look.outfit && OUTFITS.some((o) => o.id === look.outfit)) skier.setOutfit(look.outfit);
+    skier.setBoard(!!clip.template.board); skier.setStance(!!clip.template.goofy);
     replay.open(clip, { camera: 'follow' });
     return true;
   }
@@ -626,11 +653,12 @@ async function boot() {
     }
   }
   if (!setSki(store.get().ski || DEFAULT_SKI, false)) setSki(DEFAULT_SKI, false);
+  setStance(!!store.get().goofy, false);
   let skiCard = null;
   function openSkiCard() {
     if (skiCard) return;
     game.paused = true; input.setEnabled(false);
-    skiCard = showSkiCard(document.getElementById('ui'), { stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) hud.toast(SKI_BY_ID.get(id).board ? SKI_BY_ID.get(id).name : `Ski: ${SKI_BY_ID.get(id).name}`); }, onClose: () => { skiCard = null; game.paused = false; input.setEnabled(game.phase === 'running'); } });
+    skiCard = showSkiCard(document.getElementById('ui'), { stats: modes.skiStats(), selected: skiType, goofy: goofyStance, onStance: (g) => { setStance(g); hud.toast(g ? 'Goofy: de rietse Fouss vir' : 'Regulär: de lénke Fouss vir'); }, onPick: (id) => { if (setSki(id)) hud.toast(SKI_BY_ID.get(id).board ? SKI_BY_ID.get(id).name : `Ski: ${SKI_BY_ID.get(id).name}`); }, onClose: () => { skiCard = null; game.paused = false; input.setEnabled(game.phase === 'running'); } });
   }
   // ---- round 6: the challenge start gates on the mountain ----
   markers = createMarkers({ scene, list: markerList(pistes, parkLayout, gateAt), height: (x, z) => surface.height(x, z), overlay: document.getElementById('ui'), starsOf: (m) => (m.piste ? pisteStars(store.get(), rid, m.piste.id) : 0) });
@@ -701,7 +729,7 @@ async function boot() {
     } else if (m === 'goals') {                    // 28 Nov: goals + badges of this area, the daily challenge
       modePanel.showGoals({ progress: store.get(), rid, areaName: areaTitle, extra: { discCount: explore.disc.count } });
     } else if (m === 'skis') {
-      modePanel.showSkis({ stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) setMapMode('skis'); } });
+      modePanel.showSkis({ stats: modes.skiStats(), selected: skiType, goofy: goofyStance, onStance: (g) => { setStance(g); setMapMode('skis'); }, onPick: (id) => { if (setSki(id)) setMapMode('skis'); } });
     } else if (game.piste) selectPiste(game.piste, true);
     updateStartStatus();
   }
@@ -1735,7 +1763,7 @@ async function boot() {
       if (fpNow) { camera.updateMatrixWorld(); fp.afterCamera(camera, st, level !== 'low'); }
       camYaw = Math.atan2(cam.tz - cam.z, cam.tx - cam.x);
       if (Math.abs(camera.fov - cam.fov) > 0.05) { camera.fov = cam.fov; camera.updateProjectionMatrix(); }
-      if (mp) mp.render(now, time);
+      if (mp && !replay.active) mp.render(now, time);
       if (markers && game.screen === 'ski') { camera.updateMatrixWorld(); markers.update(camera, canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, game.mode === MODES.freeride && game.phase === 'running' && !game.camPose); }
       // ghost of the best run
       if (game.ghost && game.screen === 'ski' && game.run && game.run.timed && game.phase !== 'countdown' && !rpOn) {
@@ -1970,7 +1998,7 @@ async function boot() {
     modes, parkLayout, startPark, startFree: (id) => startFree(id ? modes.lifts.byId.get(id) : game.freeLift || modes.lifts.list[0]), rideUp, setMapMode,
     // round 6
     goFree: (id) => goFree(id ? modes.lifts.byId.get(id) : spawn), goDown: (id) => goFree(null, { kind: 'liftdown', lift: id }), boardLift, skipRide, toggleRideView, showRideMap, closeRideMap, midChoose, get rideMap() { return rideMap; }, get ride() { return ride; }, get carrier() { return carrier; }, get rideView() { return rideView; }, get spawn() { return spawn; },
-    get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
+    get lifts() { return lifts; }, get signs() { return signs; }, markers, setSki, get skiType() { return skiType; }, setStance, get goofy() { return goofyStance; }, get world() { return world; }, openSkiCard, resumeFree, acceptChallenge, showMap,
     place(x, z, heading) { placeAt(x, z, heading); },
     // R7-B (flows): stand still at (x, z) like after a lift (0 km/h until an input), the scatter for the tree checks
     placeHold(x, z, heading) { placeAt(x, z, heading); game.hold = true; if (modes.freeRun) modes.freeRun.moved({ x, z, heading }); },
@@ -2021,7 +2049,9 @@ async function boot() {
     mp = createMp({ ctx: mpCtx, host: {
       game, rid, pistes, streamer, terrain, surface, scene, camera, canvas, env, hud, input, audio, chase, uiRoot: document.getElementById('ui'),
       outfit: () => outfit, level: () => level, startRun: (p, lateral) => startRun(p, MODES.run, lateral),
+      replay: { open: () => openReplay(RECORD.seconds, true), openClip: (clip, look) => openReplayClip(clip, look), close: () => { if (replay.active) replay.close(); }, get active() { return replay.active; } },      // 28 Nov: online race results: «Replay»
       board: () => isBoard(),                                                 // 28 Nov 2026: the others see my snowboard (wire flag 8)
+      goofy: () => isGoofy(),                                                 // ... and the goofy stance (wire flag 16)
       setView: (pose) => { game.camPose = pose; },                           // a spectator's overview camera (net/spectate.js); null = the chase camera again
       // R7-D: a friend on a lift is drawn in his carrier even before this device rode one (the lift view is built early, once)
       liftPath: (i) => { if (!lifts) buildLifts(); return lifts ? lifts.pathOf(i) : null; },

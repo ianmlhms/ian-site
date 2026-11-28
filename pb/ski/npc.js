@@ -17,6 +17,7 @@ import { NPC } from './config.js';
 import { createLineIndex } from './pistes.js';
 import { worldcupNets } from './landmarks.js';
 import { createQueueSim } from './lift-queue.js';
+import { BELT_TOP } from './lift-path.js';
 
 /* ---------- deterministic numbers ---------- */
 function mix(h, v) { h = Math.imul(h ^ (v | 0), 0x9e3779b1); return (h ^ (h >>> 15)) | 0; }
@@ -133,6 +134,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
   let roads = [];
   let walkers = null;
   const queues = new Map();                // lift index -> spots
+  const carpets = new Map();               // lift index -> the beginners of a magic carpet (or null: no clear lane beside it)
   let nets = null;                         // the race nets as segments (grid)
   const state = new Map();                 // id -> per-skier state while listed near the camera
   const list = [];                         // the skiers drawn this frame (reused objects)
@@ -409,6 +411,94 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     return out;
   }
 
+  /* ---------- the magic carpets (28 Nov 2026): a few beginners wait at the foot, ride the belt up (standing, at the player's belt speed),
+   * step off at the top and plough down a lane beside the belt, back to the foot. Analytic like the pistes (a cycle per person from the
+   * game clock), no state, no draw calls of its own. A carpet without a clear lane on either side has nobody. ---------- */
+  function carpetFolk(l) {
+    if (carpets.has(l.index)) return carpets.get(l.index);
+    carpets.set(l.index, null);
+    const site = liftNet.world && liftNet.world.sites.get(l.index), C = NPC.carpet;
+    if (!site || !site.path) return null;
+    const path = site.path, L = path.len;
+    const q = {};
+    const lane = (sgn, s, out) => {                                           // the lane side `sgn` at s (m along the belt; before 0 / after L: straight on)
+      path.at(Math.max(0, Math.min(L, s)), q);
+      const over = s < 0 ? s : s > L ? s - L : 0;
+      out.x = q.x + q.dx * over - q.dz * C.lane * sgn; out.z = q.z + q.dz * over + q.dx * C.lane * sgn; out.dx = q.dx; out.dz = q.dz;
+      return out;
+    };
+    const clear = (sgn) => {
+      const o = {};
+      for (let s = -3; s <= L + 3; s += 2) { lane(sgn, s, o); if (solid(o.x, o.z, NPC.bodyR + 0.15)) return false; }
+      return true;
+    };
+    const sgn = clear(1) ? 1 : clear(-1) ? -1 : 0;
+    if (!sgn) return null;
+    const ls = strHash(`carpet${l.index}`), n = clamp(Math.round(L * C.perM), C.min, C.max), folk = [];
+    for (let i = 0; i < n; i++) {
+      const r = (k) => rand01(seed, ls, i, k);
+      const wait = lerp(C.wait[0], C.wait[1], r(1)), vd = lerp(C.down[0], C.down[1], r(2));
+      const T = { wait, up: L / C.speed, off: 1.4, down: (L + 6) / vd, back: 1.6, in: 1.1 };
+      const P = T.wait + T.in + T.up + T.off + T.down + T.back;
+      folk.push({ id: 4e6 + l.index * 16 + i, index: l.index, path, sgn, L, vd, T, P, t0: r(3) * P, outfit: Math.floor(r(4) * OUTFIT_COUNT) % OUTFIT_COUNT, scale: lerp(0.86, 0.98, r(5)), share: r(6), board: isBoarder(r(7)), phase: r(8) * 6.28, lane });
+    }
+    carpets.set(l.index, folk);
+    return folk;
+  }
+  /** One carpet beginner at game time t: fills o (x, z, heading, poses, belt = standing on the belt). */
+  function carpetAt(c, t, o) {
+    const T = c.T, u = (((t + c.t0) % c.P) + c.P) % c.P, q = {};
+    const C = NPC.carpet;
+    const hold = (sgn, s, out) => c.lane(sgn, s, out);
+    const up = (s, out) => { c.path.at(Math.max(0, Math.min(c.L, s)), q); out.x = q.x; out.z = q.z; out.dx = q.dx; out.dz = q.dz; return out; };
+    o.belt = 0; o.speed = 0;
+    let k;
+    const foot = { x: 0, z: 0, dx: 0, dz: 0 }, a = {}, b = {};
+    hold(c.sgn, -2.2, foot);
+    if (u < T.wait) {                                                          // waiting at the foot, beside the belt's start
+      o.x = foot.x; o.z = foot.z; o.heading = Math.atan2(foot.dz, foot.dx) + Math.sin(t * 0.21 + c.phase) * 0.25;
+      o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.12 + 0.1 * Math.sin(t * 0.13 + c.phase);
+      return o;
+    }
+    const heading = (d) => Math.atan2(d.dz, d.dx);
+    if (u < T.wait + T.in) {                                                   // stepping onto the belt's start
+      k = smooth((u - T.wait) / T.in);
+      up(0, a);
+      o.x = lerp(foot.x, a.x, k); o.z = lerp(foot.z, a.z, k); o.heading = heading(a); o.belt = k;
+      o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.2 * (1 - k); o.speed = 1;
+      return o;
+    }
+    if (u < T.wait + T.in + T.up) {                                            // up the belt
+      const s = (u - T.wait - T.in) * C.speed;
+      up(s, a);
+      o.x = a.x; o.z = a.z; o.heading = heading(a); o.belt = 1; o.speed = C.speed;
+      o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.05;
+      return o;
+    }
+    if (u < T.wait + T.in + T.up + T.off) {                                    // off at the top, over to the lane
+      k = smooth((u - T.wait - T.in - T.up) / T.off);
+      up(c.L, a); hold(c.sgn, c.L + 3, b);
+      o.x = lerp(a.x, b.x, k); o.z = lerp(a.z, b.z, k);
+      o.heading = heading(a) + Math.PI * smooth(Math.max(0, (k - 0.35) / 0.65));           // turns round to go down
+      o.belt = 1 - k;
+      o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.1 + 0.3 * k; o.speed = 1;
+      return o;
+    }
+    if (u < T.wait + T.in + T.up + T.off + T.down) {                           // down the lane in the plough, wide slow turns
+      const d = u - T.wait - T.in - T.up - T.off, s = c.L + 3 - d * c.vd;
+      hold(c.sgn, s, a);
+      const w = Math.sin(d * 0.9 + c.phase);
+      o.x = a.x; o.z = a.z; o.heading = heading(a) + Math.PI + w * 0.12; o.speed = c.vd;
+      o.poseA = POSE.plough; o.poseB = w > 0 ? POSE.carveR : POSE.carveL; o.blend = Math.min(0.35, Math.abs(w) * 0.4);
+      return o;
+    }
+    k = smooth((u - T.wait - T.in - T.up - T.off - T.down) / T.back);          // the last steps back to the waiting spot
+    hold(c.sgn, c.L + 3 - (T.down) * c.vd, a);
+    o.x = lerp(a.x, foot.x, k); o.z = lerp(a.z, foot.z, k); o.heading = heading(a) + Math.PI; o.speed = 1;
+    o.poseA = POSE.plough; o.poseB = POSE.stand; o.blend = k;
+    return o;
+  }
+
   /* ---------- the lines at the busy lifts (lift-queue.js) ---------- */
   const sims = new Map();                  // lift index -> createQueueSim (for the site of the current world)
   const lineClock = new Map();             // lift index -> the last clock (a jig-back the player rides: the line waits)
@@ -542,7 +632,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
   }
 
   /* ---------- the list near the camera ---------- */
-  function take() { const o = pool.pop() || {}; o.fade = 1; o.stop = 0; o.piste = null; o.hide = false; o.cut = false; return o; }
+  function take() { const o = pool.pop() || {}; o.fade = 1; o.stop = 0; o.piste = null; o.hide = false; o.cut = false; o.belt = 0; return o; }
   /** Re-chooses who is listed (a few times a second): every candidate in the radius, nearest first, the ones listed already keep their
    *  place a little longer (no flicker at the edge). */
   function select(t, view, cfg) {
@@ -599,7 +689,17 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       if (d < Math.min(R, cfg.walkRadius) + w.L) ws.push({ key: w.id, kind: 'walk', w, d: rank(w.x, w.z, d) });
     }
     ws.sort((a, b) => a.d - b.d);
-    selected = [...skiers, ...qs.slice(0, cfg.queue), ...ws.slice(0, cfg.walkers)];
+    // the magic carpets: their beginners, the carpets nearest first (the walkers' radius: they are slow and small)
+    const cs = [];
+    for (const l of liftNet.list) {
+      if (l.kind !== 'carpet') continue;
+      const d0 = Math.hypot(l.bottom.x - fx, l.bottom.z - fz);
+      if (d0 > Math.min(R, cfg.queueRadius)) continue;
+      const folk = carpetFolk(l);
+      if (folk) for (const c of folk) if (c.share < share) cs.push({ key: c.id, kind: 'carpet', c, d: rank(l.bottom.x, l.bottom.z, d0) });
+    }
+    cs.sort((a, b) => a.d - b.d);
+    selected = [...skiers, ...qs.slice(0, cfg.queue), ...ws.slice(0, cfg.walkers), ...cs.slice(0, cfg.carpets ?? 6)];
     stats.candidates = cand.length;
     const keep = new Set(selected.map((c) => c.key));
     for (const id of [...state.keys()]) if (!keep.has(id)) state.delete(id);
@@ -641,6 +741,15 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
         o.x = q.x + st.sx; o.z = q.z + st.sz; o.heading = q.heading + Math.sin(t * 0.21 + q.phase) * 0.18; o.outfit = q.outfit; o.scale = q.scale;
         o.vx = 0; o.vz = 0; o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.12 + 0.1 * Math.sin(t * 0.13 + q.phase);
         boardOf(o, q.board);
+      } else if (c.kind === 'carpet') {
+        carpetAt(c.c, t, tmp);
+        o.x = tmp.x; o.z = tmp.z; o.heading = tmp.heading; o.outfit = c.c.outfit; o.scale = c.c.scale; o.speed = tmp.speed;
+        o.vx = Math.cos(o.heading) * tmp.speed; o.vz = Math.sin(o.heading) * tmp.speed; o.poseA = tmp.poseA; o.poseB = tmp.poseB; o.blend = tmp.blend; o.belt = tmp.belt;
+        boardOf(o, c.c.board);
+        if ((pl && Math.hypot(pl.x - o.x, pl.z - o.z) < 1.1) || (view.hidden && view.hidden(o.x, o.z))) { pool.push(o); continue; }       // never inside the player on the same belt
+        o.st = null;
+        list.push(o);
+        continue;
       } else {
         const w = c.w, P = 2 * w.L / w.v, u = (((t + w.t0) % P) + P) % P;
         const fwd = u < P / 2, s = fwd ? u * w.v : w.L - (u - P / 2) * w.v;
@@ -685,7 +794,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     giveWay(dt, pl);
     // a running challenge's corridor: checked last (giving way may move somebody)
     if (view.hidden) for (let i = list.length - 1; i >= 0; i--) if (view.hidden(list[i].x, list[i].z)) { pool.push(list[i]); list.splice(i, 1); }
-    for (const o of list) o.y = o.kind === 'ski' ? height(o.x, o.z) : standY(o.x, o.z);
+    for (const o of list) o.y = o.kind === 'carpet' ? height(o.x, o.z) + BELT_TOP * (o.belt || 0) : o.kind === 'ski' ? height(o.x, o.z) : standY(o.x, o.z);
     stats.listed = list.length;
     stats.ms = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
     return list;
@@ -727,10 +836,10 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     pairs.length = 0;
     for (let i = 0; i < list.length; i++) {
       const o = list[i];
-      if (o.kind === 'line') continue;
+      if (o.kind === 'line' || o.kind === 'carpet') continue;
       for (let j = i + 1; j < list.length; j++) {
         const q = list[j], dx = q.x - o.x, dz = q.z - o.z;
-        if (q.kind === 'line') continue;
+        if (q.kind === 'line' || q.kind === 'carpet') continue;
         if (dx > R2 || dx < -R2 || dz > R2 || dz < -R2) continue;
         pairs.push(i, j);
         const d = Math.hypot(dx, dz);
@@ -754,7 +863,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     // standing ones step out of the player's way (back slowly when he is gone)
     if (pl) {
       for (const o of list) {
-        if (o.kind === 'ski' || o.kind === 'line') continue;
+        if (o.kind === 'ski' || o.kind === 'line' || o.kind === 'carpet') continue;
         const st = o.st, dx = o.x - pl.x, dz = o.z - pl.z, d = Math.hypot(dx, dz);
         const tx = d < NPC.stepAside && d > 1e-3 ? st.sx + dx / d * (NPC.stepAside - d) : 0, tz = d < NPC.stepAside && d > 1e-3 ? st.sz + dz / d * (NPC.stepAside - d) : 0;
         const k = 1 - Math.exp(-dt * (d < NPC.stepAside ? 6 : 0.4));
@@ -781,7 +890,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     if (pl) {
       const min = NPC.bodyR + NPC.playerR + 0.05;
       for (const o of list) {
-        if (o.kind === 'line') continue;                                    // (the player is bumped out of them: collide)
+        if (o.kind === 'line' || o.kind === 'carpet') continue;            // (the player is bumped out of them: collide; carpet folk: never listed within 1.1 m)
         const dx = o.x - pl.x, dz = o.z - pl.z, d = Math.hypot(dx, dz);
         if (d >= min) continue;
         const ux = d > 1e-4 ? dx / d : -Math.sin(o.heading), uz = d > 1e-4 ? dz / d : Math.cos(o.heading), push = min - d + 0.01;
@@ -839,7 +948,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
     lineInfo(index) { const sim = sims.get(index); return sim ? { clearIn: sim.clearIn, after: sim.after } : { clearIn: 0, after: 0 }; },
     get selected() { return selected; },
     /** obstacles(x, z, r) -> true where a skier must not stand (main.js: trees, stations, pylons, houses); the bands are built again. */
-    setBlocked(fn) { blocked = fn || (() => false); bands.clear(); queues.clear(); sims.clear(); walkers = null; state.clear(); },
+    setBlocked(fn) { blocked = fn || (() => false); bands.clear(); queues.clear(); carpets.clear(); sims.clear(); walkers = null; state.clear(); },
     setRoads(rows) { roads = rows || []; walkers = null; },
     reset() { state.clear(); selected = []; selT = -1e9; for (const o of list) pool.push(o); list.length = 0; },
     netIndex,

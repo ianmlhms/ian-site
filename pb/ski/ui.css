@@ -340,6 +340,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .skicard .bars{grid-column:1;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:12px}.skicard .bars i{font-style:normal;font-family:var(--mono);color:var(--green);letter-spacing:-.05em}
 .skicard .btn{grid-column:2;grid-row:2;align-self:start;min-height:40px}
 .skicard .lock{grid-column:1 / -1;font-size:13px;font-weight:700}
+.skicard .stance{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.skicard .stance .btn{grid-column:auto;grid-row:auto;min-height:36px;font-size:13px;flex:1 1 130px}
 .skicard .need{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:2px 10px;font-family:var(--mono);font-size:11px;color:var(--muted)}.skicard .need .ok{color:var(--green)}
 .skidraw{display:block;height:22px;position:relative}
 .skidraw i{position:absolute;left:4%;top:50%;width:var(--len);height:var(--wid);transform:translateY(-50%);border:1px solid var(--ink);border-radius:2px 11px 11px 2px;box-shadow:inset -14px 0 0 var(--tip)}
@@ -408,6 +409,16 @@ html[data-ski-replay="1"] #ui > *:not(.rpbar),html[data-ski-photo="1"] #ui > *:n
 .dailycard .dok{color:var(--green);font-weight:800}
 .dailycard.done{border-left-color:var(--green)}
 .dailyhint{margin:0}
+/* the day's board (modes/daily-board.js): top 10 + your place; in the Ziler tab and under the picker's daily card */
+.dboard{margin:8px 0 0}.dboard h3{margin:0 0 4px;font-size:14px}
+.dbbody .dbrows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.dbbody .dbrows li{display:grid;grid-template-columns:26px 1fr auto;gap:6px;align-items:baseline;padding:3px 6px;border:1px solid var(--soft);background:var(--white)}
+.dbbody .dbrows li.me{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green);font-weight:700}
+.dbbody .dbrows li.gap{display:block;text-align:center;color:var(--muted);border-style:dashed}
+.dbbody .rk{font-family:var(--mono);color:var(--muted)}.dbbody .vl{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dbbody .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dbbody p{margin:4px 0 0}
+.rp-dboard{flex:1 1 100%;margin-top:2px;border:1px solid var(--soft);background:var(--white);padding:6px 10px}.rp-dboard summary{cursor:pointer;font-weight:700;font-size:14px}.rp-dboard .dbbody{margin-top:6px;max-width:520px}
 .badgepop{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(86px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none!important;z-index:6}
 .badgepop .bp{display:flex;align-items:center;gap:9px;background:rgba(252,252,250,.94);border:1px solid var(--ink);padding:6px 11px 6px 9px;animation:bpin .35s cubic-bezier(.16,1,.3,1);transition:opacity .35s,transform .35s}
 .badgepop .bp.out{opacity:0;transform:translateY(6px)}

@@ -32,6 +32,7 @@ export function normalize(raw) {
   for (const [k, v] of Object.entries(raw.bestHash && typeof raw.bestHash === 'object' ? raw.bestHash : {})) if (Number.isFinite(v) && v > 0) p.bestHash[k] = Math.round(v);
   if (raw.stats && typeof raw.stats === 'object') p.stats = { off: Number.isFinite(raw.stats.off) && raw.stats.off > 0 ? Math.round(raw.stats.off) : 0, top: Number.isFinite(raw.stats.top) && raw.stats.top > 0 ? Math.min(60, raw.stats.top) : 0 };
   if (typeof raw.ski === 'string' && /^[a-z]{2,16}$/.test(raw.ski)) p.ski = raw.ski;
+  if (raw.goofy === true) p.goofy = true;                  // 28 Nov 2026: snowboard stance, goofy = the right foot forward (absent = regular)
   // round 7-C: discovered cells per resort (modes/discovery.js run-length text) and the Lawin challenges won (bit mask per resort)
   for (const [k, v] of Object.entries(raw.disc && typeof raw.disc === 'object' ? raw.disc : {})) if (/^[a-z0-9]{1,16}$/.test(k) && typeof v === 'string' && v.length <= 12000 && /^[0-9a-z,]*$/.test(v)) p.disc[k] = v;
   for (const [k, v] of Object.entries(raw.lawin && typeof raw.lawin === 'object' ? raw.lawin : {})) if (/^[a-z0-9]{1,16}$/.test(k) && Number.isInteger(v) && v > 0 && v < 256) p.lawin[k] = v;

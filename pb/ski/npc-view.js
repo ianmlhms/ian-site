@@ -15,6 +15,15 @@ const THREE = window.THREE;
 const TEX_W = 1024;
 /** Standing lifts (28 Nov 2026): the climb (rad) the drag-lift pose is baked on (a typical T-bar track). */
 const DRAG_BAKE_PITCH = 0.3;
+/** 28 Nov 2026: a goofy boarder (the right foot forward) is the regular pose MIRRORED across the board's long axis in the vertex shader: the
+ *  outfit number in aPose.w carries +64 (no extra poses, no extra draw calls). */
+const GOOFY_ADD = 64, GOOFY_W = '63.5';
+/** Is this record a goofy boarder? Deterministic per person (the id; a chair / cabin rider has none: his outfit number), NPC.goofyShare of the boarders. */
+export function isGoofy(pose, id, outfit) {
+  if (pose < BOARD_POSE) return false;
+  const h = Math.imul((id >= 0 ? id : outfit * 977 + 31) | 0, 2654435761) >>> 0;
+  return (h >>> 8) % 1000 < NPC.goofyShare * 1000;
+}
 
 /** The states the poses are baked from (flat snow, heading +x); p >= BOARD_POSE: the same pose on a snowboard. */
 function poseState(p) {
@@ -121,20 +130,20 @@ const FETCH = `
 /** The Lambert material of the figure with the pose blend + outfit colours (and its depth twin for the shadow pass). */
 function crowdMaterials(fig, pal) {
   const uniforms = { uPoseTex: { value: fig.tex }, uPoseV: { value: fig.V }, uPal: { value: pal } };
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });      // DoubleSide: the goofy riders are mirrored (their triangles wind the other way)
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>\n${FETCH}\n  attribute float aSlot; uniform vec3 uPal[${OUTFIT_COUNT * 5}];`)
-      .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = normalize(mix(npcFetch(int(aPose.x + 0.5), 1), npcFetch(int(aPose.y + 0.5), 1), aPose.z));\n#ifdef USE_TANGENT\nvec3 objectTangent = vec3( tangent.xyz );\n#endif')
-      .replace('#include <begin_vertex>', 'vec3 transformed = npcPos();')
-      .replace('#include <color_vertex>', '#include <color_vertex>\n  if (aSlot > 0.5) vColor.xyz = uPal[int(aPose.w + 0.5) * 5 + int(aSlot + 0.5) - 1];');
+      .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = normalize(mix(npcFetch(int(aPose.x + 0.5), 1), npcFetch(int(aPose.y + 0.5), 1), aPose.z));\n  if (aPose.w > ' + GOOFY_W + ') objectNormal = -vec3(objectNormal.x, objectNormal.y, -objectNormal.z);   // goofy: the mirror, its triangles read as back faces (DoubleSide flips the normal back)\n#ifdef USE_TANGENT\nvec3 objectTangent = vec3( tangent.xyz );\n#endif')
+      .replace('#include <begin_vertex>', 'vec3 transformed = npcPos();\n  if (aPose.w > ' + GOOFY_W + ') transformed.z = -transformed.z;')
+      .replace('#include <color_vertex>', '#include <color_vertex>\n  if (aSlot > 0.5) vColor.xyz = uPal[int(aPose.w + 0.5 - (aPose.w > ' + GOOFY_W + ' ? 64.0 : 0.0)) * 5 + int(aSlot + 0.5) - 1];');
   };
   mat.customProgramCacheKey = () => `ski-npc-${fig.V}`;
   const depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
   depth.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uniforms);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${FETCH}`).replace('#include <begin_vertex>', 'vec3 transformed = npcPos();');
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>\n${FETCH}`).replace('#include <begin_vertex>', 'vec3 transformed = npcPos();\n  if (aPose.w > ' + GOOFY_W + ') transformed.z = -transformed.z;');
   };
   depth.customProgramCacheKey = () => `ski-npc-depth-${fig.V}`;
   return { mat, depth };
@@ -294,7 +303,7 @@ export function createNpcView({ scene, height, level = 'medium' }) {
       if (k === 'near') nearLeft--;
       T.mesh.instanceMatrix.array.set(r.m, T.n * 16);
       const a = T.aPose.array, i = T.n * 4;
-      a[i] = r.a; a[i + 1] = r.b; a[i + 2] = r.k; a[i + 3] = r.o;
+      a[i] = r.a; a[i + 1] = r.b; a[i + 2] = r.k; a[i + 3] = r.o + (isGoofy(r.a, r.id, r.o) ? GOOFY_ADD : 0);
       T.n++;
     }
     stats.triangles = 0;
@@ -329,7 +338,7 @@ export function createNpcView({ scene, height, level = 'medium' }) {
     /** tests: the drawn instances [{ x, y, z, pose, outfit, near }] */
     instances() {
       const out = [];
-      for (const k of ['near', 'crowd']) { const T = meshes[k]; for (let i = 0; i < T.n; i++) { const a = T.mesh.instanceMatrix.array; out.push({ x: a[i * 16 + 12], y: a[i * 16 + 13], z: a[i * 16 + 14], pose: T.aPose.array[i * 4], outfit: T.aPose.array[i * 4 + 3], near: k === 'near' }); } }
+      for (const k of ['near', 'crowd']) { const T = meshes[k]; for (let i = 0; i < T.n; i++) { const a = T.mesh.instanceMatrix.array; out.push({ x: a[i * 16 + 12], y: a[i * 16 + 13], z: a[i * 16 + 14], pose: T.aPose.array[i * 4], outfit: T.aPose.array[i * 4 + 3] % GOOFY_ADD, goofy: T.aPose.array[i * 4 + 3] >= GOOFY_ADD, near: k === 'near' }); } }
       return out;
     },
   };

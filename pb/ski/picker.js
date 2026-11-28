@@ -143,6 +143,14 @@ async function decorate(screen, progress, onPick) {
     const tot = goals.badgeTotals(progress), card = view.dailyCardHtml(progress, areaTitle);
     const strip = el(`<div class="rp-daily" id="rpDaily">${card ? `<button type="button" class="rp-dailybtn" id="rpDailyGo" aria-label="Dagesfuerderung opmaachen">${card}</button>` : ''}<div class="rp-total" id="rpTotal"><b>${tot.earned} / ${tot.total}</b><small>Badges an allen Skigebidder</small></div></div>`);
     screen.querySelector('.rp-head').after(strip);
+    // the board of the day under the card (opens on a tap, loads once; guests get a hint)
+    const ch = view.dailyChallenge();
+    if (ch) {
+      const det = el('<details class="rp-dboard" id="rpDBoard"><summary>Klassement vun haut</summary><div class="dbbody" data-dboard></div></details>');
+      strip.append(det);
+      let loaded = false;
+      det.addEventListener('toggle', () => { if (det.open && !loaded) { loaded = true; view.mountDailyBoard(det.querySelector('[data-dboard]'), ch); } });
+    }
     const go = strip.querySelector('#rpDailyGo');
     if (go) go.addEventListener('click', () => { const rid = go.querySelector('[data-daily]').dataset.daily; if (rid) onPick(rid); });
     document.documentElement.dataset.skiPickerBadges = `${tot.earned}/${tot.total}`;

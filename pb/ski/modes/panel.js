@@ -6,7 +6,7 @@ import { STAR, specialText, starCount } from './challenges.js';
 import { formatHour, kindName } from './freeride.js';
 import { QUALITY_LABEL } from './park.js';
 import { SKI_TYPES, BAR_LABEL, skiUnlock, unlockText } from './skis.js';
-import { goalsPaneHtml } from './goals-view.js';
+import { goalsPaneHtml, mountDailyBoard } from './goals-view.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
@@ -100,7 +100,11 @@ export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPic
       bindSkiCards(pane, opts);
     },
     /** 28 Nov 2026: the goals and badges of this ski area, the daily challenge (the Ziler tab). opts = { progress, rid, areaName, extra }. */
-    showGoals(opts) { pane.innerHTML = goalsPaneHtml(opts); },
+    showGoals(opts) {
+      pane.innerHTML = goalsPaneHtml(opts);
+      const box = pane.querySelector('#dBoard');
+      if (box) mountDailyBoard(box.querySelector('[data-dboard]'), { day: box.dataset.day, type: box.dataset.type });      // the day's board (top 10 + your place; guests: a hint)
+    },
     freeReady(ready) { const b = pane.querySelector('#freeStart'); const d = pane.querySelector('#freeDown'); const st = pane.querySelector('#freeStatus'); if (b && st && st.textContent) { b.disabled = !ready; if (d) d.disabled = !ready; st.textContent = ready ? 'Prett.' : 'Gëtt gelueden …'; } },
   };
 }
@@ -178,7 +182,7 @@ export function skiDrawing(look) {
   return `<span class="skidraw${look.twin ? ' twin' : ''}" style="--base:${hex(look.base)};--tip:${hex(look.tip)};--len:${Math.round(look.length * 88)}%;--wid:${Math.round(10 * look.width)}px"><i style="background:${pat}, var(--base)"></i></span>`;
 }
 /** The ski cards: drawing, name, handling, the unlock (with progress) and the pick button. opts = { stats, selected } */
-export function skiCardsHtml({ stats, selected }) {
+export function skiCardsHtml({ stats, selected, goofy = false, onStance = null }) {
   return `<p class="m fairnote">Zäitleef (Challengen, Bestenlëschten), Snowpark-Punkten an Online-Rennen: all Ski an de Snowboard fuere gläich (All-Mountain), fir datt et fair bleift. Beim fräie Fueren mécht de Ski den Ënnerscheed.</p>
   <div class="skis">${SKI_TYPES.map((t) => {
     const u = skiUnlock(t, stats);
@@ -188,12 +192,18 @@ export function skiCardsHtml({ stats, selected }) {
       ${skiDrawing(t.look)}
       <div class="sk"><b>${esc(t.name)}</b> <span class="m">${esc(t.short)}</span></div>
       <div class="sktext">${esc(t.text)}</div>
+      ${t.board && u.open && onStance ? stanceHtml(goofy) : ''}
       <div class="bars">${Object.entries(t.bars).map(([k, v]) => `<span>${BAR_LABEL[k]} <i>${dots(v)}</i></span>`).join('')}</div>
       ${u.open ? `<button type="button" class="btn${on ? ' primary' : ''}" data-pick="${t.id}" ${on ? 'disabled' : ''}>${on ? 'Gewielt' : 'Wielen'}</button>` : `<div class="lock">🔒 ${esc(unlockText(t))}</div><div class="need">${need}</div>`}
     </div>`;
   }).join('')}</div>`;
 }
-export function bindSkiCards(root, { onPick }) {
+/** 28 Nov 2026: the stance choice on the snowboard card: regular (left foot forward) or goofy (right foot forward). */
+const stanceHtml = (goofy) => `<div class="stance" role="group" aria-label="Stand"><span class="m">Stand</span>
+  <button type="button" class="btn${goofy ? '' : ' primary'}" data-stance="regular" aria-pressed="${goofy ? 'false' : 'true'}">Regulär · lénke Fouss vir</button>
+  <button type="button" class="btn${goofy ? ' primary' : ''}" data-stance="goofy" aria-pressed="${goofy ? 'true' : 'false'}">Goofy · rietse Fouss vir</button></div>`;
+export function bindSkiCards(root, { onPick, onStance = null }) {
+  if (onStance) root.querySelectorAll('[data-stance]').forEach((b) => b.addEventListener('click', () => onStance(b.dataset.stance === 'goofy')));
   root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { if (!b.disabled) onPick(b.dataset.pick); }));
 }
 /** The ski card at a lift station (an overlay; picking closes it). */
@@ -201,7 +211,7 @@ export function showSkiCard(root, opts) {
   const c = el(`<div class="card skicardbox" id="skiCard" role="dialog" aria-label="Ski wielen"><h2>Ski wielen</h2>${skiCardsHtml(opts)}<div class="acts"><button type="button" class="btn ghost" data-a="close">Zou</button></div></div>`);
   root.appendChild(c);
   const close = () => { c.remove(); if (opts.onClose) opts.onClose(); };
-  bindSkiCards(c, { onPick: (id) => { opts.onPick(id); close(); } });
+  bindSkiCards(c, { onPick: (id) => { opts.onPick(id); close(); }, onStance: opts.onStance ? (g) => { opts.onStance(g); close(); } : null });
   c.querySelector('[data-a="close"]').addEventListener('click', close);
   return { el: c, close };
 }

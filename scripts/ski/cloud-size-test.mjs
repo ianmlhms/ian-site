@@ -67,6 +67,9 @@ console.log(`${resortCount} resorts, ${pisteCount} pistes`);
   // 28 Nov 2026: the snowboard is saved like a ski type (its id is the longest: 'snowboard', 3 bytes more than 'powder')
   const sb = { ...p, ski: 'snowboard' }, recSb = encodeCloud(sb, []);
   ok(bytes(recSb) < 7500 && bytes(recSb) - size <= 3 && decodeCloud(JSON.parse(JSON.stringify(recSb))).ski === 'snowboard', `the snowboard choice fits and round-trips (${bytes(recSb)} bytes)`);
+  // 28 Nov 2026: the goofy stance is one more tiny field (x.f = 1), absent for regular
+  const gf = { ...sb, goofy: true }, recGf = encodeCloud(gf, []);
+  ok(bytes(recGf) - bytes(recSb) <= 8 && recGf.x.f === 1 && decodeCloud(JSON.parse(JSON.stringify(recGf))).goofy === true && decodeCloud(JSON.parse(JSON.stringify(recSb))).goofy === false, `goofy stance: +${bytes(recGf) - bytes(recSb)} bytes, round-trips, regular stays absent`);
 }
 // 2. stars only (no times, no fog): nothing dropped, exact
 {

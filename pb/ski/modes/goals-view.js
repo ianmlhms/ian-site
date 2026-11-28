@@ -1,6 +1,7 @@
 /* Goals and badges on screen (28 Nov 2026, DOM only; plain Luxembourgish): the small badge pop when a goal is reached, the goals pane of
  * the map ("Ziler"), the daily challenge card (also on the resort picker). The numbers come from modes/goals.js and modes/daily.js. */
 import { dayOf, dailyFor, dailyText, dailyProgress, streakNow } from './daily.js';
+export { mountDailyBoard } from './daily-board.js';
 import { badgeCount, badgeTotals, goalProgress } from './goals.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -36,6 +37,9 @@ export function createBadgePop(parent) {
   };
 }
 
+/** Today's challenge (modes/daily.js), for the picker's board. */
+export const dailyChallenge = () => dailyFor(dayOf());
+
 /** The daily challenge card: text, area, status, streak. `areaName(rid)` gives the name of an area. */
 export function dailyCardHtml(progress, areaName, day = dayOf()) {
   const ch = dailyFor(day);
@@ -58,6 +62,7 @@ export function goalsPaneHtml({ progress, rid, areaName, extra = {} }) {
   return `<h2>Ziler · ${esc(areaName(rid))}</h2>
     <div class="gsum"><b id="gCount">${count.earned} / ${count.total}</b> Badges hei <span class="m">· ${all.earned} / ${all.total} insgesamt</span></div>
     ${ch && ch.rid === rid ? dailyCardHtml(progress, areaName, day) : ch ? `<div class="dailyhint m">Dagesfuerderung haut: ${esc(areaName(ch.rid))}</div>` : ''}
+    ${ch ? `<section class="dboard" id="dBoard" data-day="${esc(day)}" data-type="${ch.type}"><h3>Klassement vun haut</h3><div class="dbbody" data-dboard></div></section>` : ''}
     <ul class="glist" id="goalList">${rows.map(row).join('')}</ul>
     <p class="m how2">Eng Pist zielt, wann s de se eng Kéier gefuer hues (Stär 1). E Badge geet ni verluer.</p>`;
 }

@@ -18,6 +18,8 @@ import { checkGoals, checkAll, markLift, atTop } from './goals.js';
 import { liftKey } from './goals-keys.js';
 import { dailyFor, dailyEvent, dayOf, streakNow } from './daily.js';
 import { createBadgePop, SERIE } from './goals-view.js';
+import { dailyBoard } from './daily-board.js';
+import { boardId } from '../progress.js';
 
 /** The park layout for field.js (call before createField). */
 export const parkLayoutOf = (resort) => createParkLayout(resort.park);
@@ -66,6 +68,12 @@ export function createModeHost(ctx) {
     const day = dayOf(), ch = dailyFor(day);
     const r = dailyEvent(store.get(), ch, { ...ev, rid });
     if (r.progress !== store.get()) store.set(r.progress);
+    // the board of the day (modes/daily-board.js, scripts/ski-daily-v1.sql): signed-in players only, the server checks the floor; a guest keeps it local.
+    // time = every valid run under the target on today's piste (the server keeps the best), stars / combo = the completion (the server's clock)
+    if (ch) {
+      if (ch.type === 'time' && ev.t === 'finish' && ev.valid && ev.key === ch.pisteKey && ev.ms > 0 && ev.ms <= ch.targetMs && ch.rid === rid) void dailyBoard().submit({ day, kind: 'time', ms: Math.round(ev.ms), board: ev.board });
+      else if (r.done && ch.type !== 'time' && ch.rid === rid) void dailyBoard().submit({ day, kind: ch.type });
+    }
     if (r.done) { saveCloud(); badges.show([{ text: 'Dagesfuerderung gemaach!', sub: `Serie: ${SERIE(streakNow(store.get(), day))}` }]); document.documentElement.dataset.skiDailyDone = day; }
   }
 
@@ -124,7 +132,7 @@ export function createModeHost(ctx) {
         tracker = c ? createTracker(c) : null;
         if (c && c.flags.length) flags = createFlagsView({ scene, flags: c.flags, height: (x, z) => surface.height(x, z), heading: Math.atan2(game.piste.at(0, {}).dz, game.piste.at(0, {}).dx) });
       } else if (game.mode === MODES.park && layout) {
-        judge = createTrickJudge(layout);
+        judge = createTrickJudge(layout, ctx.rider || null);
         parkHintT = PARK_HINT_S;                     // R8c (QA: a straight run scored 0, nobody knew E jumps): the controls, bottom middle
         hud.hint(input.isTouch() ? 'Sprong mat ⤒ · Trick mat ✦' : 'Sprong mat E · Trick mat F (A / D dréinen) · W: ufueren');
         parkBest0 = store.get().park[rid] || 0;
@@ -261,7 +269,7 @@ export function createModeHost(ctx) {
       }
       saveCloud();
       // 28 Nov: the run counts for the daily challenge (time / combo piste, the stars won today) and may reach a goal
-      if (ev && !assisted) dailyEv({ t: 'finish', key: hash5(piste.id), ms: ev.ms, valid: !!ev.valid });
+      if (ev && !assisted) dailyEv({ t: 'finish', key: hash5(piste.id), ms: ev.ms, valid: !!ev.valid, board: boardId(rid, piste.id) });
       if (r.gained) dailyEv({ t: 'stars', n: starCount(r.gained) });
       goalsCheck();
       document.documentElement.dataset.skiStars = String(pisteStars(store.get(), rid, piste.id));

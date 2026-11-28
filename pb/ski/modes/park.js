@@ -341,7 +341,26 @@ const wrapPi = (a) => { a %= TAU; if (a > Math.PI) a -= TAU; if (a < -Math.PI) a
 export const spinResidual = (spin) => Math.abs(wrapPi(spin * 2) / 2);
 export const flipResidual = (flip) => Math.abs(wrapPi(flip));
 
-export function trickName({ spinDeg, flips, flipDir, grab, railKind, side }) {
+/** 28 Nov 2026: on a snowboard the tricks have board names (the usual English terms). The spin's direction decides frontside (the chest
+ *  leads: the other way round for a goofy rider) / backside; the grab by how long the trick button was held (a longer hold = a harder grab). */
+export const BOARD_GRABS = Object.freeze({ front: ['Mute', 'Melon', 'Method', 'Tail grab'], back: ['Indy', 'Stalefish', 'Method', 'Nose grab'] });
+export function boardTrickName({ spinDeg, flips, flipDir, grab, grabT = 0.25, spinDir = 0, goofy = false, railKind, side }) {
+  if (railKind) return side ? (railKind === 'box' ? 'Boxslide' : 'Lipslide') : railKind === 'box' ? 'Box 50-50' : 'Rail 50-50';
+  // skier.js: a positive spin turns right (the back leads for a regular rider: backside); goofy mirrors it
+  const frontside = spinDir !== 0 && (spinDir > 0) === !!goofy;
+  const spinWord = spinDeg ? `${frontside ? 'Frontside' : 'Backside'} ${spinDeg}` : '';
+  const parts = [];
+  if (flips && spinDeg >= 180) parts.push(`${flips > 1 ? 'Double ' : ''}Rodeo ${spinDeg}`);
+  else {
+    if (flips) parts.push(`${flips > 1 ? 'Double ' : ''}${flipDir > 0 ? 'Frontflip' : 'Backflip'}`);
+    if (spinWord) parts.push(spinWord);
+  }
+  if (grab) parts.push((frontside ? BOARD_GRABS.front : BOARD_GRABS.back)[Math.max(0, Math.min(3, Math.floor((grabT - 0.25) / 0.4)))]);
+  return parts.join(' ') || 'Sprong';
+}
+
+export function trickName({ spinDeg, flips, flipDir, grab, railKind, side, board = false, grabT, spinDir, goofy }) {
+  if (board) return boardTrickName({ spinDeg, flips, flipDir, grab, grabT, spinDir, goofy, railKind, side });
   if (railKind) return `${side ? (railKind === 'box' ? 'Boxslide' : 'Railslide') : railKind === 'box' ? 'Box 50-50' : 'Rail 50-50'}`;
   const parts = [];
   if (flips) parts.push(`${flips > 1 ? 'Double ' : ''}${flipDir > 0 ? 'Frontflip' : 'Backflip'}`);
@@ -351,7 +370,8 @@ export function trickName({ spinDeg, flips, flipDir, grab, railKind, side }) {
 }
 
 /** The trick judge of one park run (or of free riding). update() after every physics step returns the events of that step. */
-export function createTrickJudge(layout) {
+export function createTrickJudge(layout, rider = null) {
+  const riderNow = () => (rider ? rider() : null) || {};
   let score = 0, combo = 0, comboPoints = 0, lastLand = -99, t = 0, air = null, best = null;
   const tricks = [];
   function bank() {
@@ -382,7 +402,7 @@ export function createTrickJudge(layout) {
         const lr = cur.leftRail;
         if (lr.len > 1.5) {
           const pts = Math.max(100, lr.len * 40) * (lr.side ? 1.5 : 1);
-          events.push(land(pts, trickName({ railKind: lr.kind, side: lr.side }), 'clean', lr.kind));
+          events.push(land(pts, trickName({ railKind: lr.kind, side: lr.side, board: !!riderNow().board }), 'clean', lr.kind));
         }
       }
       // take-off: what are we flying off?
@@ -407,7 +427,7 @@ export function createTrickJudge(layout) {
         const mult = a.feature === 'S' || a.feature === 'M' || a.feature === 'L' ? KICKERS[a.feature].mult : a.feature === 'pipe' ? PIPE.mult : a.feature === 'rail' ? 1 : NATURAL_MULT;
         const pts = (SPIN_POINTS[spinDeg] || 0) + flips * FLIP_POINTS + (grab ? Math.min(450, 150 + 100 * Math.floor((grabT - 0.25) / 0.5)) : 0) + Math.floor(airT / 0.5) * 50
           + (straight && kicker ? STRAIGHT_AIR.points : 0);
-        events.push(land(pts * mult * QUALITY_MULT[quality], straight && kicker ? 'Straight Air' : trickName({ spinDeg, flips, flipDir: Math.sign(prev.flip || 0), grab }), quality, a.feature));
+        events.push(land(pts * mult * QUALITY_MULT[quality], straight && kicker ? 'Straight Air' : trickName({ spinDeg, flips, flipDir: Math.sign(prev.flip || 0), grab, grabT, spinDir: Math.sign(prev.spin || 0), board: !!riderNow().board, goofy: !!riderNow().goofy }), quality, a.feature));
       }
       if (prev.crash === 0 && cur.crash > 0 && cur.grounded && !air) { if (comboPoints) events.push({ type: 'fall' }); comboPoints = 0; combo = 0; }
       return events;

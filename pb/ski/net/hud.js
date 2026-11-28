@@ -46,7 +46,7 @@ export function createMpHud(root) {
       bar.replaceChildren(el('span', 'tx', text), ...buttons.map((b) => { const x = el('button', 'btn', b.label); x.type = 'button'; x.addEventListener('click', b.on); return x; }));
     },
     /** results of a run (or the final standings): table = runTable rows, stand = standings rows, foot = text under it */
-    results({ title, piste, table, stand, final, foot, me, statusOf }) {
+    results({ title, piste, table, stand, final, foot, me, statusOf, buttons = [] }) {
       closeCard();
       card = el('div', 'card mp-card');
       card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', title);
@@ -75,6 +75,11 @@ export function createMpHud(root) {
           t.append(el('span', `c${cls}`, String(i + 1)), el('span', `c n${cls}`, r.name + (statusOf(r.id) === 'gone' ? ' (fort)' : '')), el('span', `c r${cls}`, r.finished ? formatTime(r.totalMs) : '–'), el('span', `c r${cls}`, String(r.points)));
         });
         card.append(t);
+      }
+      if (buttons.length) {                                              // 28 Nov: «Replay» of my run / the winner's (own cards, nothing is sent)
+        const acts = el('div', 'acts mp-acts');
+        for (const b of buttons) { const x = el('button', 'btn', b.label); x.type = 'button'; x.dataset.a = b.id || ''; x.addEventListener('click', () => b.on()); acts.append(x); }
+        card.append(acts);
       }
       const f = el('div', 'mp-foot', foot || '');
       card.append(f);

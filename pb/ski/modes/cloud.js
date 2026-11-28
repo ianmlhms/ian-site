@@ -150,6 +150,7 @@ export function encodeCloud(progress, report = []) {
   }
   const st = progress.stats || {};
   const rec = { v: CLOUD_VERSION, tb: totalStars(progress), s, p, b, x: { o: Math.round(st.off || 0), t: Math.round((st.top || 0) * 10), k: typeof progress.ski === 'string' ? progress.ski : 'allmountain' } };
+  if (progress.goofy === true) rec.x.f = 1;                 // 28 Nov 2026: goofy stance (3 bytes; absent = regular, an old game ignores it)
   // round 7-C: the discovered map cells per resort (run-length text, modes/discovery.js) and the Lawin challenges won; an old game
   // ignores `d`, an old record has none (= nothing discovered there yet). Dropped resort by resort (largest first) after the times.
   const d = {};
@@ -236,6 +237,7 @@ export function decodeCloud(raw) {
   const x = isRecord(data.x) ? data.x : {};
   const stats = { off: Number.isFinite(x.o) && x.o > 0 ? Math.min(1e8, Math.round(x.o)) : 0, top: Number.isFinite(x.t) && x.t > 0 ? Math.min(60, x.t / 10) : 0 };
   const ski = typeof x.k === 'string' && /^[a-z]{2,16}$/.test(x.k) ? x.k : null;
+  const goofy = x.f === 1;
   const disc = {}, lawin = {};
   // security (R8b): the discovery grid d = { rid: run-length text } is checked like s / b: at most 16 resorts, rid [a-z0-9]{1,16}, a
   // string of base-36 runs (discovery.js rleIntervals: <= MAX_RLE characters, every cell index < MAX_CELLS), else dropped
@@ -245,7 +247,7 @@ export function decodeCloud(raw) {
   const goals = {}, lifts = {};
   for (const [rid, m] of Object.entries(isRecord(data.g) ? data.g : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 4096) goals[rid] = m;
   for (const [rid, text] of Object.entries(isRecord(data.l) ? data.l : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && cleanLifts(text)) lifts[rid] = text;
-  return { stars, park, bestHash, stats, ski, disc, lawin, goals, lifts, daily: decodeDailyCloud(data.y) };
+  return { stars, park, bestHash, stats, ski, goofy, disc, lawin, goals, lifts, daily: decodeDailyCloud(data.y) };
 }
 
 /** A NEW progress with a decoded cloud record merged in (stars OR-ed, the better park score and time). */
