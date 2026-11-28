@@ -50,7 +50,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .rp-title p{margin:6px 0 0;color:var(--muted);font-size:14px;line-height:1.45;max-width:60ch}
 .rp-acts{display:flex;gap:8px;flex:none}
 .rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
-.rp-card{appearance:none;position:relative;display:flex;flex-direction:column;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:var(--white);color:var(--ink);text-align:left;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rp-card{appearance:none;position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:var(--white);color:var(--ink);text-align:left;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rp-card:focus-visible{outline:none}
 .rp-card:focus-visible::after{content:"";position:absolute;inset:0;z-index:2;box-shadow:inset 0 0 0 3px var(--green);pointer-events:none}
 .rp-card:active{background:var(--paper)}
