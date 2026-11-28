@@ -661,7 +661,7 @@ async function boot() {
   function showPicker() {
     game.screen = 'picker';
     hud.show(false); input.showTouch(false);
-    picker = ui.showResorts({ current: rid, onOnline: window.MPGate && window.MPGate.openLobby ? () => window.MPGate.openLobby('') : null, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; goFree(spawn); } });
+    picker = ui.showResorts({ current: rid, music: { on: () => audio.isMusicOn(), set: (v) => audio.setMusic(v) }, onOnline: window.MPGate && window.MPGate.openLobby ? () => window.MPGate.openLobby('') : null, onPick: (id) => { if (id && id !== rid) { switchResort(id); return; } picker.close(); picker = null; goFree(spawn); } });
     document.documentElement.dataset.skiScreen = 'picker';
   }
   /** Another resort: one resort per page life (its tiles, textures and caches go with it), so remember the pick and load the page again,
@@ -1122,6 +1122,7 @@ async function boot() {
     rideHud.show(lift);
     stepRide(0);
     audio.event('count');
+    if (path.kind === 'gondola' || path.kind === 'cable') audio.event('door');            // the cabin door glides open / shut
     document.documentElement.dataset.skiRide = path.kind;
     document.documentElement.dataset.skiRideDir = down ? 'down' : 'up';
     document.documentElement.dataset.skiRideView = rideView;
@@ -1208,6 +1209,7 @@ async function boot() {
     if (lifts) { lifts.setRide(r.lift.index, null); lifts.setGate(r.lift.index, 0); }
     if (carrier) { carrier.dispose(); carrier = null; }
     rideHud.show(null);
+    if (r.path && (r.path.kind === 'gondola' || r.path.kind === 'cable')) audio.event('door', { shut: true });
     const ex = r.exit || (r.down ? modes.lifts.bottomExit(r.lift, (x, z) => surface.height(x, z)) || modes.lifts.boardAt(r.lift) : modes.lifts.startAt(r.lift, (x, z) => surface.height(x, z)));
     const spot = { x: ex.x, z: ex.z, heading: ex.heading };
     if (modes.freeRun) modes.freeRun.moved(spot);
@@ -1236,7 +1238,7 @@ async function boot() {
     game.paused = true;
     input.setEnabled(false);
     menuCard = ui.showMenu({
-      env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit, outfitOpen, sound: { muted: () => audio.isMuted(), set: (m) => audio.setMuted(m) },
+      env, gfx: GFX(), outfits: OUTFITS, outfit: () => outfit, onOutfit: setOutfit, outfitOpen, sound: { muted: () => audio.isMuted(), set: (m) => audio.setMuted(m), music: () => audio.isMusicOn(), setMusic: (m) => audio.setMusic(m) },
       npcs: { on: () => npcOn, set: (on) => setNpcs(on) },
       againLabel: game.mode === MODES.freeride ? '' : game.mode === MODES.park ? 'Park nach eng Kéier' : 'Nach eng Kéier',
       onResume: () => { menuCard = null; game.paused = false; input.setEnabled(game.phase === 'running' || game.phase === 'countdown'); },
@@ -1401,7 +1403,7 @@ async function boot() {
   }
 
   // ---------------- loop ----------------
-  let last = performance.now(), acc = 0, hudT = 0, time = 0, audioT = 0, liftDist = Infinity, nearVillage = 0;
+  let last = performance.now(), acc = 0, hudT = 0, time = 0, audioT = 0, sceneT = 0, liftDist = Infinity, stationDist = Infinity, nearVillage = 0;
   const ghostPos = {};
   const frameTimes = [];
   function frame(now) {
@@ -1545,6 +1547,7 @@ async function boot() {
       }
       void t0;
     }
+    if (sceneT >= 0.2) { sceneT = 0; audio.scene(game.screen !== 'ski' || game.paused); }          // the menu music: picker, map and menus only
     if (st && audioT >= 0.05) {
       audioT = 0;
       const riding = game.screen === 'ski' && (game.phase === 'running' || game.phase === 'finished');
@@ -1552,14 +1555,15 @@ async function boot() {
       audio.update({
         riding, paused: game.paused, speed: st.speed, edge: st.edge, slip: st.slip, brake: st.brake, grounded: st.grounded,
         piste: surface.info(st.x, st.z, 0), forest: surface.info(st.x, st.z, 1), village: Math.max(0, -info3) > 0.05 ? 1 : nearVillage,
-        lift: lifts ? liftDist : Infinity, altitude: st.y, weather: env.state.weatherId,
+        lift: lifts ? liftDist : Infinity, station: lifts ? stationDist : Infinity, altitude: st.y, weather: env.state.weatherId, time: env.state.timeId,
         avalanche: avalanches ? avalanches.loudness(camera.position.x, camera.position.z) : 0,          // R7-C2: the rumble
       });
     }
     audioT += dt;
+    sceneT += dt;
     hudT += dt;
     if (hudT >= HUD_EVERY) {
-      if (st && lifts) liftDist = lifts.nearest(st.x, st.z);
+      if (st && lifts) { liftDist = lifts.nearest(st.x, st.z); stationDist = lifts.nearestStation(st.x, st.z); }
       if (st) nearVillage = village ? Math.max(0, Math.min(1, -surface.info(st.x + 60, st.z, 3) - surface.info(st.x - 60, st.z, 3) - surface.info(st.x, st.z + 60, 3) - surface.info(st.x, st.z - 60, 3))) * 0.6 : 0;
       hudT = 0;
       if (st) env.setSunScale(sunVisibility(st.x, st.y + 1, st.z));
@@ -1706,6 +1710,7 @@ async function boot() {
 
   // debug / flows
   window.__ski = {
+    audio,
     get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
     setInput(o) { game.override = o; }, blocked: (x, z) => botBlocked(x, z),
     /** R8e: the share of the top fifth of the current view that hits a station part / house within 40 m (the spawn framing check). */

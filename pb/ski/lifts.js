@@ -772,12 +772,22 @@ export function createLifts({ scene, resort, height, env = null }) {
     }
     return best;
   }
+  /** Metres from (x, z) to the nearest lift station (either end of a lift line): the station machinery, crowd and clacks fade with it. */
+  function nearestStation(x, z) {
+    let best = Infinity;
+    for (const l of lifts) {
+      const p = l.src.pts, n = p.length;
+      if (n < 4 || Math.hypot(l.cx - x, l.cz - z) - l.radius > best) continue;
+      best = Math.min(best, Math.hypot(p[0] - x, p[1] - z), Math.hypot(p[n - 2] - x, p[n - 1] - z));
+    }
+    return best;
+  }
   function dispose() {
     scene.remove(group);
     for (const d of disposables) { try { d.dispose(); } catch (error) { /* already gone */ } }
   }
   return {
-    group, update, nearest, setRide, setGate, nextCarrier, shuttleBoard, holdShuttle, dockShuttle, dispose, count: lifts.length,
+    group, update, nearest, nearestStation, setRide, setGate, nextCarrier, shuttleBoard, holdShuttle, dockShuttle, dispose, count: lifts.length,
     /** The other skiers: sink(l, matrix, carrier id, distance to the camera, loop point) for each carrier on its way up (null = off). */
     setRiderSink(fn) { riderSink = fn || null; },
     pathOf: (index) => (byIndex.get(index) ? byIndex.get(index).path : null),

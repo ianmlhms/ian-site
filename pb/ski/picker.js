@@ -130,7 +130,7 @@ function showCredits(screen) {
  * The picker screen in `root`. onPick(id) on a tap; onOnline opens the lobby (null: no button).
  * Returns { el, close() } like the other screens.
  */
-export function showResorts(root, { onPick, current = null, onOnline = null }) {
+export function showResorts(root, { onPick, current = null, onOnline = null, music = null }) {
   const progress = readProgress();
   const last = progress && progress.last && progress.last.resort;
   const heroId = RESORTS.some((r) => r.id === current && r.ready) ? current : (RESORTS.find((r) => r.ready) || RESORTS[0]).id;
@@ -143,6 +143,7 @@ export function showResorts(root, { onPick, current = null, onOnline = null }) {
         <div class="rp-title"><h1>Wiel e Skigebitt</h1><p>${countWord(RESORTS.filter((r) => r.ready).length)} richteg Skigebidder an 3D. Fuer fräi, mat de richtege Liften erop, an d'Challengen um Bierg.</p></div>
         <div class="rp-acts">
           ${onOnline ? '<button type="button" class="btn" id="skiOnline">👥 Online-Rennen</button>' : ''}
+          ${music ? '<button type="button" class="btn ghost" id="skiMusic" aria-pressed="false"></button>' : ''}
           <button type="button" class="btn ghost" id="skiCredits" aria-label="Quellen">ⓘ<span class="rp-hide-s"> Quellen</span></button>
         </div>
       </div>
@@ -151,6 +152,12 @@ export function showResorts(root, { onPick, current = null, onOnline = null }) {
   </section>`);
   s.querySelectorAll('.resort.ready').forEach((b) => b.addEventListener('click', () => onPick(b.dataset.id)));
   if (onOnline) s.querySelector('#skiOnline').addEventListener('click', onOnline);
+  if (music) {
+    const mb = s.querySelector('#skiMusic');
+    const paint = () => { const on = music.on(); mb.textContent = on ? '♪ Musek un' : '♪ Musek aus'; mb.setAttribute('aria-pressed', String(on)); };
+    mb.addEventListener('click', () => { music.set(!music.on()); paint(); });
+    paint();
+  }
   s.querySelector('#skiCredits').addEventListener('click', () => showCredits(s));
   root.appendChild(s);
   loadPictures(s);

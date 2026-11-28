@@ -2316,3 +2316,27 @@ where they were; every new part is drawn only (det, never solid) and inside the 
 - **Spectator** (`net/spectate.js`, `net/splits.js`): `createRace({spectator:true})` = listener only (tick / localReady / localFinish / send are no-ops, never coordinator). Follow camera on a racer (←/→, A/D, tap the scene, bar buttons ‹ ›; auto-moves on when the followed one finishes), «Iwwersiicht» (V / Space / ↑↓): free camera behind-above the pack (`host.setView` -> `game.camPose`), live table with split gaps (S1..S4 at 20/40/60/80 %, `+0.4 s` at the last common split, finished = time), countdown banner, results card per run, final standings; after 20 s (or «Op d'Lobby waarden», menu «Net méi zuschauen») he goes to the lobby wait and the rematch lobby takes him in as a normal player. main.js hooks: `mp.hideLocal`, `mp.focusPoint()` (tiles follow what he watches), `host.setView`.
 - **Tests**: `node scripts/ski/mp-spectate-test.mjs` (splits; spectator syncs mid-run, same table / standings, never in them, never sends, alone he never paces; forged fin/dnf/go/end/sync/next from a spectator change nothing), `mp-race-test.mjs` still green; flow `ski-mp-spectate` (2 scripted racers + late spectator, Chromium + WebKit). Shots `~/Library/Caches/ski-work/spectate/`.
 - **Not done / not tested**: a real iPad; 6 spectators at once (limit only unit-reasoned: lobby button + session cap); the relay path for a spectator behind a school network works as for any pair but was not run; spectating a FREE RIDE is unchanged (late players join it as skiers).
+
+
+## Sound + menu music (28 Nov 2026)
+- **New modules** (lazy, `import()`ed after the first touch, so first-play download is unchanged): `sound-bank.js` (all loops / one-shots as
+  seeded pure-JS buffers: carve = hiss + crystal crackle, powder = pink + puffs, scrape = grain train through a resonance under stick-slip
+  chatter, glide, wind = gusting spectrum + 2 whistles, air, lift hum + roller thumps, station machinery, crowd murmur (glottal pulses
+  through vowel formants, no words), avalanche rumble; one-shots land light/heavy, chair clack over the sheaves (3 variants), gondola door,
+  6 bird phrases + chough) and `music.js` (menu music: G major, 56 bpm, 8 bars = 34 s, pad + harp arpeggio + music-box melody + bass + wind
+  bed + stereo reverb; generator, rendered in slices after the first touch, only when a menu is up; 22.05 kHz stereo = 6 MB as floats).
+  Loops are RMS-matched to the old buffers (white*0.5 = 0.289, Kellet pink*0.2 = 0.345), so the old gains still hold; two copies at
+  different playback rates for carve / powder / wind hide the repeat.
+- `audio.js`: same live-filter graph as before, sources now come from the bank (nodes made at once, sources join one per tick). New:
+  `scene(menu)` (main.js calls it every 0.2 s: music only on picker / map / pause menu, fades out ~1.5 s when a ride starts, source stopped
+  after 3.2 s), `setMusic` / `isMusicOn` (`pb_ski_music`, default on), `debug()`, `context`; `update()` also takes `station` (m to the nearest
+  station, new `lifts.nearestStation`) and `time` (env timeId, birds: morning finches / tits / robin, midday few, evening thrush, chough
+  >1700 m in sun). Events `door` (gondola / cable: board + arrive, main.js) and `clack`. Music + all sounds go through the master gain, so the
+  game / arcade mute covers them. iOS: silent-buffer unlock, resume on pointerdown / keydown / touchend / click / visibilitychange /
+  pageshow / focus, also from 'interrupted'.
+- UI: picker button "♪ Musek un/aus" next to Quellen, pause menu row "Musek" under "Toun". No in-game music layer (not done on purpose).
+- Check without ears: `node scripts/ski/sound-render.mjs` (SOUND_BASE=<git ref of the old audio.js>) renders every buffer + the real
+  audio.js through an OfflineAudioContext (old vs new, same scenarios), writes WAVs to `~/Library/Caches/ski-work/sound/`, prints
+  RMS / peak, fails on clipping / silence / loop-seam clicks. Flow `ski-sound` (Chromium + WebKit): no context / no module request before a
+  touch, resume paths, music toggle + persistence, mute, ride fade-out, direct ride never loads music.js.
+- Not done: nobody has heard it on a real iPad; levels are matched by measurement, taste is untested. Real CC0 recordings: none downloaded.

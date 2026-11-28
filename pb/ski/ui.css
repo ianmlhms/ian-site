@@ -48,7 +48,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .rp-title{min-width:0;flex:1 1 320px}
 .rp-title h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.04em;line-height:1.05}
 .rp-title p{margin:6px 0 0;color:var(--muted);font-size:14px;line-height:1.45;max-width:60ch}
-.rp-acts{display:flex;gap:8px;flex:none}
+.rp-acts{display:flex;gap:8px;flex:none;flex-wrap:wrap}
 .rp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
 .rp-card{appearance:none;position:relative;display:flex;flex-direction:column;align-items:stretch;min-width:0;margin:0;padding:0;border:0;border-radius:0;background:var(--white);color:var(--ink);text-align:left;font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rp-card:focus-visible{outline:none}
