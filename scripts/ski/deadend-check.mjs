@@ -33,6 +33,7 @@ const { VILLAGE, STEP, SKATE, CLIMB, GRADE, OFF, OFF_DROP, OFF_SLOPE, JOIN } = D
 /** Piste ends the OSM data leaves in a dead end (no lift, no mapped village there; deadend-check 26 Nov 2026): the map teleport. */
 const KNOWN = new Set(['killy:Col Pers', 'killy:Génépy (Blo)', 'killy:Golf', 'killy:Leisse (Schwaarz)', '3vallees:Plan du Vah', 'zermatt:Moos (Blo)',
   'zermatt:Verbindung → Theodulo - Plan Maison', 'arlberg:Vorderes Maroital', 'arlberg:Rendl Talabfahrt', 'arlberg:Erzberg', 'arlberg:Gamshang',
+  'arlberg:Skiroute - Wiesele', 'arlberg:Gampberg Direkte',   // 28 Nov 2026 official-map alignment: the freeride lines that used to lead on from them are off the map
   'kronplatz:Ried (Rout)', 'kronplatz:Lumen', 'vialattea:46 bassa', 'obertauern:Verbindung → Kehrkopf (Variante)', 'obertauern:Verbindung → Monte Flu-Bahn',
   'davos:Müli', 'laax:Flims Oberdorf']);
 const args = process.argv.slice(2), verbose = args.includes('--verbose');

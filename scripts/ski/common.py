@@ -113,7 +113,7 @@ RESORTS = {
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
                 "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
-                "reserved_ids": ("stockhorn",),     # 28 Nov 2026: OSM abandoned=yes, removed with prune_pistes.py (board row stays)
+                "reserved_ids": ("stockhorn", "gobba-di-rollin", "moos-blue"),     # 28 Nov 2026: OSM abandoned=yes, removed with prune_pistes.py (board row stays)
                 # the Gornergrat Bahn (rack railway Zermatt -> Gornergrat, a ski lift too): its OSM ways carry no name, only usage=tourism
                 # (the Matterhorn Gotthard Bahn up the valley is usage=branch)
                 "railways": [{"match": {"railway": "narrow_gauge", "usage": "tourism"}, "name": "Gornergrat Bahn"}],
@@ -141,6 +141,19 @@ RESORTS = {
         "name": "St. Anton · Arlberg", "short": "Ski Arlberg", "country": "AT", "crs": "EPSG:25832",
         "bbox": (47.080, 10.012, 47.278, 10.312),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        # 28 Nov 2026 official-map alignment (official_align.py + prune_pistes.py): OSM freeride / timing lines not on the 2026/27 map
+        "reserved_ids": (
+            "kuhtali", "klemm", "groes-stierloch", "albona-nord", "vorderrendl", "valluga-pazieltal", "rossfall",
+            "woster-bockbachtal", "vorderes-maroital", "nasserein-schongraben", "hasenfluhscharte", "the-north-face", "pfanne",
+            "geileger", "hinterrendl", "erzberg-standard", "knodel", "valluga-west", "furmesle", "juppenspitze", "star-wars",
+            "stierfall", "heuwet", "maienwasen", "gamshang", "guggis-sattel", "jungbrunntobel", "kleines-stierloch",
+            "auenfelder-horn", "heuwetrinne", "milchboden", "trittkopf-antenne-pazieltal", "gotzneralpe", "flexenmahder",
+            "schimmelegg", "rauzmahder", "waldschneise", "erzberg", "valluga-west-variante", "hexenboden-nord", "maienplatt",
+            "abendweide", "hexenboden-ost", "skiroute-225-stockmahd", "schindlerrinnen", "leitenalm", "albona-nord-variante",
+            "der-lange-tobel", "schafgliger", "guggis", "rendl-race", "knodel-alpe-rauz", "hinteres-rendl",
+            "schindlerrinnen-variante", "skiroute-gipsloch", "speed-check", "speed-slalom", "waldschneise-variante",
+            "umfahrung-schuttboden", "multifunktionsweg-ochsenbode", "plattiwald",
+        ),
         "start": "Kandahar",
         # the World Cup course is two OSM pistes: Kandahar-Kapall from the start, then "Fang" down to the finish in St. Anton (the
         # Kandahar-Galzig is a separate upper part that joins lower down; it stays a run of its own)
@@ -230,6 +243,11 @@ RESORTS = {
         "name": "Obertauern", "short": "Tauernrunde", "country": "AT", "crs": "EPSG:25833",
         "bbox": (47.222, 13.505, 47.275, 13.625),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
+        # 28 Nov 2026 official-map alignment
+        "reserved_ids": (
+            "grunwaldkopf-osthang", "seekareck-black", "schaidberg-2", "tauernrunde-grun-red", "tauernrunde-rot-2",
+            "tauernrunde-rot-4",
+        ),
         "tree_line": 1950.0, "derived_forest": 1800.0,       # the pass lies at 1740 m: larch / spruce only low down on the valley sides
         # the Zehnerkarbahn is one gondola in two sections (OSM: two ways, valley -> middle station 2053 m -> Zehnerkar 2194 m): shown names
         # by OSM way id (bake.py build_lifts), so the lift list does not show the same name twice
