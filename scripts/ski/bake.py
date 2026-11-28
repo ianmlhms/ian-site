@@ -41,6 +41,7 @@ from scipy import ndimage
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from codec import encode  # noqa: E402
 from lift_sites import aisle_mask, arrange, drop_drag_pylons_under, pad_stations  # noqa: E402
+from road_beds import flatten_roads  # noqa: E402
 from linepack import pack_resort  # noqa: E402  (R7-D)
 from common import (CLASS_STEP, FAR_MARGIN, FAR_STEP, NEAR_KEEP, NEAR_STEP, OSM_CREDIT, RESORTS, SOURCE_CREDITS, TILE_CELLS, TILE_SIZE, Frame, osm_path, out_dir,  # noqa: E402
                     resort_arg, work_dir)
@@ -1077,10 +1078,11 @@ ROAD_NEAR_HOUSES = 45.0           # m: a street counts as a village street this 
 
 
 def build_roads(frame, cfg, buildings, pmask):
-    """[[half width dm, x0, z0, dx, dz, ...]] in half metres (deltas after the first point), for roads.json."""
+    """([[half width dm, x0, z0, dx, dz, ...]] in half metres (deltas after the first point), for roads.json;
+    [(half width m, Nx2 points)] the same streets for road_beds.flatten_roads)."""
     path = osm_path(frame.rid, "roads")
     if not os.path.exists(path):
-        return []
+        return [], []
     C = 20.0
     nz, nx = int(frame.depth / C) + 1, int(frame.width / C) + 1
     near = np.zeros((nz, nx), bool)
@@ -1093,7 +1095,7 @@ def build_roads(frame, cfg, buildings, pmask):
     for v in cfg.get("villages", ()):
         vx, vz = frame.to_world(v[1], v[2])
         near |= np.hypot(ii * C + C / 2 - vx, jj * C + C / 2 - vz) <= v[3] * 0.9
-    out, total = [], 0.0
+    out, beds, total = [], [], 0.0
     for e in load_osm(frame.rid, "roads"):
         hw = ROAD_HALF.get(e.get("tags", {}).get("highway"))
         if not hw or e["type"] != "way" or "geometry" not in e or e.get("tags", {}).get("tunnel") == "yes":
@@ -1123,10 +1125,11 @@ def build_roads(frame, cfg, buildings, pmask):
                 for a, b in zip(h2[:-1], h2[1:]):
                     flat_ += [int(b[0] - a[0]), int(b[1] - a[1])]
                 out.append(flat_)
+                beds.append((hw, seg))
                 total += polyline_len(seg)
             k = m
     log("village streets: %d polylines, %.1f km" % (len(out), total / 1000))
-    return out
+    return out, beds
 
 
 def build_aeroways(frame):
@@ -1689,7 +1692,6 @@ def main():
     groomed_lines = [ln for ln in lines if not ln["route"]]
     mask = piste_mask(raw.shape, NEAR_STEP, groomed_lines, areas + strips)
     groomed = groom(bench(raw, groomed_lines), mask)
-    groomed = pad_stations(groomed, lifts, NEAR_STEP, log)   # round 7-B: every lift station on a level pad
     log("groomed: mean |change| under pistes %.2f m" % float(np.abs(groomed - raw)[mask > 0.5].mean()))
 
     # which height tiles are shipped
@@ -1720,6 +1722,10 @@ def main():
         log("buildings kept near the villages / pistes", len(buildings), "of", before)
     for b in buildings:
         mark(b["poly"])
+    # 28 Nov 2026: the village streets get a bed that is level across their width (road_beds.py); the station pads come after
+    roads_rows, road_beds = build_roads(frame, cfg, buildings, mask)
+    groomed = flatten_roads(groomed, NEAR_STEP, road_beds, mask, [b["poly"] for b in buildings], log)
+    groomed = pad_stations(groomed, lifts, NEAR_STEP, log)   # round 7-B (after the street beds, so a pad wins): every lift station on a level pad
     for _, lon, lat, radius in cfg.get("keep", ()):            # landmarks far from the pistes (the Matterhorn) get their 5 m tiles too
         kx, kz = frame.to_world(lon, lat)
         jj, ii = np.mgrid[0:interest.shape[0], 0:interest.shape[1]]
@@ -1781,7 +1787,7 @@ def main():
     with open(os.path.join(out, "buildings.json"), "w", encoding="utf-8") as fh:
         json.dump([b["row"] for b in buildings], fh, separators=(",", ":"))
     with open(os.path.join(out, "roads.json"), "w", encoding="utf-8") as fh:
-        json.dump({"v": 1, "unit": 0.5, "roads": build_roads(frame, cfg, buildings, mask)}, fh, separators=(",", ":"))
+        json.dump({"v": 1, "unit": 0.5, "roads": roads_rows}, fh, separators=(",", ":"))
 
     mw, mh = paint_map(frame, groomed, classes, os.path.join(out, "map.webp"))
 
