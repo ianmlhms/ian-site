@@ -20,7 +20,7 @@ import { createScatterView } from './scatter-view.js';
 import { createFarForest } from './forest-far.js';
 import { createShadows } from './shadows.js';
 import { createPost } from './post.js';
-import { createQualityControl, LEVEL_ORDER } from './quality-ctl.js';      // 28 Nov 2026: a manual Grafik pick is final; Automatesch steps one level at a time
+import { createQualityControl, LEVEL_ORDER } from '/pb/gfx-ctl/quality-ctl.js';      // 28 Nov 2026: a manual Grafik pick is final; Automatesch steps one level at a time
 import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createRuins, loadRuins } from './ruins.js';

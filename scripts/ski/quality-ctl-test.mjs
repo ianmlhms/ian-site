@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* The Grafik level controller (pb/ski/quality-ctl.js) in Node, simulated clock: a manual pick never changes; Automatesch steps one
  * level at a time with hysteresis and back up; 60 Hz / 120 Hz / a 30 fps cap; the grace after a load. node scripts/ski/quality-ctl-test.mjs */
-import { createQualityControl, QCTL } from "../../pb/ski/quality-ctl.js";
+import { createQualityControl, QCTL } from "../../pb/gfx-ctl/quality-ctl.js";
 
 let fails = 0;
 const ok = (cond, msg) => { console.log(`${cond ? "ok  " : "FAIL"} ${msg}`); if (!cond) fails++; };

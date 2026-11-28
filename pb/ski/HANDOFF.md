@@ -2638,8 +2638,7 @@ Owner's rule: only the lifts and pistes of the REAL 2026/27 (else 2025/26) piste
   the picture check (a broken picture / shader error: Niddreg shaders, toast "Feeler an der Grafik: dës Kéier Niddreg"), a WebGL context
   lost while the page was visible (sessionStorage `pb_ski_gfx_recover`) or a page that died while playing (`pb_ski_alive`, set while the
   game is on screen and visible, cleared on pagehide / hidden: iOS's out-of-memory kill): the next load starts ONE level lower with the
-  toast "Grafik dës Kéier: <level> (no engem Feeler)". The old watchdog code and `FRAME_BUDGET_MS` are gone (MTB still has its own copy
-  of that watchdog, untouched).
+  toast "Grafik dës Kéier: <level> (no engem Feeler)". The old watchdog code and `FRAME_BUDGET_MS` are gone (MTB got the same fix the same day, see pb/mtb/HANDOFF.md; the controller now lives in the shared pb/gfx-ctl/quality-ctl.js).
 - **Niddreg look** (the picture at the same geometry: draw calls / triangles identical at every shot): resolution floor 0.9 -> 1.0;
   the final pass's sharpen stretch factor capped at 1.25 (was 1.6: at the floor the unsharp mask turned the upscale into blocks); the
   corduroy fades while a groove still spans ~4 px (was ~2.5 px: at Niddreg's resolution it beat with the pixels into a coarse checker

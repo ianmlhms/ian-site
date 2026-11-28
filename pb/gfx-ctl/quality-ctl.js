@@ -1,4 +1,5 @@
-/* The Grafik level controller (28 Nov 2026; Ian, school iPad: "I pick Héich and within ~20 s it drops to Niddreg by itself").
+/* Shared by Ski Alpen (pb/ski/main.js) and MTB Mëllerdall (pb/mtb/main.js).
+ * The Grafik level controller (28 Nov 2026; Ian, school iPad: "I pick Héich and within ~20 s it drops to Niddreg by itself").
  *
  * Rules:
  *  - A MANUAL pick (Niddreg / Mëttel / Héich) is final: the controller never changes it. When the frames are really bad for a while it

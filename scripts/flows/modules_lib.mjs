@@ -8,7 +8,7 @@ import { REPO } from "./lib.mjs";
 
 export const HASH_LEN = 10;
 // code of every page of PAGES in scripts/game_importmap.py (its generator reads all of them), without data / img
-const MAP_FOLDERS = ["pb/ski", "pb/towerdefense", "pb/mtb", "pb/fouer", "pb/park"];
+const MAP_FOLDERS = ["pb/ski", "pb/towerdefense", "pb/mtb", "pb/fouer", "pb/park", "pb/gfx-ctl"];
 const MAP_PAGES = ["pb/ski.html", "pb/towerdefense.html", "pb/mtb.html", "pb/fouer.html", "pb/park.html"];
 
 export const sha = (body) => crypto.createHash("sha256").update(body).digest("hex").slice(0, HASH_LEN);

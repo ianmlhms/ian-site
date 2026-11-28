@@ -37,9 +37,9 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HASH_LEN = 10
 # page -> (folders whose modules go into its map, entry module). Every module of a folder is listed, so a computed import() is covered as well.
 PAGES = {
-    "pb/ski.html": (("pb/ski",), "pb/ski/main.js"),
+    "pb/ski.html": (("pb/ski", "pb/gfx-ctl"), "pb/ski/main.js"),
     "pb/towerdefense.html": (("pb/towerdefense",), "pb/towerdefense/main.js"),
-    "pb/mtb.html": (("pb/mtb",), "pb/mtb/main.js"),
+    "pb/mtb.html": (("pb/mtb", "pb/gfx-ctl"), "pb/mtb/main.js"),
     "pb/fouer.html": (("pb/fouer", "pb/park"), "pb/fouer/main.js"),        # the Schueberfouer imports the frozen v1 kernel in pb/park computed (legacy.js)
     "pb/park.html": (("pb/park",), "pb/park/main.js"),                      # the old Theme Park Tycoon page, same modules
 }

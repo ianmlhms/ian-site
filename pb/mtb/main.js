@@ -41,6 +41,7 @@ import {
   TRAIL_IDS, BIKE_IDS, BIKE_MEDAL_POINTS, medalPoints, medalOf, bestMs, bestSplits, ghostFor, isTrailUnlocked, isBikeUnlocked, newUnlocks, recordRun, recordViewpoint, recordDaily, addStats,
   withLoadout, withSettings, settingsOf, viewpointCount, dayNumber, dailyChallenge, createProgress, hasViewpoint, unlockedTrails, MAX_VIEWPOINTS,
 } from './progress.js';
+import { createQualityControl, LEVEL_ORDER } from '/pb/gfx-ctl/quality-ctl.js';      // 28 Nov 2026: shared with Ski Alpen: a manual Grafik pick is final, Automatesch steps one level at a time
 import { loadInitialProgress, createPersistence, createScoreReporter, dailyRpc } from './save.js';
 import { LANGS, t as translate, trailName, formatTime } from './i18n.js';
 
@@ -50,8 +51,25 @@ const $ = (id) => document.getElementById(id);
 const LANG_KEY = 'pb_mtb_lang';
 const QUALITY_KEY = 'pb_mtb_quality';
 const LAST_KEY = 'pb_mtb_last';
-const FRAME_BUDGET_MS = { low: 40, medium: 30, high: 24 };
-const ADAPT_WINDOW_S = 3;
+/* Grafik (28 Nov 2026). The player's own pick lives in gfx-quality.js (arcade_gfx, shared by the arcade's 3D games). Here, per device:
+ * where Automatesch settled last time (localStorage), and for this tab only (sessionStorage): the crash-recovery flags and the one hint. */
+const AUTO_KEY = 'pb_mtb_gfx_auto', RECOVER_KEY = 'pb_mtb_gfx_recover', ALIVE_KEY = 'pb_mtb_alive', HINT_KEY = 'pb_mtb_gfx_hint';
+const HINT = { high: 'Ze lues? Probéier Mëttel oder Automatesch', medium: 'Ze lues? Probéier Niddreg oder Automatesch' };
+const readAutoLevel = () => { try { const v = localStorage.getItem(AUTO_KEY); return LEVEL_ORDER.includes(v) ? v : null; } catch (error) { return null; } };
+const writeAutoLevel = (l) => { try { localStorage.setItem(AUTO_KEY, l); } catch (error) { console.warn('[mtb] could not store the Automatesch level', error); } };
+/** True once if the last page life ended in a crash while riding (WebGL context lost while visible, or the page died while riding: iOS out-of-memory kill). */
+function readRecover() {
+  try {
+    const hit = sessionStorage.getItem(RECOVER_KEY) === '1' || sessionStorage.getItem(ALIVE_KEY) === '1';
+    sessionStorage.removeItem(RECOVER_KEY); sessionStorage.removeItem(ALIVE_KEY);
+    return hit;
+  } catch (error) { return false; }
+}
+const markRecover = () => { try { sessionStorage.setItem(RECOVER_KEY, '1'); } catch (error) { /* private mode: no recovery step */ } };
+let aliveWanted = false;
+function setAlive(on) { aliveWanted = on; try { if (on && document.visibilityState === 'visible') sessionStorage.setItem(ALIVE_KEY, '1'); else sessionStorage.removeItem(ALIVE_KEY); } catch (error) { /* private mode */ } }
+const readHinted = () => { try { return sessionStorage.getItem(HINT_KEY) === '1'; } catch (error) { return false; } };
+const writeHinted = () => { try { sessionStorage.setItem(HINT_KEY, '1'); } catch (error) { /* private mode: once per page life */ } };
 const MAX_FRAME_S = 0.05;
 const HINT_RIDES = 3;               // the animated hint shows for the first rides
 const HINT_SECONDS = 16;
@@ -91,11 +109,14 @@ function migrateOwnQuality() {
   const gfx = GFX(), stored = readKey(QUALITY_KEY);
   if (gfx && gfx.choice() === 'auto' && QUALITY[stored] && !readKey('pb_mtb_qauto')) gfx.set(stored);
 }
+/** The player picked a level by hand (not Automatesch, no ?q=): that pick is final. */
+const manualPick = () => !param('q') && !!GFX() && GFX().choice() !== 'auto';
 function pickQuality() {
   const q = param('q');
   if (q && QUALITY[q]) return q;                                           // ?q= (tests, links) wins over everything
   migrateOwnQuality();
-  return GFX() ? GFX().level() : (QUALITY[readKey(QUALITY_KEY)] ? readKey(QUALITY_KEY) : autoQuality());
+  if (manualPick()) return GFX().choice();
+  return readAutoLevel() || (GFX() ? GFX().level() : (QUALITY[readKey(QUALITY_KEY)] ? readKey(QUALITY_KEY) : autoQuality()));      // Automatesch: where it settled last time on this device, else the guess
 }
 
 const pixelRatioFor = (q) => Math.min(window.devicePixelRatio || 1, q.pixelRatio);
@@ -128,8 +149,19 @@ async function boot() {
   const setLoad = (p, key) => { try { performance.mark(`mtb:${p}:${key || ''}`); } catch (error) { /* no marks */ } loader.set(p, key ? tr(key) : ''); };
   const canvas = $('mtbCanvas');
   const shell = $('shell');
-  const qualityId = pickQuality();
+  // 28 Nov 2026: the display's beat is learnt from the cheap frames of the load (quality-ctl.js: 60 / 120 Hz or a 30 fps cap)
+  const beatFrames = [];
+  let beatLast = 0, beatProbe = true;
+  const probeBeat = (t) => { if (!beatProbe) return; if (beatLast) beatFrames.push(t - beatLast); beatLast = t; if (beatFrames.length > 600) beatFrames.shift(); requestAnimationFrame(probeBeat); };
+  requestAnimationFrame(probeBeat);
+  let qualityId = pickQuality();
+  // a crash recovery (the WebGL context was lost while riding, or the page died while riding: out of memory) starts ONE level lower for
+  // this page life only, and says so; the player's pick stays as it is for the next time
+  const recoveredFrom = !param('q') && readRecover() && qualityId !== 'low' ? qualityId : null;
+  if (recoveredFrom) qualityId = LEVEL_ORDER[LEVEL_ORDER.indexOf(qualityId) - 1];
   const quality = { ...QUALITY[qualityId], id: qualityId };
+  const qctl = createQualityControl({ level: qualityId, manual: manualPick() });
+  let recoverToldOnce = false, slowSim = 0;
   const holeMode = param('holes') === '1';
   const debug = param('debug') === '1' || holeMode;
   const isTouch = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
@@ -282,7 +314,7 @@ async function boot() {
     onCloseMenu: () => closeMenu(),
     onFree: () => startFree(),
     onDaily: () => startDaily(),
-    onReset: () => { if (game.mode === 'run' || game.mode === 'free') { game.reset(); applyEvents(game.update(0, bike, {})); } },
+    onReset: () => { if (game.mode === 'run' || game.mode === 'free') { qctl.settle(3000); game.reset(); applyEvents(game.update(0, bike, {})); } },
     onCamera: () => { camMode = (camMode + 1) % 3; chase.snap(bike); },
     onTime: () => cycleTime(),
     onWeather: () => cycleWeather(),
@@ -339,7 +371,35 @@ async function boot() {
     terrain.setMaterial(groundFor(quality));
     renderer.setPixelRatio(pixelRatioFor(quality)); resize();
   }
-  if (GFX()) GFX().onChange((level) => { if (level !== quality.id) applyQuality(level); });      // a change in the menu, in another game or in another tab
+  // a change in the menu, in another game or in another tab. A manual pick is applied and final; Automatesch goes on from the level running now
+  if (GFX()) GFX().onChange((level) => {
+    if (param('q')) { if (level !== quality.id) applyQuality(level); return; }
+    const choice = GFX().choice();
+    if (choice === 'auto') { qctl.setMode(false, quality.id); writeAutoLevel(quality.id); return; }
+    if (choice !== quality.id) applyQuality(choice);
+    qctl.setMode(true, choice);
+  });
+  /** Once a frame while riding: the Grafik level controller. ms = the raw frame time. A manual pick only ever gets one small hint; Automatesch steps ONE level. */
+  function qualityFrame(ms) {
+    if (param('q')) return;
+    // no dynamic resolution in this game: the pixel ratio is part of the level, so the level is all there is to step
+    const ev = qctl.frame(ms, { limited: true, atTop: true });
+    if (!ev) return;
+    if (ev.type === 'hint') {
+      if (readHinted()) return;
+      writeHinted();
+      document.documentElement.dataset.mtbGfxHint = ev.level;
+      if (HINT[ev.level]) ui.toast(HINT[ev.level]);
+      return;
+    }
+    if (manualPick()) return;                                            // (never: the controller is in manual mode then)
+    applyQuality(ev.level);
+    qctl.setLevel(ev.level);
+    writeAutoLevel(ev.level);
+    perf.adapt++;
+    document.documentElement.dataset.mtbGfxAuto = `${ev.type}:${ev.level}`;
+    ui.toast(`${GFX() ? GFX().LABELS.title : 'Grafik'}: ${GFX() ? GFX().LABELS[ev.level] : ev.level}`);
+  }
   function applySetting(key, value) {
     if (key === 'time') { env.setTime(value); save(withSettings(progress, { time: value })); }
     else if (key === 'weather') { env.setWeather(value); save(withSettings(progress, { weather: value })); }
@@ -384,6 +444,7 @@ async function boot() {
     reporter.selectBoard(t.id, trailName(t, lang));                    // the arcade header and leaderboard follow the trail on the card: "Best" is this trail's best time
     showCard(); setHudMode(); input.showTouchUi(true);
   }
+  function tellRecovery() { if (recoveredFrom && !recoverToldOnce) { recoverToldOnce = true; setTimeout(() => ui.toast(`Grafik dës Kéier: ${GFX() ? GFX().LABELS[quality.id] : quality.id} (no engem Feeler)`), 1200); } }
   function startRun() {
     if (game.mode !== 'card') return;
     const t = current.trail;
@@ -393,6 +454,7 @@ async function boot() {
     ui.hideCard(); document.body.classList.remove('cardopen');
     game.begin();
     hintLeft = rides < HINT_RIDES ? HINT_SECONDS : 0;
+    tellRecovery(); qctl.settle(6000); setAlive(true);                       // 28 Nov 2026: the ride's first seconds (the rest of the world builds during the 3-2-1) are not judged
     setHudMode();
   }
   function startFree() {
@@ -407,6 +469,8 @@ async function boot() {
     ui.toast(tr('vp.hint'));
     setHudMode(); ui.setHud({ speedKmh: 0, found: { n: viewpointCount(progress.vp), total: viewpoints.length } });
     audio.resume();
+    qctl.settle(6000); setAlive(true);
+    tellRecovery();
   }
   function startDaily() {
     const d = dailyToday();
@@ -442,6 +506,7 @@ async function boot() {
     }
   }
   function respawnAt(index, reason) {
+    qctl.settle(3000);                                                     // a jump to another place: the ground, trees and shaders there settle first
     const t = current.trail;
     if (game.mode === 'free') { bike = Object.freeze({ ...createBikeState(lastSafe.x, lastSafe.z, lastSafe.heading, ground), shield: PLAY.respawnShield }); }
     else bike = stateAt(t, index, ground, reason === 'reset' ? 0 : 2);
@@ -578,7 +643,6 @@ async function boot() {
   let running = true;
   let contextLost = false;
   let hudT = 0;
-  let slowT = 0;
   const perf = { frames: 0, fps: 0, ms: 0, drawCalls: 0, triangles: 0, adapt: 0 };
   let perfT = 0, perfFrames = 0;
   const wheelbase = rider.wheelbase;
@@ -620,7 +684,8 @@ async function boot() {
     if (!running) return;
     requestAnimationFrame(frame);
     if (contextLost || document.hidden) { last = now; return; }
-    const dt = Math.min(MAX_FRAME_S, Math.max(0.0005, (now - last) / 1000));
+    const rawMs = now - last;
+    const dt = Math.min(MAX_FRAME_S, Math.max(0.0005, rawMs / 1000));
     last = now; elapsed += dt;
     const inp = input.read(scriptedInput);
     if (replay) { replay.t += dt * 1000; if (replay.t > replay.ghost.duration + 1500 || replay.t > REPLAY_SECONDS_MAX * 1000 * 60) { replay = null; ghostRider.root.visible = false; ui.showFinish(lastFinish()); } }
@@ -712,25 +777,27 @@ async function boot() {
     if (perfT >= 1) {
       perf.fps = Math.round(perfFrames / perfT); perf.ms = Math.round(1000 * perfT / perfFrames);
       perf.drawCalls = renderer.info.render.calls; perf.triangles = renderer.info.render.triangles;
-      slowT = perf.ms > FRAME_BUDGET_MS[quality.id] ? slowT + perfT : 0;
       perfT = 0; perfFrames = 0;
-      if (slowT >= ADAPT_WINDOW_S && quality.id !== 'low' && !debug) {          // watchdog: slow for a few seconds = one level down, whatever the player picked (never up: the pick is the ceiling)
-        const next = quality.id === 'high' ? 'medium' : 'low';
-        applyQuality(next);
-        perf.adapt++; slowT = 0;
-      }
     }
+    // the Grafik level (quality-ctl.js): only frames of a ride count (card, countdown, menus, the finish only teach the display's beat)
+    if (!frozen() && game.mode !== 'finished' && !ui.isMenuOpen() && !replay) qualityFrame(rawMs + slowSim);      // slowSim: flow mtb-quality's forced slow frames
+    else qctl.idleFrame(rawMs);
   }
   let lastLand = bike.landSeq, lastPopped = false, hintShown = false;
   const replayBike = () => { const p = ghostAt(replay.ghost, replay.t); const pose = poseOnTrail(replay.trail, p.s, p.o); return { ...bike, x: pose.x, z: pose.z, y: ground.height(pose.x, pose.z), heading: pose.heading, vx: Math.cos(pose.heading) * (p.speed || 5), vz: Math.sin(pose.heading) * (p.speed || 5), vy: 0, slip: 0, compression: 0, grounded: true, lean: 0 }; };
   const lastFinish = () => ({ trail: current.trail, ms: game.result ? game.result.ms : 0, medal: game.result ? game.result.medal : 0, isBest: false, bestMs: bestMs(progress, current.trail.id), crashes: game.crashes, splits: game.result ? game.result.splits : [], bestSplits: bestSplits(progress, current.trail.id), nextMedal: game.result ? game.nextMedal(game.result.ms) : null, unlocks: [], topKmh: runTopKmh, beatGhost: false, hasNext: true, daily: current.kind === 'daily' });
 
-  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); contextLost = true; console.warn('[mtb] WebGL context lost'); });
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); contextLost = true; console.warn('[mtb] WebGL context lost'); if (document.visibilityState === 'visible') markRecover(); });         // 28 Nov 2026: the reload starts one level lower, once
   canvas.addEventListener('webglcontextrestored', () => { console.warn('[mtb] WebGL context restored: reloading'); location.reload(); });
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
-  window.addEventListener('pagehide', () => persistence.pushSave());
+  window.addEventListener('pagehide', () => { setAlive(false); persistence.pushSave(); });          // a clean exit: no crash recovery
+  document.addEventListener('visibilitychange', () => setAlive(aliveWanted));         // hidden (another app / tab) clears the flag: iOS may drop a background tab for reasons that have nothing to do with us
   window.addEventListener('message', (e) => { if (e.data && e.data.__pbSndMute !== undefined) audio.setMuted(Boolean(e.data.__pbSndMute)); });
 
+  beatProbe = false;                                                     // 28 Nov 2026: the load's frames teach the controller the beat
+  for (const f of beatFrames) qctl.idleFrame(f);
+  beatFrames.length = 0;
+  qctl.settle(5000);
   last = performance.now();
   requestAnimationFrame(frame);
   await new Promise((r) => setTimeout(r, 60));
@@ -755,6 +822,9 @@ async function boot() {
     tick(dt, inp) { logic(dt, inp || scriptedInput || input.read(null)); }, enterCard, startRun, startFree, startDaily, openMenu, closeMenu, showFinishForTest: (d) => ui.showFinish(d),
     stop() { running = false; },
     elapsed: () => elapsed,
+    /** 28 Nov 2026: the Grafik controller (flow mtb-quality); slow(ms) adds ms to every judged frame (a GPU-bound device, simulated). */
+    gfx: () => ({ level: quality.id, choice: GFX() ? GFX().choice() : 'auto', manual: manualPick(), recoveredFrom, ...qctl.stats() }),
+    slow(ms) { slowSim = Math.max(0, Number(ms) || 0); },
   };
 }
 
