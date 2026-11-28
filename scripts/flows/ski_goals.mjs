@@ -59,7 +59,7 @@ export const flow = {
     const want = G.areaGoals(rid).map((g) => g.def.id);
     h.eq(rows.map((r) => r.id), want, `${want.length} goals: ${want.join(", ")}`);
     h.expect(rows.every((r) => !r.done), "none done yet");
-    h.expect(/All Lifte gefuer/.test(rows[0].text) && /0 \/ 71/.test(rows[0].text), `first goal: ${rows[0].text}`);
+    h.expect(/All Lifte gefuer/.test(rows[0].text) && /0 \/ 66/.test(rows[0].text), `first goal: ${rows[0].text}`);
     h.eq((await page.textContent("#gCount")).trim(), `0 / ${want.length}`, "badge count 0 / n");
     h.expect(await page.$eval(".dailycard, .dailyhint", (e) => !!e), "the daily challenge card (or the hint to its area) is in the pane");
     await h.shot("goals-fresh");

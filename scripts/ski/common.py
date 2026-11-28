@@ -65,6 +65,18 @@ RESORTS = {
         # winter drawdown of the reservoir (bake.py apply_drawdown): the ice lies `drop` m below the full level, the banks slope down to it
         # over `bank` m (EDF empties Lac du Chevril through the winter: the frozen lake sits deep between bare banks)
         "reservoirs": [{"name": "Lac du Chevril", "drop": 40.0, "bank": 65.0}],
+        # official-map alignment (28 Nov 2026): pistes removed from resort.json (not on the 2026/27 map), never given to another run
+        "reserved_ids": (
+            "col-pers", "col-pers-variante", "les-grands-vallons", "vallons-de-la-sache",
+            "vallee-perdue", "couloir-de-la-table-d-orient", "couloir-de-petite-balme", "anciens-teleskis-de-grande-b",
+            "parking-ski-d-ete", "trolles", "cognon", "semanmille",
+            "saxifrage", "termignon", "triffollet", "roches",
+            "signal-bas", "chemin-des-coves", "chemin-vers-le-lavachet-pist", "retour-lavachet",
+            "acces-merles", "leisse", "leisse-red", "mont-blanc",
+            "pylones", "pays-desert", "pays-desert-variante", "cugnai",
+            "verbindung-cugnai", "verbindung-leisse", "verbindung-leisse-leisse", "verbindung-schlepplift-termi",
+            "verbindung-schlepplift-termi-2", "verbindung-termignon",
+        ),
         "landmarks": [
             # Barrage du Chevril / de Tignes (OSM way 30195773, 181 m, 1953): the arch along the middle of the OSM outline, convex towards
             # the lake (`toward`), Jean-Marie Pierret's painted giant (1989) on the downstream face; crest = the lake's full level + 4 m
@@ -82,6 +94,12 @@ RESORTS = {
                  # the box grew south in the data round (the Orelle gondola starts at 45.208): own cache folder, old tiles reused
                  "work": "3vallees-r5", "work_from": ("3vallees", 970240.0, 6490880.0),
                  "start": "combe-de-la-saulire",            # the first piste on the map: Saulire -> Courchevel 1850
+                 # official-map alignment (28 Nov 2026): routes not on the official maps, removed from resort.json, ids never reused
+                 "reserved_ids": (
+                     "couloir-emile-allais", "couloir-sous-les-cables", "couloir-des-belges", "turcs",
+                     "jockeys", "itineraire-du-mont-vallon", "caron-lac-du-lou", "le-lac-de-lou-par-la-masse",
+                     "bouchet-lory", "tetras-black", "bouc-blanc-black",
+                 ),
                  "villages": [
                      ("Courchevel 1850", 6.6345, 45.4150, 850, "chalet"), ("Courchevel Moriond", 6.6480, 45.4235, 450, "chalet"), ("Courchevel Village", 6.6310, 45.4300, 380, "chalet"),
                      ("Courchevel Le Praz", 6.6280, 45.4405, 380, "chalet"), ("La Tania", 6.5935, 45.4315, 380, "chalet"), ("Méribel", 6.5666, 45.3991, 900, "chalet"),
