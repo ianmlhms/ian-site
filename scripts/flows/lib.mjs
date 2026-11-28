@@ -155,6 +155,57 @@ function rafCapScript(fps) {
   window.cancelAnimationFrame = (id) => { cancelled.add(id); };
 }
 
+/* Playwright WebKit sometimes (28 Nov 2026, ~5 % of launches) hangs for good: its Networking helper blocks in a launchd lookup
+ * of com.apple.analyticsd, so the first page never gets a WebContent process. launch() and newContext() still succeed, newPage()
+ * never returns. A throw-away page with a short timeout proves the browser works; if it hangs, close it and launch again. */
+const WEBKIT_WARMUP_MS = 8000;
+const WEBKIT_ATTEMPTS = 5;
+/* The same hang can hit any later WebContent process (a new context's first page), not only the first one: newPage() on a
+ * context of this browser times out after WEBKIT_PAGE_MS and is tried again (a hung attempt never answers, so nothing leaks into the retry). */
+const WEBKIT_PAGE_MS = 10000;
+const WEBKIT_PAGE_TRIES = 4;
+function withPageRetry(browser) {
+  const retrying = (create) => async (...args) => {
+    let lastError;
+    for (let attempt = 1; attempt <= WEBKIT_PAGE_TRIES; attempt++) {
+      let timer;
+      try {
+        return await Promise.race([create(...args), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`newPage: no page after ${WEBKIT_PAGE_MS} ms`)), WEBKIT_PAGE_MS); })]);
+      } catch (error) { lastError = error; } finally { clearTimeout(timer); }
+    }
+    throw lastError;
+  };
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (...args) => {
+    const context = await newContext(...args);
+    context.newPage = retrying(context.newPage.bind(context));
+    return context;
+  };
+  return browser;
+}
+
+async function launchWebkitChecked(webkit) {
+  let lastError;
+  for (let attempt = 1; attempt <= WEBKIT_ATTEMPTS; attempt++) {
+    let browser;
+    try {
+      browser = await webkit.launch();
+      const context = await browser.newContext();
+      const page = await Promise.race([
+        context.newPage(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`no page after ${WEBKIT_WARMUP_MS} ms`)), WEBKIT_WARMUP_MS)),
+      ]);
+      await page.close();
+      await context.close();
+      return withPageRetry(browser);
+    } catch (error) {
+      lastError = error;
+      if (browser) await Promise.race([browser.close().catch(() => {}), new Promise((resolve) => setTimeout(resolve, 3000))]);
+    }
+  }
+  throw new Error(`FLOW_BROWSER=webkit: WebKit did not start after ${WEBKIT_ATTEMPTS} tries (npx playwright install webkit?): ${String(lastError.message).split("\n")[0]}`, { cause: lastError });
+}
+
 /* FLOW_BROWSER=webkit runs the flow in Playwright WebKit (the engine of the school iPads) instead of Chromium (the default).
  * WebKit has no --mute-audio: the games of this repo only make sound after a tap, which a headless flow never makes unless it says so. */
 export async function launchBrowser({ fullChromium: wantsFull = false, args = [], power = process.env.FLOW_POWER === "1" && process.env.FLOW_FULL !== "1", strict = false } = {}) {
@@ -173,7 +224,7 @@ export async function launchBrowser({ fullChromium: wantsFull = false, args = []
   }
   if (process.env.FLOW_BROWSER === "webkit") {
     if (!playwright.webkit) throw new Error("FLOW_BROWSER=webkit: this Playwright has no webkit");
-    try { return await playwright.webkit.launch(); } catch (error) { throw new Error(`FLOW_BROWSER=webkit: WebKit did not start (npx playwright install webkit?): ${String(error.message).split("\n")[0]}`, { cause: error }); }
+    return launchWebkitChecked(playwright.webkit);
   }
   if (process.env.FLOW_BROWSER && process.env.FLOW_BROWSER !== "chromium") throw new Error(`FLOW_BROWSER must be chromium or webkit, got ${process.env.FLOW_BROWSER}`);
   const { chromium } = playwright;
