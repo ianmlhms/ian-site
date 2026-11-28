@@ -2611,3 +2611,44 @@ Owner's rule: only the lifts and pistes of the REAL 2026/27 (else 2025/26) piste
 - **Kronplatz source**: Dolomiti Superski / Kronplatz map **2026/27** (`dss-kronplatz-2025-26.pdf`, the rendered footer says 2026-2027; legend = 0 Lumen ... 59 Antermoia with the colour badges + the 32-lift list) + the Intermaps feed of kronplatz.com (`intermaps-data.json`, 54 slopes / 32 lifts). All 26 game lifts match the list (refs 100-113, 201-215, 301-305, 308); the 6 others (310, 403-405, 501, 601) are outside the box.
   Removed pistes (no number on the legend): furcia-9a-picio-jaru, furcia-12-a, seewiese-2 (2C), furcia-9a, furcia-9-b, costa-ruis (9C), 0 (Blo 0). Removed lift: the unnamed Reischach carpet (not on the list). Recoloured to the legend: Ried (Blo / Schwaarz / Blo 2) red (16), Arndt (Blo) red (22), Marchner 2 blue (28). Refs / names: Seewiese 2, Gassl (Variante) -> "World Record" (23), Rara (Rout) 33, Rara 31, Pre da Peres 32 + "Atomic Arena Pre da Peres" 32R, Trasse 2A, 2D Weiden, 0 Lumen. Missing: Hintna Riese (56R) and the village slopes outside the box. Pistes 71 -> 64, lifts 27 -> 26.
 - Checks: reach-check (vialattea 12 unreachable, 0 clear leftovers; kronplatz 0), deadend-check none, goals-check 1036, cloud-size-test 31, check_site clean. Printed map (`panorama.webp`) regenerated for both (see below if it was skipped).
+
+## Grafik levels (28 Nov 2026; Ian, school iPad: "I pick Héich, within ~20 s it drops to Niddreg by itself, and Niddreg looks much worse"; shots ~/Library/Caches/ski-work/quality/)
+- **Root cause of the 20-second drop**: main.js had a level watchdog that (1) never looked at the player's pick (only `?q=` turned it off),
+  (2) judged frames against ABSOLUTE budgets (`FRAME_BUDGET_MS` high 24 / medium 30 / low 40 ms) and (3) stepped again 3 s after the last
+  step. An iPad that delivers 30 fps (iOS Low Power Mode caps requestAnimationFrame at 30 fps; an A13 at Héich is GPU-bound near that
+  anyway) has 33 ms frames: over Héich's 24 ms AND over Mëttel's 30 ms. post.js's dynamic resolution also aimed at a fixed 1/60 s, so it
+  pushed the resolution to each level's floor first (Héich 2 -> 1.5 in ~1 s after its 6 s hold), then 3 s -> Mëttel, its floor (~1 s),
+  3 s -> Niddreg, and Niddreg then sat at ITS floor (0.9 x on a 2 x screen, with the strongest sharpen): ~15-20 s from the start, and the
+  blurriest picture the game can make. The pause menu kept showing "Héich" (the pick in gfx-quality.js was never changed).
+- **Now** (`quality-ctl.js`, pure, `node scripts/ski/quality-ctl-test.mjs`): a manual pick (Niddreg / Mëttel / Héich) is final; at most ONE
+  hint per tab ("Ze lues? Probéier Mëttel oder Automatesch" / "... Niddreg oder Automatesch", sessionStorage `pb_ski_gfx_hint`) after 8 s
+  with the median frame > 1.5 x target and the resolution at its floor. "Automatesch" steps ONE level at a time: median of the last 2 s >
+  1.3 x target for 4 s (sustained) while the resolution can't help (post.atFloor() or post.cpuBound()), >= 8 s between two changes; back up
+  after 15 s with p90 <= 1.1 x target and the resolution at its ceiling (post.atTop()); an up step followed by a down within 30 s blocks that
+  level for 60 s, doubling to 480 s. Grace (no judging): 5 s after the load, 6 s after a run start / free-ride start / teleport (startFree:
+  post.hold(5000) too, it had none), 5 s after every level change; frames > 250 ms are hitches, ignored. Where Automatesch settled is kept
+  per device (localStorage `pb_ski_gfx_auto`) and is its start level next time (else gfx-quality.js's guess). Picking Automatesch goes on
+  from the level running now.
+- **The display's beat**: target = max(1/60 s, beat). The beat is learnt from the load's frames (a rAF probe from boot until the loop
+  starts) and every frame without a 3D render (picker, map, finish): 24 frames < 25 ms = 60 Hz (< 12.5 ms = 120 Hz: target stays 1/60 s,
+  a ProMotion iPad is fine at 60 fps), 150 frames and none < 25 ms = a 30 fps cap (target 33.3 ms). post.js takes the same budget
+  (`post.setBudget`), so a 30 fps-capped iPad no longer drives the resolution to the floor. (A Low Power Mode switched on mid-game is not
+  re-learnt: the beat only goes faster; Automatesch may then step down, a manual pick only gets the hint.)
+- **Recovery paths** (only these may lower a manual pick, for that page life only, and they say so; the pick itself is never changed):
+  the picture check (a broken picture / shader error: Niddreg shaders, toast "Feeler an der Grafik: dës Kéier Niddreg"), a WebGL context
+  lost while the page was visible (sessionStorage `pb_ski_gfx_recover`) or a page that died while playing (`pb_ski_alive`, set while the
+  game is on screen and visible, cleared on pagehide / hidden: iOS's out-of-memory kill): the next load starts ONE level lower with the
+  toast "Grafik dës Kéier: <level> (no engem Feeler)". The old watchdog code and `FRAME_BUDGET_MS` are gone (MTB still has its own copy
+  of that watchdog, untouched).
+- **Niddreg look** (the picture at the same geometry: draw calls / triangles identical at every shot): resolution floor 0.9 -> 1.0;
+  the final pass's sharpen stretch factor capped at 1.25 (was 1.6: at the floor the unsharp mask turned the upscale into blocks); the
+  corduroy fades while a groove still spans ~4 px (was ~2.5 px: at Niddreg's resolution it beat with the pixels into a coarse checker
+  round the skier); the low-sun sheen on every level (ALU only); a painted forest shadow instead of none (two taps of the 10 m forest
+  raster up-sun, coarser mips = soft, as long as a ~14 m tree's shadow at this sun height; uniform branch); paid for by reading the lake
+  (2 noise taps) and canopy (2 taps) textures only where there is a lake / canopy (CHEAP only, explicit gradients: textureGrad).
+- **Tests**: flow `ski-quality` (Héich picked in the pause menu stays Héich 60 s under `__ski.slow(30)` = +30 ms on every judged frame,
+  one hint at most; a reload keeps it; Automatesch under the same slow frames: high -> medium -> low with a gap, then back up when
+  `slow(0)`); `node scripts/ski/quality-ctl-test.mjs` (22 checks: manual never changes, one level at a time, spikes, 30 fps cap, 120 Hz,
+  retry wait, grace, hitches). Debug: `__ski.gfx()` (level, choice, beat, target, median, slowFor, goodFor, resolution), `__ski.slow(ms)`.
+  Shots: `scripts/ski/quality-shots.sh OUT [ROOT]` (Killy + 3 Vallées, Niddreg / Héich, iPad 1080 x 810 @2, fixed resolution);
+  `perf-probe.mjs --root DIR` measures another copy (before / after).

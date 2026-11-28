@@ -1599,7 +1599,7 @@ async function boot() {
     pictureChecks++;
     const step = pictureChecks;
     console.warn(`[ski] the picture looks broken (${n} colours, ${shaderErrors.length} shader errors): safety step ${step}`);
-    if (step === 1 && level !== 'low') { applyQuality('low'); qctl.setLevel('low'); hud.toast('Grafikfeeler: dës Kéier Niddreg', 3000); }      // a broken picture: this page life only, the pick stays
+    if (step === 1 && level !== 'low') { applyQuality('low'); qctl.setLevel('low'); hud.toast('Feeler an der Grafik: dës Kéier Niddreg', 3000); }      // a broken picture: this page life only, the pick stays
     else post.fallback(Math.min(2, step - (level === 'low' ? 0 : 1)));
     document.documentElement.dataset.skiSafe = String(post.safe);
     setTimeout(pictureCheck, 1500);
@@ -1929,7 +1929,7 @@ async function boot() {
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
     resolution: () => post.stats(), post,
     /** 28 Nov 2026: the Grafik controller (flow ski-quality); slow(ms) adds ms to every judged frame (a GPU-bound device, simulated). */
-    quality: () => ({ level, choice: GFX().choice(), manual: manualPick(), recoveredFrom, ...qctl.stats(), res: post.stats(), budget: post.budget }),
+    gfx: () => ({ level, choice: GFX().choice(), manual: manualPick(), recoveredFrom, ...qctl.stats(), res: post.stats(), budget: post.budget }),
     slow(ms) { slowSim = Math.max(0, Number(ms) || 0); }, get shaderErrors() { return shaderErrors; }, pictureColours, pictureCheck,
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },

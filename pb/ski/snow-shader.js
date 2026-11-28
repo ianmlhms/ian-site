@@ -118,7 +118,13 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float laneR = fract(sin(lane * 12.9898) * 43758.5453);
         float gp = across * 34.0 + laneR * 3.0 + nA.r * 0.6;
         float gw = fwidth(across) * 34.0;
+        #ifdef CHEAP
+        // Niddreg (28 Nov 2026): at its lower internal resolution the grooves beat with the pixel grid into a coarse blotchy checker
+        // close to the skier: they fade out while a groove still spans ~4 px (Mëttel / Héich: ~2.5 px)
+        float aa = clamp(1.0 - gw * 0.62, 0.0, 1.0); aa *= aa * (1.0 - smoothstep(70.0, 160.0, vDist));
+        #else
         float aa = clamp(1.0 - gw * 0.4, 0.0, 1.0); aa *= aa * (1.0 - smoothstep(70.0, 160.0, vDist));
+        #endif
         float onPiste = smoothstep(0.25, 0.7, piste);
         float cordS = sin(gp), cordC = cos(gp);
         float cord = cordS * aa * (0.5 + 0.35 * laneR) * onPiste;

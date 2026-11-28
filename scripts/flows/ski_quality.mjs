@@ -33,7 +33,7 @@ export const flow = {
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
-    const q = () => page.evaluate(() => window.__ski.quality());
+    const q = () => page.evaluate(() => window.__ski.gfx());
     const running = () => page.waitForFunction(() => window.__ski && window.__ski.game.phase === "running" && document.documentElement.dataset.skiScreen === "ski", null, { timeout: 150000 });
     const pick = async (v) => {
       await page.keyboard.press("Escape");
@@ -48,7 +48,7 @@ export const flow = {
       const seen = [], t0 = performance.now();
       let last = null;
       while (performance.now() - t0 < seconds * 1000) {
-        last = window.__ski.quality();
+        last = window.__ski.gfx();
         if (!seen.length || seen[seen.length - 1].level !== last.level) seen.push({ level: last.level, at: +((performance.now() - t0) / 1000).toFixed(1) });
         if (until && last.level === until) break;
         await new Promise((r) => setTimeout(r, 500));
