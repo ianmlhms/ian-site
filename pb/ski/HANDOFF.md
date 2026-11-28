@@ -2660,3 +2660,28 @@ Owner's rule: only the lifts and pistes of the REAL 2026/27 (else 2025/26) piste
   raster's box (3V "far" shot): faded out at the box edge like the canopy.
 - **Not tested**: WebKit. On 28 Nov ~14:50-16:20 every Playwright WebKit launch on the Mini hung at 0 % CPU (three other agents' `=ski`
   runs for 45-60 min, mine, and a blank page probe), so `FLOW_BROWSER=webkit` for `ski-quality` / `ski` is still to run. No real iPad.
+## Official-map alignment: Livigno, Davos, Laax, Sölden (28 Nov 2026; owner: only the lifts and pistes of the real 2026/27 / 2025/26 piste map)
+Sources, inventories and shots: `~/Library/Caches/ski-work/official-maps/<resort>/` (`inventory.json`, the map images). None of the four resorts publishes a
+text list; the maps were read piece by piece (crops, zoom). OSM stays the geometry, the map decides what exists and its colour / number.
+- **Tool**: `scripts/ski/official_apply.py <rid> [--dry]` (venv python) from a spec `scripts/ski/official/<rid>.spec.json` (remove_pistes / recolour / set /
+  remove_lifts / lift_set / lift_cut). Pistes go through `prune_pistes.py` (painted network ways go with them, ids reserved in `common.py`, piste / lift
+  index append-only, no DB change); names / numbers / lift fields are set in place; `lift_cut` shortens a lift to its last N m (new bottom height from the
+  shipped 5 m tiles). Idempotent. Nothing else in the data changes (tiles / classes / map / panorama stay as baked; the printed map draws the pistes live).
+- **Sölden** (map 2026/27 via skiresort.info trail map; piste 1-81 incl. skiroutes): removed the pistes the map does not show: `35`, `7b`, `mini`,
+  `abfahrt-zur-pension-waldesru`, `22-black` and the four private hut routes `gaislachalm*` (dotted "private ski routes", not public). Mutkogl T-bar
+  (E67) cut to the rebuilt 859 m: top where it was (Mutkogl shoulder), bottom now at 3108 / 9074 (height from the tiles, 3029 m). The OSM way is still
+  the old 2.1 km line, so the exact new alignment is the old line's upper part (the map shows it parallel to piste 39): approximate. Innerwald I / II = B21 / B22.
+  Colours of all numbered pistes already matched. Missing on the map, not in the game (no clean OSM line): ski routes 60, 63, 80.
+- **Laax** (map 2025/26; the right Vorab glacier T-bar is still drawn there, dismantled Aug 2026, the game has only the left one): removed `laax-46`, `laax-80`
+  (a second 80), `laax-62-inoffiziell`. Colours set from the map: 15 Nagens - Alp Nagens red, 26 Siala West (Blo) black, 38 Sogn Martin - Plaun (Schwaarz)
+  blue, 25 Nagens - Sogn Martin red. `Via Alp Muletg` / `Via Planezzas` / `Verbindung → Ladir` stay: they are the lower part of piste 90 (Ladir slope) down to Ladir.
+  Pistes 32 / 33 (Vorab glacier right) stay (2025/26 map), they have no lift of their own any more. All 55 map piste numbers are in the game.
+- **Davos** (DKM map PDF made 13 Nov 2026 + Schatzalp map): removed `5a-rennpiste`; colours: 22 Verbindungsweg red, Bräma (rot) Blo part red, Rinerhorn 11 (+ variant)
+  red; `usser-isch` is official 7, `furkastrasse` is 41 "Gruobenalp - Rechts", `bobbahnstrasse` is Schatzalp piste 5 ("Blo 5"). Missing, needs manual geometry:
+  48 Gotschnaboden - Klosters (along the Gotschnabahn), 9 Heimeli - Langwies, 16 Usser Isch | Abfahrt (the Dec 2023 valley run: no OSM piste way), Rinerhorn 3 Trainer,
+  4 Spina (red), 12 Meder Abfahrt, 18 Rennpiste, Schatzalp 2. Pischa stays out on purpose.
+- **Livigno** (map 2026/27): the map has numbered lifts but unlabelled piste lines (no numbers, no names), so no piste could be checked: all 96 stay.
+  Lifts: all 30 numbers 1-30 are in the game (Planon Skilift = lift 2 "Camanel - Monte Sponda", ref set; Mottolino gondola 10 seats); 26 (dashed, "coming soon") is not built.
+  Missing: the 2025 Snowpark Mottolino chair (not in OSM, no number on the map).
+- Kids ropes / carpets / the unnamed small drags are not drawn on piste maps; they stay (listed as unverified in the report).
+- Checks: `reach-check`, `deadend-check`, `cloud-size-test`, goals checks, `check_site` green; flow `ski-official` (Chromium + WebKit): data assertions + the Mutkogl bottom station shot.

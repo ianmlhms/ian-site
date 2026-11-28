@@ -305,6 +305,7 @@ RESORTS = {
     # swissALTI3D 2 m (LV95), Copernicus GLO-30 where the Swiss tiles end (north of Madrisa).
     "davos": {
         "name": "Davos Klosters", "short": "Parsenn · Jakobshorn · Madrisa", "country": "CH", "crs": "EPSG:2056",
+        "reserved_ids": ("5a-rennpiste",),                       # 28 Nov 2026: not on the official map, removed by official_apply.py (board row stays)
         "bbox": (46.715, 9.775, 46.940, 9.945),
         "dem": ["swissalti3d", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "tree_line": 2150.0, "derived_forest": 2000.0,       # inner Graubünden: larch and arolla pine up to ~2100 m, Davos valley floor 1560 m
@@ -327,6 +328,7 @@ RESORTS = {
     # network. Heights swissALTI3D 2 m (LV95). Elm (north) and Obersaxen Mundaun (south-west) are separate areas outside the box.
     "laax": {
         "name": "Laax", "short": "Flims · Laax · Falera", "country": "CH", "crs": "EPSG:2056",
+        "reserved_ids": ("laax-46", "laax-80", "laax-62-inoffiziell"),      # 28 Nov 2026: not on the official map (official_apply.py)
         "bbox": (46.775, 9.140, 46.905, 9.345),
         "dem": ["swissalti3d", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "tree_line": 2150.0, "derived_forest": 2000.0,
@@ -344,6 +346,8 @@ RESORTS = {
     # (= the Land Tirol airborne scan, CC BY 4.0), Copernicus GLO-30 where BEV has no data. Obergurgl-Hochgurgl and Vent are separate areas.
     "soelden": {
         "name": "Sölden", "short": "Gaislachkogl · Giggijoch · Gletscher", "country": "AT", "crs": "EPSG:25832",
+        "reserved_ids": ("35", "7b", "mini", "abfahrt-zur-pension-waldesru", "22-black", "gaislachalm", "gaislachalm-2",
+                         "gaislachalm-3", "gaislachalm-variante"),     # 28 Nov 2026: not on the official map (official_apply.py)
         "bbox": (46.895, 10.895, 46.995, 11.050),
         "dem": ["at-dgm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "tree_line": 2150.0, "derived_forest": 2000.0,

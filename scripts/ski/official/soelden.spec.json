@@ -1,0 +1,8 @@
+{"season": "2026/27 (map shows the new Gratl A16 and the 7a link; via skiresort.info trail map)",
+ "source": "https://www.skiresort.info/ski-resort/soelden/trail-map (reproduces the Sölden panorama map); soelden.com new-ski-area-features",
+ "remove_pistes": ["35", "7b", "mini", "abfahrt-zur-pension-waldesru", "22-black", "gaislachalm", "gaislachalm-2", "gaislachalm-3", "gaislachalm-variante"],
+ "recolour": {},
+ "set": {},
+ "remove_lifts": [],
+ "lift_set": {"Innerwald I": {"ref": "B21"}, "Innerwald II": {"ref": "B22"}},
+ "lift_cut": {"Mutkogl": {"keep_m": 859, "keep": "top"}}}

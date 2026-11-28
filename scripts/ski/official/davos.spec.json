@@ -1,0 +1,7 @@
+{"season": "2026/27 (DKM Pistenplan, PDF made 13 Nov 2026) + Schatzalp-Strela map (skiresort.info, 2025/26)",
+ "source": "https://www.davosklostersmountains.ch/archiv/dkm/dokumente/karten/Pistenplan-DKM.pdf; https://www.skiresort.info/ski-resort/schatzalp-strela/trail-map",
+ "remove_pistes": ["5a-rennpiste"],
+ "recolour": {"verbindungsweg": "red", "brama-rot-blue": "red", "rinerhorn-11": "red", "rinerhorn-11-variante": "red"},
+ "set": {"usser-isch": {"ref": "7"}, "furkastrasse": {"name": "Gruobenalp - Rechts", "ref": "41"}, "bobbahnstrasse": {"name": "Blo 5", "ref": "5"}},
+ "remove_lifts": [],
+ "lift_set": {}}

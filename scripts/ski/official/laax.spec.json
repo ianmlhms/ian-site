@@ -1,0 +1,7 @@
+{"season": "2025/26 (no 2026/27 map yet)",
+ "source": "https://www.skiresort.info/ski-resort/laaxflimsfalera/trail-map (reproduces the Flims Laax Falera piste map 2025/26)",
+ "remove_pistes": ["laax-46", "laax-80", "laax-62-inoffiziell"],
+ "recolour": {"nagens-alp-nagens": "red", "siala-west-blue": "black", "sogn-martin-plaun-black": "blue", "nagens-sogn-martin-plaun": "red"},
+ "set": {},
+ "remove_lifts": [],
+ "lift_set": {}}
