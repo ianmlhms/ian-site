@@ -2652,3 +2652,11 @@ Owner's rule: only the lifts and pistes of the REAL 2026/27 (else 2025/26) piste
   retry wait, grace, hitches). Debug: `__ski.gfx()` (level, choice, beat, target, median, slowFor, goodFor, resolution), `__ski.slow(ms)`.
   Shots: `scripts/ski/quality-shots.sh OUT [ROOT]` (Killy + 3 Vallées, Niddreg / Héich, iPad 1080 x 810 @2, fixed resolution);
   `perf-probe.mjs --root DIR` measures another copy (before / after).
+- **Measured** (Mini, Chromium): flow `ski-quality` PASS (manual Héich 60 s under +30 ms frames: no change, one hint; Automatesch high ->
+  medium at 11.6 s -> low at 22.4 s, back to medium 21.6 s after the slow frames stopped). Flow `ski` PASS (Niddreg p95 16.7 ms, 133 calls,
+  360k triangles). perf-probe Killy, CPU x4, --gpu, Niddreg x2 before / after: p50 16.7 / 16.7 ms, the same draw calls and triangles; the
+  p95 (83-117 ms) are tile-streaming hitches in both. Shots (fixed resolution, same spots): draw calls / triangles identical before /
+  after at every shot; Héich pictures unchanged. A first try of the forest shadow smeared stripes onto far mountains outside the forest
+  raster's box (3V "far" shot): faded out at the box edge like the canopy.
+- **Not tested**: WebKit. On 28 Nov ~14:50-16:20 every Playwright WebKit launch on the Mini hung at 0 % CPU (three other agents' `=ski`
+  runs for 45-60 min, mine, and a blank page probe), so `FLOW_BROWSER=webkit` for `ski-quality` / `ski` is still to run. No real iPad.
