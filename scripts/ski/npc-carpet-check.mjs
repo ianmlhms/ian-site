@@ -97,7 +97,7 @@ for (const rid of rids.length ? rids : ALL) {
         const prev = seen.get(o.id);
         if (prev && k - prev.k === 1) { const d = Math.hypot(o.x - prev.x, o.z - prev.z); maxGap = Math.max(maxGap, d); if (d > 0.35) jumps++; }
         seen.set(o.id, { x: o.x, z: o.z, k });
-        if (o.belt) {
+        if (o.belt === 1) {
           onBelt++;
           const g = height(o.x, o.z) + 0.18;
           if (Math.abs(o.y - g) > 0.02) beltBad++;
