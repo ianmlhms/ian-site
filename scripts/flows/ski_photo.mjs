@@ -82,7 +82,9 @@ export const flow = {
     h.eq(bytes.subarray(0, 4).toString("hex"), PNG_MAGIC, "the download is a PNG");
     h.expect(/^ski-alpen-\d{8}-\d{6}\.png$/.test(dl.suggestedFilename()), `file name ${dl.suggestedFilename()}`);
     const w = bytes.readUInt32BE(16), hh = bytes.readUInt32BE(20);
-    h.expect(w >= 800 && hh >= 500 && bytes.length > 30000, `${w}x${hh} px, ${(bytes.length / 1024).toFixed(0)} KB`);
+    const cv = await page.evaluate(() => [document.getElementById("skiCanvas").width, document.getElementById("skiCanvas").height]);
+    h.eq([w, hh], cv, "the picture has the canvas's own size (power mode draws a smaller canvas, so no fixed minimum)");
+    h.expect(w >= 300 && hh >= 200 && bytes.length > 15000, `${w}x${hh} px, ${(bytes.length / 1024).toFixed(0)} KB`);
     if (shotsDir) { fs.mkdirSync(shotsDir, { recursive: true }); fs.copyFileSync(file, path.join(shotsDir, "ski-photo.saved-bw.png")); }
     await page.waitForSelector(".phcard img");
     h.expect(await page.evaluate(() => { const i = document.querySelector(".phcard img"); return i.complete && i.naturalWidth > 100; }), "the card shows the picture (long press saves it)");
@@ -103,7 +105,7 @@ export const flow = {
     await page.click('.phbar [data-a="save"]');
     await page.waitForFunction(() => !!window.__shared, null, { timeout: 15000 });
     const shared = await page.evaluate(() => window.__shared);
-    h.expect(shared.length === 1 && shared[0].type === "image/png" && shared[0].size > 30000, `shared ${shared[0].name} (${shared[0].size} bytes)`);
+    h.expect(shared.length === 1 && shared[0].type === "image/png" && shared[0].size > 15000, `shared ${shared[0].name} (${shared[0].size} bytes)`);
     await page.click('.phcard [data-a="x"]');
 
     h.step("pixel look: black-and-white really is grey");
