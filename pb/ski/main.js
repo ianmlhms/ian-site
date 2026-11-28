@@ -44,6 +44,7 @@ import { createPisteMap } from './map.js';
 import { readMpContext, mpResort, createMp } from './net/index.js';
 // round 4A: game modes (stars / snow park / free ride all day), see modes/host.js
 import { parkLayoutOf, createModeHost } from './modes/host.js';
+import { areaTitle } from './picker.js';
 import { attachModePanel, starRow, createRideHud, createChallengePrompt, showSkiCard } from './modes/panel.js';
 // round 6: lift rides, challenge gates on the mountain, ski types
 import { createRide, createDescent, rideCamera, RIDE } from './modes/liftride.js';
@@ -640,6 +641,8 @@ async function boot() {
       if (me && !game.mapPicked) game.freeLift = modes.lifts.nearestBottom(me.x, me.z, 1e9);
       if (!game.freeLift) game.freeLift = spawn;
       pickLift(game.freeLift);
+    } else if (m === 'goals') {                    // 28 Nov: goals + badges of this area, the daily challenge
+      modePanel.showGoals({ progress: store.get(), rid, areaName: areaTitle, extra: { discCount: explore.disc.count } });
     } else if (m === 'skis') {
       modePanel.showSkis({ stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) setMapMode('skis'); } });
     } else if (game.piste) selectPiste(game.piste, true);
@@ -1114,6 +1117,7 @@ async function boot() {
     if (path.shuttle && !down) { const sw = view.shuttleBoard(lift.index); if (sw && sw.wait > 2) hud.toast(`D'Kabin kënnt (${Math.ceil(sw.wait)} s)`, 2200); }
     if (camMode === 'fp') { rideView = 'window'; rideCam = null; }          // R7-C: first person = the window view on a lift
     explore.rode(lift);
+    modes.liftRidden(lift);                      // 28 Nov: goals + daily challenge
     modes.rideStart(lift);
     chPrompt.show(null);
     game.phase = 'lift'; game.hold = false;
@@ -1586,7 +1590,7 @@ async function boot() {
         modes.hudTick(game);
         if (!replay.active) freeTick(st);
         // R7-C: discovery (every place skied through, every station reached), the avalanche warning, the course HUD
-        if ((game.phase === 'running' || game.phase === 'lift') && !replay.active) explore.tick(st, HUD_EVERY);
+        if ((game.phase === 'running' || game.phase === 'lift') && !replay.active) { explore.tick(st, HUD_EVERY); modes.goalTick(st, HUD_EVERY, explore.disc.count); }
         if (avalanches) avalanches.hudTick(st, { freeride: game.mode === MODES.freeride && !isRace(), running: game.phase === 'running' && !game.paused });
         if (course && lastCourse) courseHud.set(lastCourse, st, camYaw);
         if (ride) rideHud.set({ left: ride.left, share: ride.share, view: rideView, down: !!ride.down });

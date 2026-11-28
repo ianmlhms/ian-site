@@ -27,7 +27,7 @@ export const flow = {
     await h.goto("/pb/ski.html?resort=killy&map=1&debug=1&bot=1&timescale=8&q=low");
     await page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map" || document.documentElement.dataset.bootError, null, { timeout: 90000 });
     h.eq(await html("bootError"), "", "boots without an error");
-    h.eq(await page.$$eval(".modetabs button", (b) => b.map((x) => x.textContent)), ["Fräi fueren", "Challengen", "Snowpark", "Skier"], "mode tabs: Fräi fueren, Challengen, Snowpark, Skier");
+    h.eq(await page.$$eval(".modetabs button", (b) => b.map((x) => x.textContent)), ["Fräi fueren", "Challengen", "Snowpark", "Skier", "Ziler"], "mode tabs: Fräi fueren, Challengen, Snowpark, Skier, Ziler");
     const lockedRows = await page.$$eval(".prow.locked", (r) => r.length);
     h.eq(lockedRows, 0, "round 6: no piste is locked");
 

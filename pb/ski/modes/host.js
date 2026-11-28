@@ -6,7 +6,7 @@
  * Saves: stars / park points into the local progress (progress.js store) and the compact cloud record (cloud.js). */
 import { MODES, SKI } from '../config.js';
 import { stepSkier } from '../skier.js';
-import { starKey, challengeFor, createTracker, addStars, resortStars, totalStars, lockState, pisteStars, migrateStars, outfitOpen, thresholds } from './challenges.js';
+import { starKey, hash5, starCount, challengeFor, createTracker, addStars, resortStars, totalStars, lockState, pisteStars, migrateStars, outfitOpen, thresholds } from './challenges.js';
 import { createParkLayout, stepPark, createTrickJudge, parkBoardId, parkBoardName, parkScoreOf, validParkPoints } from './park.js';
 import { createLiftNet, createFreeRun, createDayClock, startHourFor, DAY } from './freeride.js';
 import { createFlagsView, createParkView } from './views.js';
@@ -14,6 +14,10 @@ import { createMinimap } from './minimap.js';
 import { createCloudSave, mergeCloud, cloudGain } from './cloud.js';
 import { finishStarsHtml, showParkFinish, createFreeHud, parkHudText, trickToast } from './panel.js';
 import { SKI_TYPES, skiStatsOf, skiUnlock } from './skis.js';
+import { checkGoals, checkAll, markLift, atTop } from './goals.js';
+import { liftKey } from './goals-keys.js';
+import { dailyFor, dailyEvent, dayOf, streakNow } from './daily.js';
+import { createBadgePop, SERIE } from './goals-view.js';
 
 /** The park layout for field.js (call before createField). */
 export const parkLayoutOf = (resort) => createParkLayout(resort.park);
@@ -34,11 +38,11 @@ export function createModeHost(ctx) {
   const arcade = () => (window.Arcade && typeof window.Arcade.setBoard === 'function' && typeof window.Arcade.score === 'function' ? window.Arcade : null);
 
   // old saves: a piste with a best time has its first star; then the cloud copy (the arcade's injected save, then the cloud)
-  store.set(migrateStars(store.get()));
+  store.set(checkAll(migrateStars(store.get())).progress);                    // 28 Nov: old saves earn their badges silently
   const cloud = createCloudSave({
     onIncoming(decoded) {
       const before = store.get();
-      const after = mergeCloud(before, decoded);
+      const after = checkAll(mergeCloud(before, decoded)).progress;
       if (!cloudGain(before, after)) return;
       store.set(after);
       if (ctx.onProgressChanged) ctx.onProgressChanged();
@@ -46,8 +50,45 @@ export function createModeHost(ctx) {
   });
   const saveCloud = () => cloud.push(store.get());
 
+  // 28 Nov 2026: goals, badges, the daily challenge. Every event goes through these three; the pop is small and never blocks.
+  const badges = createBadgePop(uiRoot);
+  let goalT = 0, topSeen = false;
+  /** Check this area's goals (extra = { discCount, top }); a reached one is saved, sent to the cloud and shown as a badge pop. */
+  function goalsCheck(extra = {}) {
+    const r = checkGoals(store.get(), rid, extra);
+    if (!r.gained.length) return;
+    store.set(r.progress);
+    saveCloud();
+    badges.show(r.gained.map((g) => ({ text: g.label })));
+  }
+  /** An event for today's challenge ({ t: 'finish' | 'stars' | 'lift', ... }): saved; completed = a pop with the streak. */
+  function dailyEv(ev) {
+    const day = dayOf(), ch = dailyFor(day);
+    const r = dailyEvent(store.get(), ch, { ...ev, rid });
+    if (r.progress !== store.get()) store.set(r.progress);
+    if (r.done) { saveCloud(); badges.show([{ text: 'Dagesfuerderung gemaach!', sub: `Serie: ${SERIE(streakNow(store.get(), day))}` }]); document.documentElement.dataset.skiDailyDone = day; }
+  }
+
   const host = {
-    lifts, layout, challengeOf, cloud,
+    lifts, layout, challengeOf, cloud, badges,
+    goalsCheck, dailyEv,
+    /** A lift ride starts (main.js): the lift is ridden (goal bit + cloud), it counts for the daily combo, the goals are checked. */
+    liftRidden(lift) {
+      const src = resort.lifts[lift.index];
+      const next = src ? markLift(store.get(), rid, src) : store.get();
+      if (next !== store.get()) store.set(next);
+      if (src) dailyEv({ t: 'lift', key: liftKey(src) });
+      goalsCheck();
+      saveCloud();
+    },
+    /** HUD rate (main.js, next to explore.tick): the highest point and the discovery goal, checked every 2 s. */
+    goalTick(st, dt, discCount) {
+      goalT += dt;
+      if (goalT < 2) return;
+      goalT = 0;
+      if (!topSeen && st && atTop(rid, st.y)) topSeen = true;
+      goalsCheck({ discCount, top: topSeen });
+    },
     get judge() { return judge; }, get tracker() { return tracker; }, get freeRun() { return freeRun; }, get clock() { return clock; }, sessionStats,
     /** Round 6: what the player has done towards the ski unlocks, and the open ski ids. */
     skiStats: () => skiStatsOf(store.get(), totalStars(store.get())),
@@ -217,6 +258,10 @@ export function createModeHost(ctx) {
         if (!(bh[key] > 0) || ev.ms < bh[key]) store.set({ ...store.get(), bestHash: { ...bh, [key]: ev.ms } });
       }
       saveCloud();
+      // 28 Nov: the run counts for the daily challenge (time / combo piste, the stars won today) and may reach a goal
+      if (ev && !assisted) dailyEv({ t: 'finish', key: hash5(piste.id), ms: ev.ms, valid: !!ev.valid });
+      if (r.gained) dailyEv({ t: 'stars', n: starCount(r.gained) });
+      goalsCheck();
       document.documentElement.dataset.skiStars = String(pisteStars(store.get(), rid, piste.id));
       return finishStarsHtml({ challenge: c, runMask, totalMask: pisteStars(store.get(), rid, piste.id), gained: r.gained, unlocked });
     },
@@ -231,6 +276,7 @@ export function createModeHost(ctx) {
       if (a && !assisted && validParkPoints(points)) {
         try { a.setBoard({ id: parkBoardId(rid), name: parkBoardName(resort.short), format: 'skipark' }); a.score(parkScoreOf(points)); } catch (error) { console.warn('[ski] park board submit failed', error.message); }
       }
+      goalsCheck();                                       // 28 Nov: the park goals
       document.documentElement.dataset.skiPark = String(points);
       return showParkFinish(uiRoot, { name: layout.name, points, best: store.get().park[rid] || 0, improved, tricks: judge.tricks, assisted, onAgain, onMap });
     },

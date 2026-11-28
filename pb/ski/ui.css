@@ -384,3 +384,41 @@ html[data-ski-replay="1"] #ui > *:not(.rpbar),html[data-ski-photo="1"] #ui > *:n
 .phcard img{width:100%;height:auto;max-height:46vh;object-fit:contain;border:1px solid var(--soft);-webkit-touch-callout:default;user-select:auto}
 .phhint{margin:0;font-size:12px;color:#444}
 .hud .hbtns.hbtns2{right:calc(60px + env(safe-area-inset-right))}
+/* 28 Nov 2026: goals + badges + the daily challenge (modes/goals*.js, modes/daily.js) */
+.medal{display:inline-block;flex:none;width:14px;height:14px;border-radius:50%;border:2px solid #c9ccd1;background:var(--white);position:relative;vertical-align:-2px}
+.medal.on{border-color:#a87000;background:radial-gradient(circle at 36% 30%,#ffe69a,#e0a100 70%)}
+.medal.on::after{content:"";position:absolute;left:3px;top:0;width:3px;height:6px;border:solid #5a3d00;border-width:0 1.6px 1.6px 0;transform:rotate(40deg)}
+.modetabs{padding:8px 6px}.modetabs button{padding:0 2px;font-size:12px;letter-spacing:-.01em}
+.gsum{font-size:14px}.gsum b{font-size:20px;letter-spacing:-.02em}
+.glist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px}
+.goal{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"m l n" "b b b";gap:2px 8px;align-items:center;font-size:14px}
+.goal .medal{grid-area:m}.goal .gl{grid-area:l;font-weight:650}.goal .gn{grid-area:n;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.goal .gbar{grid-area:b;display:block;height:6px;background:var(--tint);border:1px solid var(--soft)}
+.goal .gbar i{display:block;height:100%;background:var(--green)}
+.goal.done .gbar i{background:#e0a100}.goal.done .gl{color:var(--ink)}.goal:not(.done) .gl{color:var(--muted)}
+.how2{margin:0}
+#mapScreen[data-mode="goals"] .side > .pick{flex:1 1 auto;min-height:0;overflow:auto}
+.dailycard{display:flex;flex-direction:column;gap:3px;border:1px solid var(--ink);border-left-width:5px;border-left-color:#e0a100;padding:8px 10px;background:var(--white);text-align:left}
+.dailycard .dk{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#8a5e00}
+.dailycard .dt{font-size:15px;line-height:1.25}
+.dailycard .dm{display:flex;flex-wrap:wrap;align-items:center;gap:2px 10px;font-size:12px;color:var(--muted)}
+.dailycard .dbar{display:block;width:90px;height:6px;background:var(--tint);border:1px solid var(--soft)}.dailycard .dbar i{display:block;height:100%;background:var(--green)}
+.dailycard .dstreak{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink)}
+.dailycard .dok{color:var(--green);font-weight:800}
+.dailycard.done{border-left-color:var(--green)}
+.dailyhint{margin:0}
+.badgepop{position:absolute;right:calc(12px + env(safe-area-inset-right));bottom:calc(86px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:6px;align-items:flex-end;pointer-events:none!important;z-index:6}
+.badgepop .bp{display:flex;align-items:center;gap:9px;background:rgba(252,252,250,.94);border:1px solid var(--ink);padding:6px 11px 6px 9px;animation:bpin .35s cubic-bezier(.16,1,.3,1);transition:opacity .35s,transform .35s}
+.badgepop .bp.out{opacity:0;transform:translateY(6px)}
+.badgepop .bp .medal{width:20px;height:20px;border-width:2.5px}.badgepop .bp .medal.on::after{left:5px;top:1px;width:4px;height:8px}
+.badgepop .bp span{display:flex;flex-direction:column;line-height:1.15}.badgepop .bp small{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.badgepop .bp b{font-size:14px}
+@keyframes bpin{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.badgepop .bp{animation:none}}
+.rp-medals{display:inline-flex;align-items:center;gap:4px;flex:none;align-self:center;margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rp-stars + .rp-medals{margin-left:6px}
+.rp-medals.all{color:#8a5e00;font-weight:700}
+.rp-daily{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:stretch;padding:0 20px 14px}
+.rp-dailybtn{appearance:none;flex:1 1 320px;min-width:0;margin:0;padding:0;border:0;background:none;text-align:left;font:inherit;color:inherit;cursor:pointer}
+.rp-dailybtn:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+.rp-dailybtn:hover .dailycard{background:var(--paper)}
+.rp-total{display:flex;flex-direction:column;justify-content:center;padding:0 4px;min-width:130px}.rp-total b{font-size:22px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}.rp-total small{font-family:var(--mono);font-size:11px;color:var(--muted)}

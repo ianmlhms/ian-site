@@ -18,7 +18,7 @@ export function emptyProgress() {
   // stars: { "<resort>/<hash5>": mask } and bestHash (the best times under the same short keys, for the cloud record): modes/challenges.js
   // park: { <resort>: best park points } (round 4A)
   // stats: { off: metres skied off the piste, top: top speed m/s } and ski: the picked ski type (round 6, modes/skis.js)
-  return { v: SAVE_VERSION, best: {}, ghosts: {}, runs: {}, stars: {}, park: {}, bestHash: {}, last: null, ghostOrder: [], stats: { off: 0, top: 0 }, ski: 'allmountain', disc: {}, lawin: {} };
+  return { v: SAVE_VERSION, best: {}, ghosts: {}, runs: {}, stars: {}, park: {}, bestHash: {}, last: null, ghostOrder: [], stats: { off: 0, top: 0 }, ski: 'allmountain', disc: {}, lawin: {}, goals: {}, lifts: {}, daily: { d: '', n: 0, s: 0, last: 0, streak: 0, best: 0 } };
 }
 
 export function normalize(raw) {
@@ -35,6 +35,14 @@ export function normalize(raw) {
   // round 7-C: discovered cells per resort (modes/discovery.js run-length text) and the Lawin challenges won (bit mask per resort)
   for (const [k, v] of Object.entries(raw.disc && typeof raw.disc === 'object' ? raw.disc : {})) if (/^[a-z0-9]{1,16}$/.test(k) && typeof v === 'string' && v.length <= 12000 && /^[0-9a-z,]*$/.test(v)) p.disc[k] = v;
   for (const [k, v] of Object.entries(raw.lawin && typeof raw.lawin === 'object' ? raw.lawin : {})) if (/^[a-z0-9]{1,16}$/.test(k) && Number.isInteger(v) && v > 0 && v < 256) p.lawin[k] = v;
+  // 28 Nov 2026 (goals, badges, daily challenge; modes/goals.js, modes/daily.js): reached goals (bit mask per resort), lifts ridden (one bit
+  // per position of modes/lift-index.js, base64) and the daily challenge state
+  for (const [k, v] of Object.entries(raw.goals && typeof raw.goals === 'object' ? raw.goals : {})) if (/^[a-z0-9]{1,16}$/.test(k) && Number.isInteger(v) && v > 0 && v < 4096) p.goals[k] = v;
+  for (const [k, v] of Object.entries(raw.lifts && typeof raw.lifts === 'object' ? raw.lifts : {})) if (/^[a-z0-9]{1,16}$/.test(k) && typeof v === 'string' && v.length <= 400 && /^[A-Za-z0-9_-]+$/.test(v)) p.lifts[k] = v;
+  if (raw.daily && typeof raw.daily === 'object') {
+    const d = raw.daily, int = (v, max) => (Number.isInteger(v) && v >= 0 && v <= max ? v : 0);
+    p.daily = { d: typeof d.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.d) ? d.d : '', n: int(d.n, 1000), s: int(d.s, 1), last: int(d.last, 100000), streak: int(d.streak, 100000), best: int(d.best, 100000) };
+  }
   if (raw.last && typeof raw.last.resort === 'string') p.last = { resort: raw.last.resort, piste: typeof raw.last.piste === 'string' ? raw.last.piste : null };
   p.ghostOrder = Array.isArray(raw.ghostOrder) ? raw.ghostOrder.filter((k) => p.ghosts[k]) : Object.keys(p.ghosts);
   return p;

@@ -25,6 +25,9 @@ const INFO = Object.freeze({
   obertauern: { title: 'Obertauern', places: 'Tauernrunde ronderëm de Pass', flags: ['🇦🇹'], region: 'Salzburger Land' },
 });
 
+/** The title of an area as the cards show it (Luxembourgish), for the goals pane and the daily challenge. */
+export const areaTitle = (rid) => (INFO[rid] || {}).title || rid;
+
 /* the sources of all resorts (scripts/ski/common.py SOURCE_CREDITS + OSM_CREDIT); each resort's own list: its piste map ⓘ */
 const CREDITS = [
   'Gelänn: IGN RGE ALTI® 5 m (© IGN, Licence Ouverte / Etalab 2.0), iwwer de Géoplateforme',
@@ -126,6 +129,26 @@ function showCredits(screen) {
   c.querySelector('[data-a="ok"]').focus();
 }
 
+/** 28 Nov 2026: the badges of every area on its card (n / m) and the daily challenge strip with the streak. The goals code loads lazily
+ *  (the cards are on screen before it arrives, the first-play download stays as it was); a failure leaves the plain cards. */
+async function decorate(screen, progress, onPick) {
+  try {
+    const [goals, view] = await Promise.all([import('./modes/goals.js'), import('./modes/goals-view.js')]);
+    if (!screen.isConnected) return;
+    screen.querySelectorAll('.resort.ready').forEach((b) => {
+      const c = goals.badgeCount(progress, b.dataset.id), name = b.querySelector('.rp-name');
+      if (!c.total || !name) return;
+      name.appendChild(el(`<span class="rp-medals${c.earned === c.total ? ' all' : ''}" title="Badges">${view.medal(c.earned > 0)}${c.earned} / ${c.total}</span>`));
+    });
+    const tot = goals.badgeTotals(progress), card = view.dailyCardHtml(progress, areaTitle);
+    const strip = el(`<div class="rp-daily" id="rpDaily">${card ? `<button type="button" class="rp-dailybtn" id="rpDailyGo" aria-label="Dagesfuerderung opmaachen">${card}</button>` : ''}<div class="rp-total" id="rpTotal"><b>${tot.earned} / ${tot.total}</b><small>Badges an allen Skigebidder</small></div></div>`);
+    screen.querySelector('.rp-head').after(strip);
+    const go = strip.querySelector('#rpDailyGo');
+    if (go) go.addEventListener('click', () => { const rid = go.querySelector('[data-daily]').dataset.daily; if (rid) onPick(rid); });
+    document.documentElement.dataset.skiPickerBadges = `${tot.earned}/${tot.total}`;
+  } catch (error) { console.warn('[ski] picker: goals unavailable', error); }
+}
+
 /**
  * The picker screen in `root`. onPick(id) on a tap; onOnline opens the lobby (null: no button).
  * Returns { el, close() } like the other screens.
@@ -161,5 +184,6 @@ export function showResorts(root, { onPick, current = null, onOnline = null, mus
   s.querySelector('#skiCredits').addEventListener('click', () => showCredits(s));
   root.appendChild(s);
   loadPictures(s);
+  if (progress) decorate(s, progress, onPick);
   return { el: s, close() { s.remove(); } };
 }

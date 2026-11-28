@@ -7,11 +7,16 @@
  *     (best times in ms, base 36, dropped first when the record would not fit)
  *     round 9: s3: { <resort>: 3-bit masks by piste-index position } (+ s2: packed hashes of pistes the index lacks) replace s when the plain text would pass LIMIT; the order of what is dropped is in encodeCloud, x: { o: metres off the piste, t: top speed in
  *     0.1 m/s, k: the picked ski type } (round 6: the ski unlocks; an old game ignores it, an old record without it reads as zero) }
+ *     28 Nov 2026: g: { <resort>: goal bit mask } (reached goals = badges, modes/goals.js), l: { <resort>: lifts ridden, one bit per position of
+ *     modes/lift-index.js, base64 }, y: [last daily day, streak, best streak] (modes/daily.js); all tiny, an old game ignores them, an old record
+ *     reads as nothing yet. Only `l` can be dropped (before the stars); the badges in `g` and `y` always stay.
  * Merging is always a union: stars OR-ed, park points and times keep the better one. Nothing is ever taken away from a player.
  * Test mode (window.__pbTestMode): nothing is sent or applied (the arcade keeps test saves apart). Standalone: local only. */
 import { cleanMask, starCount, totalStars } from './challenges.js';
 import { mergeRle, rleIntervals } from './discovery.js';
 import { PISTE_INDEX } from './piste-index.js';
+import { cleanLifts, mergeLifts } from './goals.js';
+import { dailyCloud, decodeDailyCloud, mergeDaily } from './daily.js';
 
 export const CLOUD_VERSION = 1;
 const LIMIT = 7000;                 // bytes of JSON (game_saves: jsonb <= 8192)
@@ -151,12 +156,19 @@ export function encodeCloud(progress, report = []) {
   for (const [rid, text] of Object.entries(progress.disc || {})) if (typeof text === 'string' && text) d[rid] = text;
   const w = {};
   for (const [rid, m] of Object.entries(progress.lawin || {})) if (Number.isInteger(m) && m > 0) w[rid] = m;
+  const g = {}, l = {};
+  for (const [rid, m] of Object.entries(progress.goals || {})) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 4096) g[rid] = m;
+  for (const [rid, text] of Object.entries(progress.lifts || {})) if (/^[a-z0-9]{1,16}$/.test(rid) && cleanLifts(text)) l[rid] = text;
+  const y = dailyCloud(progress);
+  if (Object.keys(g).length) rec.g = g;
+  if (Object.keys(l).length) rec.l = l;
+  if (y) rec.y = y;
   if (Object.keys(d).length) rec.d = d;
   if (Object.keys(w).length) rec.w = w;
   const size = () => JSON.stringify(rec).length;
   // round 9: 1. too big -> the stars move to the packed format s2 (lossless; old games read v1 without `s`: no stars shown, nothing lost
   // server-side because the keep-progress trigger compares `tb`). 2. best times (the boards keep them), 3. discovered cells resort by
-  // resort (largest first, the fog grid is the biggest part), 4. Lawin bits, 5. park points, 6. stars of the least-starred resorts.
+  // resort (largest first, the fog grid is the biggest part), 4. Lawin bits, 5. park points, 6. ridden lifts (28 Nov), 7. stars of the least-starred resorts. Badges (g) and the daily streak (y) never go.
   if (size() > LIMIT) {
     const s2 = {}, s3 = {};
     for (const [rid, text] of Object.entries(s)) {
@@ -179,6 +191,7 @@ export function encodeCloud(progress, report = []) {
   }
   if (size() > LIMIT && rec.w) drop('Lawin wins', () => { delete rec.w; });
   if (size() > LIMIT) drop('park points', () => { rec.p = {}; });
+  if (size() > LIMIT && rec.l) drop('ridden lifts', () => { delete rec.l; });
   const starText = (rid) => ((rec.s3 || {})[rid] || '') + ((rec.s2 || {})[rid] || '');
   while (size() > LIMIT && new Set([...Object.keys(rec.s3 || {}), ...Object.keys(rec.s2 || {})]).size) {
     const least = [...new Set([...Object.keys(rec.s3 || {}), ...Object.keys(rec.s2 || {})])].sort((a, b) => starText(a).length - starText(b).length)[0];
@@ -228,7 +241,11 @@ export function decodeCloud(raw) {
   // string of base-36 runs (discovery.js rleIntervals: <= MAX_RLE characters, every cell index < MAX_CELLS), else dropped
   for (const [rid, text] of Object.entries(isRecord(data.d) ? data.d : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && typeof text === 'string' && rleIntervals(text).length) disc[rid] = text;
   for (const [rid, m] of Object.entries(isRecord(data.w) ? data.w : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 256) lawin[rid] = m;
-  return { stars, park, bestHash, stats, ski, disc, lawin };
+  // 28 Nov 2026: goals (badges), lifts ridden, the daily streak; each checked like the rest (at most 16 resorts, bounded values)
+  const goals = {}, lifts = {};
+  for (const [rid, m] of Object.entries(isRecord(data.g) ? data.g : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && Number.isInteger(m) && m > 0 && m < 4096) goals[rid] = m;
+  for (const [rid, text] of Object.entries(isRecord(data.l) ? data.l : {}).slice(0, 16)) if (/^[a-z0-9]{1,16}$/.test(rid) && cleanLifts(text)) lifts[rid] = text;
+  return { stars, park, bestHash, stats, ski, disc, lawin, goals, lifts, daily: decodeDailyCloud(data.y) };
 }
 
 /** A NEW progress with a decoded cloud record merged in (stars OR-ed, the better park score and time). */
@@ -246,13 +263,17 @@ export function mergeCloud(progress, cloud) {
   for (const [rid, text] of Object.entries(cloud.disc || {})) disc[rid] = disc[rid] ? mergeRle(disc[rid], text) : text;
   const lawin = { ...(progress.lawin || {}) };
   for (const [rid, m] of Object.entries(cloud.lawin || {})) lawin[rid] = (lawin[rid] || 0) | m;
-  return { ...progress, stars, park, bestHash, stats, disc, lawin };
+  const goals = { ...(progress.goals || {}) };
+  for (const [rid, m] of Object.entries(cloud.goals || {})) goals[rid] = (goals[rid] || 0) | m;
+  const lifts = { ...(progress.lifts || {}) };
+  for (const [rid, text] of Object.entries(cloud.lifts || {})) lifts[rid] = mergeLifts(lifts[rid], text);
+  return { ...progress, stars, park, bestHash, stats, disc, lawin, goals, lifts, daily: mergeDaily(progress, cloud.daily) };
 }
 
 /** Did the merge add anything? (stars, park points, times) */
 export function cloudGain(before, after) {
   const count = (p) => totalStars(p) * 1e6 + Object.values(p.park || {}).reduce((a, b) => a + b, 0) + ((p.stats && p.stats.off) || 0) * 1e-3 + ((p.stats && p.stats.top) || 0) * 1e-6;
-  const extra = (p) => JSON.stringify(p.disc || {}) + JSON.stringify(p.lawin || {});
+  const extra = (p) => JSON.stringify(p.disc || {}) + JSON.stringify(p.lawin || {}) + JSON.stringify(p.goals || {}) + JSON.stringify(p.lifts || {}) + JSON.stringify(dailyCloud(p));
   return count(after) !== count(before) || Object.keys(after.bestHash || {}).length !== Object.keys(before.bestHash || {}).length || extra(after) !== extra(before);
 }
 

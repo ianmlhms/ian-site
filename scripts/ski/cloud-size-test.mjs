@@ -12,6 +12,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../p
 const imp = (p) => import(path.join(root, p));
 const { encodeCloud, decodeCloud, mergeCloud } = await imp('modes/cloud.js');
 const { starKey, totalStars } = await imp('modes/challenges.js');
+const { LIFT_INDEX } = await imp('modes/lift-index.js');
+const { GOAL_DEFS } = await imp('modes/goals.js');
 
 let fails = 0, checks = 0;
 const ok = (cond, text) => { checks++; if (!cond) { fails++; console.log(`  FAIL ${text}`); } else console.log(`  ok   ${text}`); };
@@ -29,15 +31,19 @@ for (const [rid, n] of [['livigno', 300]]) ids[rid] = Array.from({ length: n }, 
 const resortCount = Object.keys(ids).length;
 const pisteCount = Object.values(ids).reduce((n, a) => n + a.length, 0);
 
-function player({ mask = 7, times = true, disc = true }) {
-  const stars = {}, bestHash = {}, discMap = {}, park = {}, lawin = {};
+// 28 Nov 2026 (goals, badges, daily): every lift of every resort ridden (one bit per index position, 6 per character), every goal reached
+const ALL_GOALS = GOAL_DEFS.reduce((m, d) => m | d.bit, 0);
+const allLifts = (rid) => { const n = ((LIFT_INDEX[rid] || '').length / 5) | 0; let t = ''; for (let i = 0; i < Math.ceil(n / 6); i++) t += '_'; return t; };
+function player({ mask = 7, times = true, disc = true, goals = true }) {
+  const stars = {}, bestHash = {}, discMap = {}, park = {}, lawin = {}, goalMask = {}, lifts = {};
   for (const [rid, list] of Object.entries(ids)) {
     list.forEach((id) => { stars[starKey(rid, id)] = mask; if (times) bestHash[starKey(rid, id)] = 30000 + Math.floor(rnd() * 600000); });
     if (disc) discMap[rid] = Array.from({ length: 1200 }, () => Math.floor(rnd() * 400).toString(36)).join(',');
     park[rid] = 1000 + Math.floor(rnd() * 90000);
     lawin[rid] = 1 + Math.floor(rnd() * 254);
+    if (goals) { goalMask[rid] = ALL_GOALS; if (LIFT_INDEX[rid]) lifts[rid] = allLifts(rid); }
   }
-  return { stars, bestHash, disc: discMap, park, lawin, stats: { off: 123456, top: 41.3 }, ski: 'powder' };
+  return { stars, bestHash, disc: discMap, park, lawin, goals: goalMask, lifts, daily: goals ? { d: '2026-11-28', n: 5, s: 1, last: 20785, streak: 365, best: 365 } : undefined, stats: { off: 123456, top: 41.3 }, ski: 'powder' };
 }
 const starsOf = (progress) => JSON.stringify(Object.entries(progress.stars).sort());
 
@@ -53,7 +59,10 @@ console.log(`${resortCount} resorts, ${pisteCount} pistes`);
   ok(back.ski === 'powder' && back.stats.off === 123456 && Math.abs(back.stats.top - 41.3) < 0.06, 'ski type + stats survive');
   ok(dropped.length > 0 && dropped[0] === 'best times', `degradation order starts with the best times (dropped: ${dropped.join(' | ')})`);
   ok(!dropped.some((x) => x.startsWith('stars of')), 'no stars dropped');
+  ok(!dropped.includes('ridden lifts'), 'the ridden lifts stay when the fog and the times were enough');
   ok(rec.tb === totalStars(p), 'tb = total stars (keep-progress trigger)');
+  ok(JSON.stringify(back.goals) === JSON.stringify(p.goals) && JSON.stringify(back.lifts) === JSON.stringify(p.lifts) && back.daily && back.daily.last === 20785 && back.daily.streak === 365 && back.daily.best === 365, 'badges, ridden lifts and the daily streak round-trip');
+  console.log(`  info new fields: g ${bytes(rec.g)} + l ${bytes(rec.l)} + y ${bytes(rec.y)} bytes (of ${size})`);
   console.log(`  info stars alone: ${bytes({ s2: rec.s2 })} bytes of ${size}`);
 }
 // 2. stars only (no times, no fog): nothing dropped, exact
@@ -61,7 +70,7 @@ console.log(`${resortCount} resorts, ${pisteCount} pistes`);
   const p = player({ times: false, disc: false }), dropped = [];
   const rec = encodeCloud(p, dropped);
   const back = decodeCloud(JSON.parse(JSON.stringify(rec)));
-  ok(bytes(rec) < 7500 && dropped.length === 0, `stars + park + Lawin only: ${bytes(rec)} bytes, nothing dropped`);
+  ok(bytes(rec) < 4500 && dropped.length === 0, `stars + park + Lawin + badges + lifts + streak (no fog, no times): ${bytes(rec)} bytes < 4500, nothing dropped`);
   ok(starsOf({ stars: back.stars }) === starsOf(p) && JSON.stringify(back.park) === JSON.stringify(p.park) && JSON.stringify(back.lawin) === JSON.stringify(p.lawin), 'stars, park, Lawin exact');
 }
 // 3. mixed masks round-trip (1..7), and merging back into the progress changes nothing
@@ -100,6 +109,8 @@ console.log(`${resortCount} resorts, ${pisteCount} pistes`);
   const dropped = [], rec = encodeCloud(big, dropped);
   ok(bytes(rec) <= 7000, `absurd player (${Object.keys(big.stars).length} starred pistes): ${bytes(rec)} bytes <= 7000`);
   ok(dropped.some((x) => x.startsWith('stars of')), `drops are reported (${dropped.slice(-2).join(' | ')})`);
+  ok(dropped.indexOf('ridden lifts') >= 0 && dropped.indexOf('ridden lifts') < dropped.findIndex((x) => x.startsWith('stars of')), 'the ridden lifts go before any stars');
+  ok(!!rec.g && !!rec.y && Object.keys(rec.g).length === resortCount, 'the badges and the streak are never dropped');
 }
 // 7. the piste index covers every baked piste (run scripts/ski/piste_index.mjs after a bake / new resort), and the real resorts alone use s3 only
 {
@@ -110,6 +121,22 @@ console.log(`${resortCount} resorts, ${pisteCount} pistes`);
   const rec = encodeCloud(real);
   ok(rec.s3 && !rec.s2 && bytes(rec) < 2500, `indexed stars only (s3, no s2 fallback): ${bytes(rec)} bytes for ${Object.keys(real.stars).length} pistes`);
   ok(starsOf({ stars: decodeCloud(JSON.parse(JSON.stringify(rec))).stars }) === starsOf(real), 'indexed stars round-trip exactly');
+}
+// 8. goals fields: merging is a union, forged values are rejected, the lift index is complete
+{
+  const { mergeCloud: merge } = await imp('modes/cloud.js');
+  const { mergeLifts, cleanLifts } = await imp('modes/goals.js');
+  const a = { stars: {}, park: {}, bestHash: {}, goals: { killy: 3 }, lifts: { killy: 'B' }, daily: { d: '', n: 0, s: 0, last: 100, streak: 4, best: 9 } };
+  const b = decodeCloud({ v: 1, g: { killy: 12, laax: 1 }, l: { killy: 'C', laax: 'A' }, y: [101, 5, 5] });
+  const m = merge(a, b);
+  ok(m.goals.killy === 15 && m.goals.laax === 1, 'badge masks merge as a union');
+  ok(m.lifts.killy === 'D', 'lift bits merge as a union (B | C = D)');
+  ok(m.daily.last === 101 && m.daily.streak === 5 && m.daily.best === 9, 'the later daily day wins, the best streak is kept');
+  ok(mergeLifts('B', '') === 'B' && mergeLifts('', '') === '' && cleanLifts('x y') === '' && cleanLifts('a'.repeat(500)) === '', 'lift texts: merge with empty, bad characters / too long are dropped');
+  const forged = decodeCloud({ v: 1, g: { killy: -3, laax: 1e9, '!!': 1, davos: 5 }, l: { killy: '<script>', davos: 'AB' }, y: [5, 99, 3] });
+  ok(JSON.stringify(forged.goals) === '{"davos":5}' && JSON.stringify(forged.lifts) === '{"davos":"AB"}' && forged.daily === null, 'forged goals / lifts / streak are dropped');
+  const r = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'lift_index.mjs'), '--check'], { encoding: 'utf8' });
+  ok(r.status === 0, `lift index complete: ${(r.stdout || '').trim()}`);
 }
 console.log(fails ? `${fails} of ${checks} FAILED` : `all ${checks} cloud-size checks passed`);
 process.exit(fails ? 1 : 0);

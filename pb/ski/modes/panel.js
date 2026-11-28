@@ -6,11 +6,12 @@ import { STAR, specialText, starCount } from './challenges.js';
 import { formatHour, kindName } from './freeride.js';
 import { QUALITY_LABEL } from './park.js';
 import { SKI_TYPES, BAR_LABEL, skiUnlock, unlockText } from './skis.js';
+import { goalsPaneHtml } from './goals-view.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const el = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 // round 6: free ride is the main game (first tab); the piste list is the challenge list; the ski types have their own tab
-export const MODE_TABS = Object.freeze([['freeride', 'Fräi fueren'], ['piste', 'Challengen'], ['park', 'Snowpark'], ['skis', 'Skier']]);
+export const MODE_TABS = Object.freeze([['freeride', 'Fräi fueren'], ['piste', 'Challengen'], ['park', 'Snowpark'], ['skis', 'Skier'], ['goals', 'Ziler']]);
 const fmtPts = (n) => Math.round(n).toLocaleString('de-LU');
 
 /** ★★☆ as HTML (won stars gold, the others grey). */
@@ -98,6 +99,8 @@ export function attachModePanel(mapEl, { onMode, onParkStart, onFreeStart, onPic
       pane.innerHTML = `<h2>Skier</h2>${skiCardsHtml(opts)}`;
       bindSkiCards(pane, opts);
     },
+    /** 28 Nov 2026: the goals and badges of this ski area, the daily challenge (the Ziler tab). opts = { progress, rid, areaName, extra }. */
+    showGoals(opts) { pane.innerHTML = goalsPaneHtml(opts); },
     freeReady(ready) { const b = pane.querySelector('#freeStart'); const d = pane.querySelector('#freeDown'); const st = pane.querySelector('#freeStatus'); if (b && st && st.textContent) { b.disabled = !ready; if (d) d.disabled = !ready; st.textContent = ready ? 'Prett.' : 'Gëtt gelueden …'; } },
   };
 }
