@@ -18,6 +18,7 @@ const MASTER = 0.65;
 const TC = 0.08;                       // s: time constant of the continuous layers
 const MUSIC_LEVEL = 0.7;               // x the loop's RMS 0.1, through the master gain
 const MUSIC_KEY = 'pb_ski_music';
+const BANK_DELAY_MS = 1800, MUSIC_DELAY_MS = 2600;      // after the first touch: the sound bank, then the menu music (only if a menu is still up)
 /* which bird phrases sing at which time of day, and the seconds between songs (the phrases themselves: sound-bank.js birdPhrases) */
 const BIRD_PLANS = {
   morning: { phrases: ['finch', 'tit', 'robin', 'peep', 'tit', 'finch'], gap: [2.5, 6] },
@@ -103,7 +104,7 @@ export function createAudio({ win = window } = {}) {
       into: { windBp, airLp, carveBp, powderLp, scrapeBp, glideLp, humLp, machLp, stationLp, villLp, rumLp },
     };
     unlock();
-    loadBank();
+    setTimeout(loadBank, BANK_DELAY_MS);          // the first touch is often the tap that starts a ride: let that start finish first
     return true;
   }
 
@@ -168,6 +169,12 @@ export function createAudio({ win = window } = {}) {
   function loadMusic() {
     if (musicState !== 'idle' || !ctx) return;
     musicState = 'loading';
+    setTimeout(() => {
+      if (!ctx || !(wantMenu && musicOn)) { musicState = 'idle'; return; }
+      importMusic();
+    }, MUSIC_DELAY_MS);
+  }
+  function importMusic() {
     import('./music.js').then((m) => {
       const steps = m.renderMusicSteps(m.MUSIC_RATE);
       const next = () => {
