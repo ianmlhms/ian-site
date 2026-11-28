@@ -8,7 +8,7 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 export const LOOKS = Object.freeze([
   { id: 'none', label: 'Keen', css: '' },
-  { id: 'warm', label: 'Waarm', css: 'sepia(0.22) saturate(1.3) contrast(1.05) brightness(1.03)' },
+  { id: 'warm', label: 'Waarm', css: 'sepia(0.22) saturate(1.3) contrast(1.05) brightness(0.95)' },
   { id: 'bw', label: 'Schwaarz-wäiss', css: 'grayscale(1) contrast(1.12)' },
 ]);
 export const ORBIT = Object.freeze({ distMin: 1.6, distMax: 70, pitchMin: -0.08, pitchMax: 1.45, lookUp: 1.0, liftMin: -0.6, liftMax: 3.2, fov: 50 });
@@ -26,7 +26,7 @@ export function applyLookPixels(data, look) {
       const r = data[i], g = data[i + 1], b = data[i + 2];
       const y = 0.299 * r + 0.587 * g + 0.114 * b;
       const sr = y + (r - y) * 1.3, sg = y + (g - y) * 1.3, sb = y + (b - y) * 1.3;
-      data[i] = clamp(sr * 1.07 + 3, 0, 255); data[i + 1] = clamp(sg * 1.01, 0, 255); data[i + 2] = clamp(sb * 0.9, 0, 255);
+      data[i] = clamp(sr * 1.03 - 4, 0, 255); data[i + 1] = clamp(sg * 0.97, 0, 255); data[i + 2] = clamp(sb * 0.85, 0, 255);
     }
   }
   return data;
