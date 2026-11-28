@@ -803,11 +803,11 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
   let lastEdge = 0, plant = 0, plantSide = 1, prevT = 0, smEdge = 0, smCrouch = 0, smPlough = 0, smAir = 0, lastGrab = 0, smGrab = 0;
   const HIP_PIVOT = 0.85;                    // flips turn the body round the hips, not the feet
   /* standing lifts: the ground the skis stand on (pose(): the snow, else the plane by the slope normal under him; a carpet: its belt) */
-  let standX = 0, standY = 0, standZ = 0, baseGround = null, beltFx = 1, beltFz = 0, beltTan = 0;
+  let standX = 0, standY = 0, standZ = 0, baseGround = null, beltFx = 1, beltFz = 0, beltTan = 0, beltUp = 0;
   const planeGround = (x, z) => standY - (tmp.x * (x - standX) + tmp.z * (z - standZ)) / Math.max(0.2, tmp.y);
   const beltGround = (x, z) => baseGround(x, z) + BELT_TOP;
   // (the local rider on a carpet: state.beltPitch = the belt's own pitch (liftride.js): a plane through his feet, level across)
-  const beltPlane = (x, z) => standY + ((x - standX) * beltFx + (z - standZ) * beltFz) * beltTan;
+  const beltPlane = (x, z) => standY + beltUp + ((x - standX) * beltFx + (z - standZ) * beltFz) * beltTan;
   /** state = physics state; normal(x, z, out) = slope normal; t = time (s); ground(x, z) = snow height (for the blob in the air). */
   function pose(state, normal, t, ground) {
     const dt = clamp(t - prevT, 0, 0.1); prevT = t;
@@ -909,7 +909,7 @@ export function createSkierModel({ outfit = OUTFITS[0].id, ghost = false, skinne
       // standing lifts (28 Nov 2026): the skis / the board on the snow (a carpet: on its belt) under them, the body upright
       standX = state.x; standY = state.y; standZ = state.z; baseGround = ground || planeGround;
       const onBelt = ride === 'belt', planar = onBelt && Number.isFinite(state.beltPitch);
-      if (planar) { beltFx = Math.cos(state.heading); beltFz = Math.sin(state.heading); beltTan = Math.tan(state.beltPitch); }
+      if (planar) { beltFx = Math.cos(state.heading); beltFz = Math.sin(state.heading); beltTan = Math.tan(state.beltPitch); beltUp = state.beltLift || 0; }
       const g = planar ? beltPlane : onBelt ? beltGround : baseGround, pull = ride === 'drag';
       if (boarding) poseBoardDrag(t, g, state.heading, state.dragHand, pull); else poseDrag(t, g, state.heading, state.dragHand, pull);
     } else if (ride === 'carry') poseCarry(t, state.walk || 0);         // R7-B ('skisdown' / 'clickin': the skis on the snow, standing)

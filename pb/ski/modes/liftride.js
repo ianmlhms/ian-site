@@ -351,8 +351,12 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
         grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
       st.dragHand = k === 'drag' && (w.onCarrier || w.grab) && w.hand ? w.hand : null;      // R8e: the hand on the rod (skier-model.js poseDrag)
       // standing lifts (28 Nov 2026): on a carpet the skis lie on the belt: its pitch here (skier-model.js: a plane through his feet)
-      // (its pitch from the ground it is laid on, 0.8 m ahead / behind: what the drawn belt does there; the line's own slope is a chord)
-      if (k === 'carpet' && w.onCarrier) { const fx = Math.cos(w.heading) * 0.8, fz = Math.sin(w.heading) * 0.8; st.beltPitch = Math.atan2(rideH(w.x + fx, w.z + fz) - rideH(w.x - fx, w.z - fz), 1.6); } else delete st.beltPitch;
+      // (its pitch from the ground it is laid on, 0.9 m ahead / behind: what the drawn belt does there; the line's own slope is a chord)
+      // (in a dip the plane through his feet would cut the belt under the tips and tails: it rises by the sag, beltLift)
+      if (k === 'carpet' && w.onCarrier) {
+        const fx = Math.cos(w.heading) * 0.9, fz = Math.sin(w.heading) * 0.9, hA = rideH(w.x + fx, w.z + fz), hB = rideH(w.x - fx, w.z - fz);
+        st.beltPitch = Math.atan2(hA - hB, 1.8); st.beltLift = Math.max(0, Math.min(0.2, (hA + hB) / 2 - rideH(w.x, w.z)));
+      } else { delete st.beltPitch; delete st.beltLift; }
       if (w.onCarrier) { st.rideLift = lift.index; st.rideS = s; st.rideKind = KIND_CODE[k]; }
       else { delete st.rideLift; delete st.rideS; delete st.rideKind; }
       return st;

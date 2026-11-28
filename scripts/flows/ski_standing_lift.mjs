@@ -20,7 +20,8 @@ async function rideRecord(page, { until, maxS, belt = 0 }) {
     const tick = () => {
       if (!alive) return;
       const st = S.state, c = S.camera.position, g = S.skier.gearPoints();
-      const onRide = !!(S.ride && S.ride.phase === "ride");
+      // (on a carpet only where the belt is under both skis: past its ends the tips / tails reach over the end plates)
+      const onRide = !!(S.ride && S.ride.phase === "ride" && (!belt || (S.ride.s > 1.5 && S.ride.s < S.ride.path.len - 1.5)));
       let mn = Infinity, span = 0;
       if (onRide) {
         const sets = g.board.length ? [g.board] : [g.skis.slice(0, 16), g.skis.slice(16, 32)];
@@ -42,12 +43,13 @@ async function rideRecord(page, { until, maxS, belt = 0 }) {
       if (dc > cam) { cam = dc; camAt = `${a.ph}->${b.ph}`; }
     }
     const ride = frames.filter((f) => f.onRide);
-    for (const f of ride) { minCl = Math.min(minCl, f.mn); maxSpan = Math.max(maxSpan, f.span); }
+    let worstS = null;
+    for (const f of ride) { if (f.mn < minCl) { minCl = f.mn; worstS = f.s; } maxSpan = Math.max(maxSpan, f.span); }
     // the speed on the carrier: metres along the line per second over the middle of the ride
     let v = null;
     if (ride.length > 20) { const a = ride[Math.floor(ride.length * 0.3)], b = ride[Math.floor(ride.length * 0.8)]; v = (b.s - a.s) / ((b.t - a.t) / 1000); }
     const phases = [...new Set(frames.map((f) => f.ph))];
-    return { n: frames.length, step: +step.toFixed(2), stepAt, cam: +cam.toFixed(2), camAt, minCl: +minCl.toFixed(3), maxSpan: +maxSpan.toFixed(3), v: v === null ? null : +v.toFixed(2), rideSpeed: S.ride ? S.ride.speed : null, phases, done: done(), ms: Math.round(performance.now() - t0) };
+    return { n: frames.length, step: +step.toFixed(2), stepAt, cam: +cam.toFixed(2), camAt, minCl: +minCl.toFixed(3), worstS: worstS === null ? null : +worstS.toFixed(1), maxSpan: +maxSpan.toFixed(3), v: v === null ? null : +v.toFixed(2), rideSpeed: S.ride ? S.ride.speed : null, phases, done: done(), ms: Math.round(performance.now() - t0) };
   }, { until, maxS, belt });
 }
 
@@ -120,7 +122,7 @@ export const flow = {
         h.expect(rec.step < 1.2 && rec.cam < 1.5, `${tag}: continuous all the way (skier ${rec.step} m / camera ${rec.cam} m in a frame at most)`);
         const want = await page.evaluate((id) => { const S = window.__ski, l = S.modes.lifts.byId.get(id), p = S.modes.lifts.world.sites.get(l.index).path; return p.spec.speed * 2; }, picks.carpet.id);
         h.expect(rec.v !== null && Math.abs(rec.v - want) < want * 0.2, `${tag}: carried at the belt's speed (${rec.v} m/s, belt ${want} m/s)`);
-        h.expect(rec.minCl > -0.06 && rec.maxSpan < 0.15, `${tag}: the skis on the belt (lowest ${rec.minCl} m, tip-tail ${rec.maxSpan} m)`);
+        h.expect(rec.minCl > -0.06 && rec.maxSpan < 0.15, `${tag}: the skis on the belt (lowest ${rec.minCl} m at ${rec.worstS} m, tip-tail ${rec.maxSpan} m)`);
         const end = await page.evaluate((id) => { const S = window.__ski, l = S.modes.lifts.byId.get(id), st = S.state; return { d: Math.round(Math.hypot(st.x - l.top.x, st.z - l.top.z)), hold: S.hold }; }, picks.carpet.id);
         h.expect(end.d < 40 && end.hold, `${tag}: he stands at the top, ${end.d} m from the belt's end`);
         await h.shot(`${rid}-carpet-top`);

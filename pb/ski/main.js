@@ -1719,7 +1719,7 @@ async function boot() {
       }
       if (camFrom) {
         camFrom.t += dt;
-        const k = Math.min(1, camFrom.t / camFrom.dur), e = 1 - (1 - k) * (1 - k) * (1 - k), f = camFrom, ox = view.x - f.sx, oy = view.y - f.sy, oz = view.z - f.sz;
+        const k = Math.min(1, camFrom.t / camFrom.dur), e = k * k * (3 - 2 * k), f = camFrom, ox = view.x - f.sx, oy = view.y - f.sy, oz = view.z - f.sz;
         const m = (a, b) => a + (b - a) * e;
         cam = { ...cam, x: m(f.x + ox, cam.x), y: m(f.y + oy, cam.y), z: m(f.z + oz, cam.z), tx: m(f.tx + ox, cam.tx), ty: m(f.ty + oy, cam.ty), tz: m(f.tz + oz, cam.tz), fov: m(f.fov, cam.fov) };
         if (!game.camPose && !fpNow) cam.y = Math.max(cam.y, surface.height(cam.x, cam.z) + 0.5);
