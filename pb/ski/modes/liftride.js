@@ -13,7 +13,7 @@
  * The ride state that goes on the wire (multiplayer: a friend on the same lift sits in his own chair) is { lift index, s, kind } while
  * he is on the carrier. The camera: 'chase' = third person beside / behind, 'window' = from the rider's eyes along the line. */
 import { LIFT_SPEC, carrierBox } from '../lift-path.js';
-import { BOARD, UNLOAD } from '../lift-site.js';
+import { BOARD, UNLOAD, stationCrawl } from '../lift-site.js';
 
 export const RIDE = Object.freeze({
   factor: 4,                 // x the real line speed
@@ -59,10 +59,35 @@ export function rideSpan(path) {
   const s0 = Math.min(BOARD[key], path.len * 0.2), s1 = Math.max(s0 + 1, path.len - Math.min(UNLOAD[key], path.len * 0.2));
   return [s0, s1];
 }
-/** Seconds the ride on the carrier takes at the game's speed (path = lift-path.js createLiftPath). */
-export function rideSeconds(path, factor = RIDE.factor) {
+/** Lift fixes (28 Nov 2026): the speed of the player's carrier `tRide` s into the ride at `s` m along the line. A gondola cabin / a
+ *  detachable chair crawls through its stations like the lift's other carriers (lift-site.js stationCrawl: the same curve of the share of
+ *  the line speed by the distance to the nearer end, so no hall is crossed at line speed), a loop cabin brakes gently to stand at the top.
+ *  env = { k, path, speed, s1, crawl, cab (a cabin that docks), vs (a chair's crawl at the loading line) }. */
+const STOP_DECEL = 4;                  // m/s^2: a cabin that crawls through the hall brakes to a stop at the unloading point
+export function rideSpeedAt(env, tRide, s) {
+  const { k, path, speed, s1, crawl, cab, vs } = env;
+  let v = vs ? vs + (speed - vs) * ease(tRide / CHAIR.accel) : speed;
+  if (cab && k !== 'train') {
+    // (a jig-back cable car keeps its old arrival: slowed, its roof clips the top terminal's roof edge at Cime Caron (3V, round7b))
+    const dLeft = Math.max(0, s1 - s), dStop = crawl ? (speed * crawl.vs) ** 2 / (2 * STOP_DECEL) : 0;      // (crawling: the stop only starts from the crawl speed)
+    const brake = path.shuttle || dLeft > dStop && crawl ? speed : Math.max(0.9, Math.sqrt(2 * (crawl ? STOP_DECEL : speed / CABIN.accel) * dLeft));
+    v = Math.min(speed * Math.max(0.03, ease(tRide / CABIN.accel)), brake);
+  } else if (k === 'drag' && path.sub !== 'rope') v = speed * Math.max(0.03, ease(tRide / PULL));
+  if (crawl) v = Math.min(v, speed * crawl.k(Math.min(s, path.len - s)));
+  return v;
+}
+/** Seconds a ride on the carrier takes at the game's speed (path = lift-path.js createLiftPath; site: the station slow-down of a
+ *  gondola / detachable chair counts, else the analytic time). */
+export function rideSeconds(path, factor = RIDE.factor, site = null) {
   const [s0, s1] = rideSpan(path);
   const D = Math.max(0, s1 - s0), v = path.spec.speed * factor;
+  const crawl = site ? stationCrawl(site) : null;
+  if (crawl) {
+    const env = { k: path.kind, path, speed: v, s1, crawl, cab: path.kind !== 'chair', vs: path.kind === 'chair' ? ((path.seats || 4) >= 4 ? CHAIR.vsDetach : CHAIR.vsFixed) : 0 };
+    let s = s0, t = 0;
+    for (; s < s1 && t < 3600; t += 1 / 60) s = Math.min(s1, s + rideSpeedAt(env, t + 1 / 60, s) / 60);
+    return t;
+  }
   if (path.kind !== 'chair') {
     // lift lines round: a cabin pulls away and stops over CABIN.accel s each, a drag bar pulls him up to speed over PULL s
     const T = (CARRY.has(path.kind) && path.kind !== 'train' ? CABIN.accel * (path.shuttle ? 1 : 2) : 0) + (path.kind === 'drag' && path.sub !== 'rope' ? PULL : 0);
@@ -71,6 +96,50 @@ export function rideSeconds(path, factor = RIDE.factor) {
   // after launch: a chair speeds up from the station crawl over CHAIR.accel s (liftride step): A (v + vs) / 2 m in that time
   const A = CHAIR.accel, vs = (path.seats || 4) >= 4 ? CHAIR.vsDetach : CHAIR.vsFixed, dA = A * (v + vs) / 2;
   return D >= dA ? A + (D - dA) / v : D / v;
+}
+
+/** Lift lines round: a cabin's boarding timeline (createRide and createDescent): the rider walks to the door spot beside the cabin, the
+ *  cabin docks (a loop cabin slows over the last `tail` s) with its doors opening, he walks in, they close. The plan: { tDock, tEnter,
+ *  tArrive, door, cam, u(t), doorK(t), rider(t, w) }. */
+export function cabinBoarding({ path, k, door, start, tStep, approach, uLoad, seat, height, shuttleWait, tail = 1.2 }) {
+  const setGround = (w, x, z, heading) => { w.x = x; w.z = z; w.y = height(x, z); w.heading = heading; };
+  const doored = DOORED.has(k);
+  const dMove = Math.hypot(door.x - start.x, door.z - start.z);
+  const tAtDoor = tStep + Math.max(0.8, dMove / RIDE.walk);
+  let tDock;
+  if (path.shuttle) tDock = shuttleWait;
+  else tDock = Math.max(Math.min(approach / path.spec.speed, tAtDoor + RIDE.wait), tAtDoor - CABIN.open * 0.7, 0.4);
+  const tEnter = Math.max(tDock + (doored ? CABIN.open * 0.75 : 0.2), tAtDoor);
+  const tClose = tEnter + CABIN.walkIn + CABIN.gap;
+  const tArr = tClose + (doored ? CABIN.close : 0) + 0.1;
+  // the loop cabin's way in: D(x) m still to go x s before it docks (line speed, then slowing over the last 1.2 s)
+  const T = tDock, vv = T > tail ? approach / (T - tail / 2) : 0;
+  const D = (x) => (x <= 0 ? 0 : T <= tail ? approach * (x / T) * (x / T) : x <= tail ? vv * x * x / (2 * tail) : vv * (x - tail / 2));
+  return {
+    tDock, tEnter, tArrive: tArr, door, cam: door.cam,
+    u: (tt) => uLoad - D(tDock - tt),
+    doorK(tt) {
+      if (!doored) return 0;
+      const open = path.shuttle ? ease((tt - tDock) / CABIN.open) : ease(1 - (tDock - tt) / CABIN.open);
+      return Math.min(open, 1 - ease((tt - tClose) / CABIN.close));
+    },
+    rider(tt, w) {
+      w.doorK = this.doorK(tt); w.doorCam = door.cam;
+      if (tt < tStep) { setGround(w, start.x, start.z, start.heading); w.pose = 'carry'; return; }
+      if (tt < tAtDoor) {
+        const kk = ease((tt - tStep) / (tAtDoor - tStep)), hx = Math.atan2(door.z - start.z, door.x - start.x);
+        setGround(w, lerp(start.x, door.x, kk), lerp(start.z, door.z, kk), dMove > 0.3 ? angLerp(start.heading, hx, Math.min(1, (tt - tStep) / 0.4)) : start.heading);
+        if (tt > tAtDoor - 0.45) w.heading = angLerp(w.heading, door.heading, (tt - (tAtDoor - 0.45)) / 0.45);
+        w.pose = 'carry'; w.walk = dMove * kk;
+        return;
+      }
+      if (tt < tEnter) { setGround(w, door.x, door.z, door.heading); w.pose = 'carry'; return; }
+      // in through the door (onto the cabin's floor), turning to face the way it will go
+      const kk = ease((tt - tEnter) / CABIN.walkIn), g = height(door.x, door.z);
+      w.x = lerp(door.x, seat.x, kk); w.z = lerp(door.z, seat.z, kk); w.y = lerp(g, seat.y, Math.min(1, kk * 1.6));
+      w.heading = angLerp(door.heading, seat.heading, kk); w.pose = 'carry'; w.walk = dMove + kk * 1.6;
+    },
+  };
 }
 
 /** The carrier and the rider at s along the line (up lane): { cx, cy, cz (rope grip / rail top / belt), x, y, z (rider), heading, pitch,
@@ -160,6 +229,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   const cabin = (tt) => (path.shuttle && shuttle ? shuttle.at(tt) : { s: s0, up: true });       // the jig-back cabin while he boards
   // lift lines round: a cabin (gondola, funitel, cable car; trains as before but through the same timeline): he walks to the door spot on
   // the platform (beside the cabin, not in its lane), the cabin docks there with its doors opening, he walks in, they close, it goes
+  const crawl0 = stationCrawl(site);                  // lift fixes: a gondola / detachable chair crawls through its stations (see rideSpeedAt)
   const cab = DOORED.has(k) || k === 'train' ? cabinPlan() : null;
   if (cab) tArrive = cab.tArrive;
   // After launch (Ian, 3V Tovets: "through the barrier, scooped abruptly"): a chair is boarded like a real one: he waits behind the
@@ -167,8 +237,18 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   // him to the loading line), stands, his chair comes up slowly behind him and he sits down; then it speeds up out of the station
   const CP = k === 'chair' && site.chair ? chairPlan() : null;
   if (CP) { u0 = CP.u0; approach = CP.approach; tArrive = CP.tArrive; }
-  let phase = 'board', t = 0, s = sLoad, skipped = false, tRide = 0, alight = null;
+  let phase = 'board', t = 0, s = sLoad, skipped = false, tRide = 0, alight = null, vNow = 0;
   const pose = { roll: 0 };
+  // lift fixes: his carrier crawls through the stations like the lift's others (see rideSpeedAt)
+  const speedEnv = { k, path, speed, s1, crawl: crawl0, cab: !!cab, vs: CP ? CP.vs : 0 };
+  /** Seconds still to go on the carrier from s (the speed law integrated by position; the start-up of the carrier is not in it). */
+  const leftFrom = (s0n) => {
+    if (!speedEnv.crawl) return Math.max(0, (s1 - s0n) / speed);
+    const ds = Math.max(2, (s1 - s0n) / 400);
+    let tt = 0;
+    for (let x = s0n; x < s1; x += ds) tt += Math.min(ds, s1 - x) / Math.max(0.5, rideSpeedAt(speedEnv, 1e3, x));
+    return tt;
+  };
   const ride = {
     lift, path, site, kind: k, pose: POSE_OF[k], speed, carry,
     get phase() { return phase; },
@@ -176,7 +256,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     get done() { return phase === 'done'; },
     get share() { return phase === 'board' ? 0 : phase === 'ride' ? (s - s0) / (s1 - s0) : 1; },
     /** Seconds left on the carrier at the game's speed. */
-    get left() { return phase === 'ride' ? Math.max(0, (s1 - s) / speed) : phase === 'board' ? rideSeconds(path, factor) : 0; },
+    get left() { return phase === 'ride' ? leftFrom(s) : phase === 'board' ? rideSeconds(path, factor, site) : 0; },
     /** The loop parameter of the rider's own carrier while it holds him (lifts.js setRide), else null (the lift's own loop has it). */
     get carrierU() {
       if (phase === 'board') return path.shuttle ? path.upU(cabin(t).s) : boardU(t);
@@ -198,10 +278,8 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
         tRide += dt;
         // after launch: a chair leaves the loading line at the station's crawl and speeds up to the ride speed over CHAIR.accel s;
         // lift lines round: a cabin pulls away (and slows into the top station), a drag bar pulls him up to speed
-        let v = CP ? CP.vs + (speed - CP.vs) * ease(tRide / CHAIR.accel) : speed;
-        // (a jig-back cable car keeps its old arrival: slowed, its roof clips the top terminal's roof edge at Cime Caron (3V, round7b))
-        if (cab && k !== 'train') v = Math.min(speed * Math.max(0.03, ease(tRide / CABIN.accel)), path.shuttle ? speed : Math.max(0.9, Math.sqrt(2 * (speed / CABIN.accel) * Math.max(0, s1 - s))));
-        else if (k === 'drag' && path.sub !== 'rope') v = speed * Math.max(0.03, ease(tRide / PULL));
+        const v = rideSpeedAt(speedEnv, tRide, s);
+        vNow = v;
         s = Math.min(s1, s + v * dt);
         if (s >= s1 && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) beginAlight();
       } else if (phase === 'alight') {
@@ -216,7 +294,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
     /** A skier state for the figure (skier-model.js pose: ride = 'sit' | 'carry' | 'drag' | 'belt' | '' (on his skis)). */
     state(base) {
       const w = place();
-      const moving = phase === 'ride' ? speed : 0;
+      const moving = phase === 'ride' ? Math.max(vNow, 0.1) : 0;
       const st = { ...base, x: w.x, y: w.y, z: w.z, heading: w.heading, vx: Math.cos(w.heading) * moving, vz: Math.sin(w.heading) * moving, vy: 0, speed: k === 'drag' && phase === 'ride' ? speed : w.glide || 0,
         grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
       st.dragHand = k === 'drag' && (w.onCarrier || w.grab) && w.hand ? w.hand : null;      // R8e: the hand on the rod (skier-model.js poseDrag)
@@ -353,45 +431,7 @@ export function createRide({ lift, path, site, height, factor = RIDE.factor, fro
   /** Lift lines round: a cabin's boarding (see cab above). Loop cabins: the next one comes in at line speed, slows over the last 1.2 s
    *  and docks at the loading point (the lift's other cabins follow it: lifts.js setRide); a jig-back cabin: the scheduled one docks. */
   function cabinPlan() {
-    const doored = DOORED.has(k);
-    const door = doorSpot(site.bottom, -s0, 1);
-    const dMove = Math.hypot(door.x - start.x, door.z - start.z);
-    const tAtDoor = tStep + Math.max(0.8, dMove / RIDE.walk);
-    let tDock;
-    if (path.shuttle) tDock = shuttle ? shuttle.wait : 0;
-    else tDock = Math.max(Math.min(approach / path.spec.speed, tAtDoor + RIDE.wait), tAtDoor - CABIN.open * 0.7, 0.4);
-    const tEnter = Math.max(tDock + (doored ? CABIN.open * 0.75 : 0.2), tAtDoor);
-    const tClose = tEnter + CABIN.walkIn + CABIN.gap;
-    const tArr = tClose + (doored ? CABIN.close : 0) + 0.1;
-    // the loop cabin's way in: D(x) m still to go x s before it docks (line speed, then slowing over the last 1.2 s)
-    const T = tDock, vv = T > 1.2 ? approach / (T - 0.6) : 0;
-    const D = (x) => (x <= 0 ? 0 : T <= 1.2 ? approach * (x / T) * (x / T) : x <= 1.2 ? vv * x * x / 2.4 : vv * (x - 0.6));
-    const seat = seatAt0;
-    return {
-      tDock, tEnter, tArrive: tArr, door, cam: door.cam,
-      u: (tt) => uLoad - D(tDock - tt),
-      doorK(tt) {
-        if (!doored) return 0;
-        const open = path.shuttle ? ease((tt - tDock) / CABIN.open) : ease(1 - (tDock - tt) / CABIN.open);
-        return Math.min(open, 1 - ease((tt - tClose) / CABIN.close));
-      },
-      rider(tt, w) {
-        w.doorK = this.doorK(tt); w.doorCam = door.cam;
-        if (tt < tStep) { setGround(w, start.x, start.z, start.heading); w.pose = 'carry'; return; }
-        if (tt < tAtDoor) {
-          const kk = ease((tt - tStep) / (tAtDoor - tStep)), hx = Math.atan2(door.z - start.z, door.x - start.x);
-          setGround(w, lerp(start.x, door.x, kk), lerp(start.z, door.z, kk), dMove > 0.3 ? angLerp(start.heading, hx, Math.min(1, (tt - tStep) / 0.4)) : start.heading);
-          if (tt > tAtDoor - 0.45) w.heading = angLerp(w.heading, door.heading, (tt - (tAtDoor - 0.45)) / 0.45);
-          w.pose = 'carry'; w.walk = dMove * kk;
-          return;
-        }
-        if (tt < tEnter) { setGround(w, door.x, door.z, door.heading); w.pose = 'carry'; return; }
-        // in through the door (onto the cabin's floor), turning to face the way it will go
-        const kk = ease((tt - tEnter) / CABIN.walkIn), g = height(door.x, door.z);
-        w.x = lerp(door.x, seat.x, kk); w.z = lerp(door.z, seat.z, kk); w.y = lerp(g, seat.y, Math.min(1, kk * 1.6));
-        w.heading = angLerp(door.heading, seat.heading, kk); w.pose = 'carry'; w.walk = dMove + kk * 1.6;
-      },
-    };
+    return cabinBoarding({ path, k, door: doorSpot(site.bottom, -s0, 1), start, tStep, approach, uLoad, seat: seatAt0, height, shuttleWait: path.shuttle ? (shuttle ? shuttle.wait : 0) : 0, tail: crawl0 ? 2.4 : 1.2 });
   }
   /** After launch: the chair boarding plan (see CP above): the rider's way (zone -> gate -> lane (-> belt) -> loading line), the
    *  gate's timing, his chair's approach (line speed, then the last CHAIR.slowFor s at the station crawl vs behind him). */
@@ -500,10 +540,14 @@ export function createDescent({ lift, path, site, height, factor = RIDE.factor, 
   // the carrier: a loop's next one round the top wheel (at most RIDE.wait s late), a jig-back cabin / train waits docked at the top
   const u0 = path.shuttle ? uLoad : startU === null || !Number.isFinite(startU) ? uLoad - path.spec.speed * tNeed : startU;
   const approach = uLoad - u0;
-  const tArrive = path.shuttle ? tNeed : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));
+  let tArrive = path.shuttle ? tNeed : Math.max(tNeed, Math.min(approach / path.spec.speed, tNeed + RIDE.wait));
+  // lift fixes: a cabin's doors (gondola, funitel, cable car) work at the top like at the bottom: he walks to the door spot beside the
+  // down lane's cabin (the return side), it docks with its doors opening, he steps in, they close, it pulls away (the up ride's timeline)
+  const cab = DOORED.has(k) ? cabinBoarding({ path, k, door: doorSpotOf(path, site.top, -(path.len - sT), -1), start, tStep, approach, uLoad, seat: seatAt0, height, shuttleWait: 0, tail: 1.2 }) : null;
+  if (cab) tArrive = cab.tArrive;
   let phase = 'board', t = 0, s = sT, skipped = false, tRide = 0, alight = null;
   const pose = { roll: 0 };
-  const boardU = (tt) => u0 + approach * Math.min(1, tt / tArrive);
+  const boardU = (tt) => (cab && !path.shuttle ? cab.u(tt) : u0 + approach * Math.min(1, tt / tArrive));
   // lifts.js setRide: a loop carrier by its loop parameter; a jig-back pair by the metres travelled down (the counter cabin goes up)
   const held = (u, sNow) => (path.shuttle ? Math.max(0, Math.min(path.docks[1] - path.docks[0], path.docks[1] - sNow)) : u);
   const ride = {
@@ -527,7 +571,7 @@ export function createDescent({ lift, path, site, height, factor = RIDE.factor, 
       if (phase === 'board' && t >= tArrive) { phase = 'ride'; tRide = 0; }
       else if (phase === 'ride') {
         tRide += dt;
-        s = Math.max(sB, s - speed * dt);
+        s = Math.max(sB, s - speed * (cab ? Math.max(0.03, ease(tRide / CABIN.accel)) : 1) * dt);
         if (s <= sB && tRide >= (skipped ? RIDE.minRide * 0.5 : 0)) beginAlight();
       } else if (phase === 'alight') {
         alight.t += dt;
@@ -564,16 +608,18 @@ export function createDescent({ lift, path, site, height, factor = RIDE.factor, 
   function setGround(w, x, z, heading) { w.x = x; w.z = z; w.y = height(x, z); w.heading = heading; }
   function place() {
     const w = pose;
-    w.onCarrier = false; w.walk = 0; w.glide = 0; w.boardCam = null; w.hand = null; w.hip = undefined;
+    w.onCarrier = false; w.walk = 0; w.glide = 0; w.boardCam = null; w.hand = null; w.hip = undefined; w.doorK = 0; w.doorCam = null;
     if (phase === 'ride' || (phase === 'board' && t >= tArrive)) {
       riderAt(path, s, height, w, true);
       w.onCarrier = true; w.pose = POSE_OF[k];
+      if (cab && phase === 'ride' && tRide < 1.2) w.doorCam = cab.cam;                  // (the camera eases out of the door view)
       w.barDown = k === 'chair' && sT - s > 9 && s - sB > 12;
       return w;
     }
     if (phase === 'board') {
       const c = path.shuttle ? path.shuttleAt(sT, -1, false, {}) : path.loopAt(boardU(t), {});
       w.cx = c.x; w.cz = c.z; w.cy = c.y; w.heading = c.heading; w.pitch = k === 'train' ? Math.atan(path.slope(sT)) : 0; w.barDown = false;
+      if (cab) { cab.rider(t, w); return w; }
       const tm = t - tStep;
       if (tm <= 0) { setGround(w, start.x, start.z, start.heading); w.pose = carry ? 'carry' : ''; return w; }
       if (tm < tMove) {
@@ -623,7 +669,8 @@ export function createDescent({ lift, path, site, height, factor = RIDE.factor, 
 }
 /** Seconds a ride down takes on the carrier at the game's speed. */
 export function descentSeconds(path, site, factor = RIDE.factor) {
-  return site && site.down ? Math.max(0, site.down.sTop - site.down.sBottom) / (path.spec.speed * factor) : 0;
+  // (a cabin pulls away from the dock over CABIN.accel s: half of it is lost)
+  return site && site.down ? Math.max(0, site.down.sTop - site.down.sBottom) / (path.spec.speed * factor) + (DOORED.has(path.kind) ? CABIN.accel / 2 : 0) : 0;
 }
 
 /** The ride cameras. mode 'chase' | 'window'; w = ride.where(); returns { x, y, z, tx, ty, tz, fov, inside? } (the caller smooths

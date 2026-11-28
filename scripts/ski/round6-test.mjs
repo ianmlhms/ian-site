@@ -58,9 +58,9 @@ for (const rid of resorts) {
       prev = { ...w };
     }
     ok(r.done, `${rid} ${lift.name} (${p.kind}): the ride ends`);
-    const secs = rideSteps / 60;
+    const secs = rideSteps / 60, siteOf = net.world.sites.get(lift.index);
     longest = Math.max(longest, secs);
-    ok(Math.abs(secs - rideSeconds(p)) < 0.2, `${rid} ${lift.name}: ${secs.toFixed(1)} s = rideSeconds ${rideSeconds(p).toFixed(1)}`);
+    ok(Math.abs(secs - rideSeconds(p, RIDE.factor, siteOf)) < 0.2, `${rid} ${lift.name}: ${secs.toFixed(1)} s = rideSeconds ${rideSeconds(p, RIDE.factor, siteOf).toFixed(1)}`);
     const st = midState || {};
     ok(st.ride && st.rideLift === lift.index && st.rideKind === KIND_CODE[p.kind], `${rid} ${lift.name}: the ride state carries the lift`);
     const top = net.startAt(lift, h);

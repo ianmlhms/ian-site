@@ -2206,6 +2206,46 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   flat canopy); the terminals are as long as the old footprint allows (-9 m), real ones are longer; heated chairs look like the others;
   the player's own chair crosses the rail at line speed; real iPad untested.
 
+## Lift fixes (28 Nov 2026): the four open lift items (flat terminal roofs, Via Lattea roofs, the player's own carrier in the station, ride-down doors)
+- **1 + 2, roofs** (`lift-site.js pruneCrossings`). Root causes found with the new `node scripts/ski/roof-check.mjs [rid|all] [--verbose] [--detail=<lift index>]`
+  (per end: FLAT = a gable / shell squashed, NOROOF = no roof of its own and no mate within 16 m; the pruning is decided on the far grid like the game):
+  a) a neighbour's chair grazing ONE corner post cut the post and the cascade `cp.cap && y0 == p.y1` then cut the whole terminal SHELL (it sits on the
+     post tops) = Killy Bollin top / Fresse bottom with no roof at all (not even the slab); the dark liner under the shell did the same. The cascade now only takes
+     what is no bigger than the cut part (snow on a roof) and never a `shell` part (tested on its own).
+  b) a shell / hall gable the neighbour's carriers graze now lifts the WHOLE roof (`raiseRoof`, ROOF_RAISE 0.5 .. 2.2 m) when that clears them (Via Lattea Sportinia 1 /
+     2, Serra Granet 1 / 2, Garnel 1, Killy Rosset ...); if not, the old flatten now takes the tallest height that fits (`FLATTEN` 1.2 / 0.8 / 0.5 / 0.3 m), else it is cut.
+  Result (roof-check, all 11 resorts): flattened 3 -> 1 (Killy Rosset top: Paquis' chairs pass 1.2 m over it, 0.3 m is all that fits), ends without a roof of
+  their own and no mate 36 -> 6 (arlberg Vallugabahn II bottom, davos Parsennbahn 1 top, zermatt Matterhorn Express 1 / 2, Plan Maison, Leisee-Shuttle top: another
+  lift's cabins run through the hall at roof height; left as they are). The 3 Via Lattea ends of `station-diag` "missing roof" (#43 Fraiteve 1 top hall, #70 Garnel 1 top,
+  #75 Sportinia 1 top) are shared mid-stations: lift 1's top and lift 2's bottom overlap, one of them keeps the roof; #70 / #75 now draw their (raised) terminal shell,
+  #43's hall stays covered by the next gondola's hall. `station-diag` still prints them (it looks for the hidden collider roof). Gondola hall roofs sit 0.18 m higher
+  (`wheel + 1.28`): the slower own carrier below revealed a 1 - 8 cm graze of the roof lip (round7b failed on 3V Orelle-Caron / Obertauern Grünwaldkopfbahn).
+- **3, the player's own carrier in the station** (`lift-site.js stationCrawl`, `modes/liftride.js rideSpeedAt`). The hall / shell slow-down curve (HALL_SLOW,
+  CHAIR_SLOW, the station-speed search) moved from lifts.js to `lift-site.js stationCrawl(site)` (cached on the site; `lifts.js hallWarp` builds its map from it:
+  the drawn neighbours are unchanged). `createRide` now takes its speed from `rideSpeedAt(env, tRide, s)`: the old law (chair crawl + accel, cabin pull-away /
+  stop) capped by `speed x crawl.k(distance to the nearer end)`, so a gondola cabin / detachable chair crosses both stations at the same share of the line speed
+  as the others and speeds up over `ramp` m; a loop cabin brakes at 4 m/s2 from the crawl speed to stand at the unloading point (was 15 m/s2 from full speed); a
+  cabin's way into the bottom dock slows over the last 2.4 s (was 1.2 s). Position-based, so s / the camera stay continuous (round6 worst jump unchanged).
+  `rideSeconds(path, factor, site)` and `ride.left` follow (round6-test passes the site); `state` velocity = the real speed. Measured (killy #0 gondola, ride x4 =
+  24 m/s): before 15.6 m/s 12 m from the bottom hall's end and 17.5 m/s 16 m from the top; after 8.1 / 9.2 m/s (0.34 x), 24 m/s from ~25 m out; Bollin chair: 20 m/s at
+  the top -> 6 m/s at 4 m. The rest of the ridden lift stays on the plain loop (`W.w` eases to 0 as before).
+- **4, ride-down doors** (`modes/liftride.js cabinBoarding`, `createDescent`). The up-boarding cabin timeline is now ONE exported function `cabinBoarding(env)`
+  (createRide uses it unchanged except the tail above); `createDescent` uses it for gondolas / funitels / cable cars (`DOORED`): he walks to a door spot beside the
+  down lane's cabin on the return side (`doorSpotOf(path, site.top, -(len - sTop), -1)`), the cabin docks (loop cabin: slowing in; jig-back: already there) with its
+  doors opening (`w.doorK`, the door camera `w.doorCam`), he steps in, they close, it pulls away over CABIN.accel s (trains / chairs unchanged). The carrier's door
+  side was already `path.sign`; the reversed heading puts it on the return side. flow `ski-ride-down` now checks doorK peaks > 0.95 and is shut when the ride starts.
+- **Camera in a station wall (coordinator, Laax spawn)**: the camera already collides with the station's solid parts (`main.js camBlocked` -> `world.hit`);
+  the hole was `look.js createCameraGuard`: its `minDist` 1.1 m could itself lie inside a wall when the skier stands close to it, so the camera sat in the
+  wall. Now it comes in further (down to 0.3 m) until its point is clear. Not reproduced on the Mini (Laax spawn x 10264.5 z 9723.7 is on the hall's platform mat,
+  steering in place only turns him, 5 tries: left / right / tuck / push: never `world.hit`, camera outside); the iPad-sim shot ~/Library/Caches/ski-work/ipad-sim/15-tuck.png
+  could not be rebuilt, so that exact case is untested. `scripts/ski/spawn-wall-shots.mjs` repeats the tries.
+- **Files**: `pb/ski/lift-site.js` (cascade, roof raise, FLATTEN, hall roof +0.18, stationCrawl), `lifts.js` (hallWarp from stationCrawl), `modes/liftride.js`, `look.js` (camera guard),
+  `pb/ski.html` (import map), `scripts/ski/round6-test.mjs`, `scripts/flows/ski_ride_down.mjs`; new `scripts/ski/roof-check.mjs`, `lift-fix-shots.mjs`
+  (stations from 4 poses), `lift-fix-descent-shots.mjs` (ride-down boarding frames). Shots: `~/Library/Caches/ski-work/lift-fixes/{before,after}/` (killy-6-1-*,
+  killy-63-0-*, killy-39-1-*, vialattea-43/70/75-1-*, ridedown-doors-*), `ridedown/` (flow shots).
+- **Not tested / open**: real iPad; the player's own chair / cabin were checked by node (speed trace, round6 / round7b, flow rides) and by the ride-down frames, not
+  by a recorded video; chair rides on the camera 'window' view through the station not looked at; a lift with several neighbours (Zermatt Matterhorn Express halls) still
+  has no roof where cabins run through it; Killy Rosset top keeps a 0.3 m slab.
 ## Inviting a friend from Ski Alpen (27 Nov 2026; Ian: "ski alpen multiplayer is really buggy, when inviting by friends"; bugs: ~/Library/Caches/ski-work/mp-invites/bugs.md)
 - Standalone `pb/ski.html` never got invites: auth.js read `window.PB_CONFIG` once at its first import (pulled in early by arcade-kit's score saving), and the page had no config. Now the config is loaded in the head (top level only; the arcade frame gets none) and the page starts the auth client when idle, so invite-pop (banner while playing) works.
 - Join never lands on friends.html any more (invite-pop `resolveTarget`, friends.js): unknown game id in an old cached mp-games.js -> fresh list -> `lobby.html?g=<id>&c=<code>`; expired -> «D'Invitatioun ass ofgelaf.». Push tap now opens the lobby (notify edge function, deployed; `ski` has a name).

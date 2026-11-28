@@ -67,9 +67,20 @@ export const flow = {
     const hour0 = await page.evaluate(() => window.__ski.modes.clock && window.__ski.modes.clock.hour);
     await page.keyboard.press("l");
     await page.waitForFunction(() => window.__ski.game.phase === "lift" && window.__ski.ride && window.__ski.ride.down, null, { timeout: 5000 });
-    await h.pause(700);
-    await shot("2-boarding-at-the-top");
+    // lift fixes (28 Nov 2026): the cabin's doors open for the boarding at the top like at the bottom (w.doorK 0 shut .. 1 open), then shut
+    let doorMax = 0, doorShotDone = false, shut0 = null;
+    for (let i = 0; i < 400; i += 1) {
+      const d = await page.evaluate(() => { const r = window.__ski.ride; if (!r) return null; const w = r.where(); return { phase: r.phase, doorK: w.doorK || 0, doorCam: !!w.doorCam }; });
+      if (!d || d.phase !== "board") break;
+      if (shut0 === null) shut0 = d.doorK;
+      doorMax = Math.max(doorMax, d.doorK);
+      if (!doorShotDone && d.doorK > 0.9) { doorShotDone = true; await shot("2-boarding-at-the-top-doors-open"); }
+      await page.waitForTimeout(100);
+    }
+    h.expect(doorMax > 0.95, `the cabin's doors open for the boarding at the top (max ${doorMax.toFixed(2)})`);
     await page.waitForFunction(() => window.__ski.ride && window.__ski.ride.phase === "ride", null, { timeout: 20000 });
+    h.expect(await page.evaluate(() => (window.__ski.ride.where().doorK || 0) < 0.05), "the doors are shut when the ride starts");
+    await shot("2-boarding-at-the-top");
     const hour1 = await page.evaluate(() => window.__ski.modes.clock && window.__ski.modes.clock.hour);
     const r1 = await ride();
     await h.pause(2500);

@@ -110,6 +110,10 @@ export function createCameraGuard({ ground, blocked = () => false, clearance = 0
         const k = t / full, x = pivot.x + vx * k, y = pivot.y + vy * k, z = pivot.z + vz * k;
         if (y < ground(x, z) + clearance || blocked(x, y, z)) { free = Math.max(minDist, t - step * 1.5); break; }
       }
+      // lift fixes (28 Nov 2026, Laax spawn: camera inside a station wall): the minimum distance may itself lie inside a wall when the
+      // skier stands close to it; then the camera comes in further (down to 0.3 m) until its point is clear
+      const clearAt = (d) => { const k = d / full, x = pivot.x + vx * k, y = pivot.y + vy * k, z = pivot.z + vz * k; return !(y < ground(x, z) + clearance * 0.5 || blocked(x, y, z)); };
+      while (free > 0.3 && free <= minDist + 1e-6 && !clearAt(free)) free = Math.max(0.3, free - 0.2);
       dist = dist === null || free < dist ? free : Math.min(free, dist + outRate * dt);
       if (dist < full) { const k = dist / full; cam.x = pivot.x + vx * k; cam.y = pivot.y + vy * k; cam.z = pivot.z + vz * k; }
       return cam;

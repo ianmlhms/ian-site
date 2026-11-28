@@ -11,7 +11,7 @@
 const THREE = window.THREE;
 
 import { createLiftPath, chairWidth } from './lift-path.js';
-import { createLiftWorld, frames, SITE_COLOURS } from './lift-site.js';
+import { createLiftWorld, frames, stationCrawl, HALL_SLOW, SITE_COLOURS } from './lift-site.js';
 import { carrierGeometry, bubbleGeometry, BUBBLE, GLASS } from './modes/carriers.js';
 import { mergeParts } from './modes/views.js';
 import { gpuOnly } from './gpu-mem.js';
@@ -23,10 +23,9 @@ const DOWN_RIDERS = 1e6, DOWN_SHARE = 0.3;       // ride down: rider ids of the 
  * wheel turn), a `ramp` m smooth change, a little faster on the line; at most `stretch` x the line's own speed), anchored at the bottom
  * loading point (a cabin is where the loop puts it when it picks a rider up). A lift the player rides eases back to the plain loop in
  * `blend` s (his own cabin is drawn by the ride at its plain place: its neighbours keep their spacing to it, never closer than in a hall). */
-const HALL_SLOW = Object.freeze({ speed: 0.34, ramp: 10, stretch: 1.12, blend: 0.9 });
+// (HALL_SLOW / CHAIR_SLOW now live in lift-site.js: the player's own ride uses the same curve)
 // chairs round (26 Nov 2026): a detachable chair lets go of the rope under the terminal's shell and rolls slowly along the station rail
 // round the bull-wheel (the loading / unloading line included), then speeds up again: the same map with the shell's length
-const CHAIR_SLOW = Object.freeze({ speed: 0.24, ramp: 8, stretch: 1.12, blend: 0.9 });
 
 const FINE = Object.freeze({ size: 2.1, cell: 1250, share: 0.25, max: 700 });     // R8d: small station parts within share x liftRadius (<= max m)
 // Station look (26 Nov 2026): the stations' near detail (window frames, doors, lamps, mullions, trims: parts flagged `near`) per NEAR_DETAIL.cell
@@ -603,25 +602,12 @@ export function createLifts({ scene, resort, height, env = null }) {
   function hallWarp(l) {
     if (l.warp !== undefined) return l.warp;
     l.warp = null;
-    const chair = l.kind === 'chair' && l.site && l.site.chair && l.site.chair.look.detach;
-    const roof = l.site && l.site.bottom.parts.find((p) => (chair ? p.shell && !p.cut : p.roof));
-    if (!(l.kind === 'gondola' || chair) || l.shuttle || !roof || !(l.loopLen > 60)) return null;
-    const SLOW = chair ? CHAIR_SLOW : HALL_SLOW;
-    const H = Math.min(-roof.a0, l.len * 0.3), L = l.loopLen, n = Math.ceil(L), w = {}, dist = new Float32Array(n + 1);
-    for (let k = 0; k <= n; k++) { l.loopAt((k / n) * L, w); dist[k] = Math.min(w.s, l.len - w.s); }
-    const smooth = (e0, e1, x) => { const v = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return v * v * (3 - 2 * v); };
-    // time (in line metres) to each sample; the slowest hall speed that keeps the line within `stretch` of its own speed
+    const C = stationCrawl(l.site);               // (lift-site.js: the same curve the player's own ride follows)
+    if (!C) return null;
+    const { L, n, dist } = C;
+    // time (in line metres) to each sample
     const tau = new Float64Array(n + 1);
-    let vs = SLOW.speed;
-    for (;;) {
-      for (let k = 1; k <= n; k++) {
-        const v = (d) => 1 - (1 - vs) * smooth(H + SLOW.ramp, H, d);
-        tau[k] = tau[k - 1] + (L / n) * 0.5 * (1 / v(dist[k - 1]) + 1 / v(dist[k]));
-      }
-      if (tau[n] / L <= SLOW.stretch || vs > 0.9) break;
-      vs += 0.06;
-    }
-    if (vs > 0.9) return null;
+    for (let k = 1; k <= n; k++) tau[k] = tau[k - 1] + (L / n) * 0.5 * (1 / C.k(dist[k - 1]) + 1 / C.k(dist[k]));
     // the inverse: X at equal steps of time (u / L of the loop = the same share of the time round it)
     const inv = new Float32Array(n + 1), T = tau[n];
     for (let j = 0, k = 0; j <= n; j++) {

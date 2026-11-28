@@ -180,7 +180,7 @@ export function createLiftSite(path) {
       }
     } else if (key === 'gondola') {
       type = 'hall';
-      const roof = wheel + 1.1, a0 = -14.5, a1 = aBack + 1.6, b0 = bIn - 2.2, b1 = bOut + 4.4;
+      const roof = wheel + 1.28, a0 = -14.5, a1 = aBack + 1.6, b0 = bIn - 2.2, b1 = bOut + 4.4;
       add(a0, a1, b0, b1, -0.35, 0.04, COL.deck, false, { deck: true });
       add(-11, -2, bOut + 0.2, bOut + 3.9, 0.04, 0.12, COL.concrete, false, { deck: true });          // the platform
       add(a0, a1 + 0.2, b0, b1, roof, roof + 0.55, COL.concrete, true, { roof: true });
@@ -394,6 +394,42 @@ export function createLiftSite(path) {
 
 /** Every station-like frame of a site (both ends, the portals, the stops). */
 export const frames = (site) => [...site.ends, ...site.portals, ...site.stops];
+
+/* Lift fixes (28 Nov 2026): how a gondola cabin / detachable chair slows down in its stations (it lets go of the rope under the hall /
+ * the terminal's shell and rolls on the rail). ONE definition for the carriers the pool draws (lifts.js hallWarp) and the player's own
+ * (modes/liftride.js: the ride's speed follows the same curve by position). `speed` = the share of the line speed inside the station
+ * (raised for a short lift so the line is never more than `stretch` x its own speed), `ramp` m of smooth change, blend = s a lift the
+ * player rides takes to ease back to the plain loop. */
+export const HALL_SLOW = Object.freeze({ speed: 0.34, ramp: 10, stretch: 1.12, blend: 0.9 });
+export const CHAIR_SLOW = Object.freeze({ speed: 0.24, ramp: 8, stretch: 1.12, blend: 0.9 });
+const smoothstep = (e0, e1, x) => { const v = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return v * v * (3 - 2 * v); };
+/** The station slow-down of a site: { SLOW, H (m the station reaches from the end), vs (the crawl share), L, n, dist (per loop sample:
+ *  m to the nearer end), k(d) (the speed share at d m from the nearer end) } or null (no gondola / detachable chair, a jig-back pair,
+ *  no roof to slow under, a short loop). Cached on the site. */
+export function stationCrawl(site) {
+  if (!site || site.crawl !== undefined) return site ? site.crawl : null;
+  site.crawl = null;
+  const path = site.path;
+  const chair = path.kind === 'chair' && site.chair && site.chair.look.detach;
+  const roof = site.bottom.parts.find((p) => (chair ? p.shell && !p.cut : p.roof));
+  if (!(path.kind === 'gondola' || chair) || path.shuttle || !roof || !(path.loopLen > 60)) return null;
+  const SLOW = chair ? CHAIR_SLOW : HALL_SLOW;
+  const H = Math.min(-roof.a0, path.len * 0.3), L = path.loopLen, n = Math.ceil(L), w = {}, dist = new Float32Array(n + 1);
+  for (let k = 0; k <= n; k++) { path.loopAt((k / n) * L, w); dist[k] = Math.min(w.s, path.len - w.s); }
+  const k = (vs) => (d) => 1 - (1 - vs) * smoothstep(H + SLOW.ramp, H, d);
+  // the slowest station speed that keeps the line within `stretch` of its own speed (time round the loop, in line metres)
+  let vs = SLOW.speed;
+  for (;;) {
+    const v = k(vs);
+    let tau = 0;
+    for (let i = 1; i <= n; i++) tau += (L / n) * 0.5 * (1 / v(dist[i - 1]) + 1 / v(dist[i]));
+    if (tau / L <= SLOW.stretch || vs > 0.9) break;
+    vs += 0.06;
+  }
+  if (vs > 0.9) return null;
+  site.crawl = { SLOW, H, vs, L, n, dist, k: k(vs) };
+  return site.crawl;
+}
 
 /* ---------------- the resort's lift world ---------------- */
 const CELL = 60;
@@ -848,6 +884,7 @@ export function createLiftWorld(paths, opts = {}) {
  *     lift net), every later world (lifts.js on the 5 m heights, setBuildings) applies the same cuts, raised roofs, moved huts and
  *     mounts (part lists identical); round7b-test checks the drawn world's carriers against every kept part. */
 const CUT_MARGIN = 0.5;                         // m of vertical clearance between a neighbour's carrier and a part that keeps the part
+const FLATTEN = [1.2, 0.8, 0.5, 0.3];            // m a grazed gable / terminal shell may be cut down to (tallest that clears the neighbour's carriers)
 const ROOF_RAISE = [0.5, 1.0, 1.6, 2.2];       // m a roof may go up to clear a neighbour's carriers (a shared station's canopy)
 const TOUCH = 0.16;                             // m: two parts closer than this in all three axes hold each other
 const pruneCache = new WeakMap();               // lift src -> per frame { n, cut: [indices], added: [parts], shift: [[index, dy0, dy1]] }
@@ -923,12 +960,18 @@ function pruneCrossings(sites) {
           const dy = ROOF_RAISE.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1.5, y1: p.y1 + d + 1.5 }, q)));
           if (dy) { raiseRoof(f, p, dy); continue; }
         }
+        if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // lift fixes: a big shape (terminal shell, hall gable) the neighbour's carriers graze: the whole roof goes up over them
+          const rf = f.parts.find((q) => q.roof && !q.cut && !q.shift);
+          const dy = rf && ROOF_RAISE.find((d) => !near.some((q) => hits(f, g, { ...p, y0: p.y0 + d - 1, y1: p.y1 + d + 1 }, q)) && !near.some((q) => hits(f, g, { ...rf, y0: rf.y0 + d - 1, y1: rf.y1 + d + 1 }, q)));
+          if (dy) { raiseRoof(f, rf, dy); if (!near.some((q) => hits(f, g, p, q))) continue; }
+        }
         if (p.shape && p.cap && p.y1 - p.y0 > 0.45) {      // station look: a gable the neighbour grazes stays as a flat roof (0.3 m) if it can
-          const low = { ...p, y1: p.y0 + 0.3 };
-          if (!near.some((q) => hits(f, g, low, q))) { shiftPart(p, 0, low.y1 - p.y1); continue; }
+          // (lift fixes: the tallest roof that fits under the neighbour's carriers, 1.2 / 0.8 / 0.5 / 0.3 m, not always a slab)
+          const fit = FLATTEN.map((h) => ({ ...p, y1: p.y0 + Math.min(h, p.y1 - p.y0) })).find((low) => !near.some((q) => hits(f, g, low, q)));
+          if (fit) { shiftPart(p, 0, fit.y1 - p.y1); continue; }
         }
         p.cut = true; p.solid = false;
-        for (const cp of f.parts) if (cp.cap && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0) cp.cut = true;
+        for (const cp of f.parts) if (cp.cap && !cp.shell && Math.abs(cp.y0 - p.y1) < 0.05 && cp.a0 < p.a1 && cp.a1 > p.a0 && cp.b0 < p.b1 && cp.b1 > p.b0 && cp.a0 > p.a0 - 0.6 && cp.a1 < p.a1 + 0.6 && cp.b0 > p.b0 - 0.6 && cp.b1 < p.b1 + 0.6) cp.cut = true;   // (only what sits on it and is no bigger; a terminal shell is tested on its own: a cut corner post / the dark liner under it must not take it along)
       }
       // a station hut that had to go (twin drag lifts, a chair's operator hut in the next lift's lane) moves to a free spot: across the
       // line on the return side, or further back / forward (hut, its snow and its window move together)
