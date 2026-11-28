@@ -95,10 +95,18 @@ export const flow = {
     await page.evaluate(() => { window.__ski.game.bot = null; });
     const h0 = await page.evaluate(() => window.__ski.state.heading);
     await page.keyboard.down("ArrowRight");
-    await h.pause(700);
+    // The heading is sampled during the hold and the largest swing counts: at x4 game time (~3 s of carving) the skier swings through
+    // the fall line and the slope pulls him back, so the heading at the instant of release is a random phase of that swing (28 Nov
+    // 2026: 0.04 .. 0.3 rad run to run in WebKit, also at older commits, while the game steers fine).
+    let swing = 0, peakSteer = 0;
+    for (let i = 0; i < 7; i++) {
+      await h.pause(100);
+      const now = await page.evaluate(() => ({ heading: window.__ski.state.heading, steer: window.__ski.state.steer }));
+      swing = Math.max(swing, Math.abs(Math.atan2(Math.sin(now.heading - h0), Math.cos(now.heading - h0))));
+      peakSteer = Math.max(peakSteer, Math.abs(now.steer));
+    }
     await page.keyboard.up("ArrowRight");
-    const h1 = await page.evaluate(() => window.__ski.state.heading);
-    h.expect(Math.abs(h1 - h0) > 0.05, `right arrow turns the skier (heading ${h0.toFixed(2)} -> ${h1.toFixed(2)})`);
+    h.expect(peakSteer > 0.8 && swing > 0.15, `right arrow turns the skier (steer ${peakSteer.toFixed(2)}, heading swing ${swing.toFixed(2)} rad from ${h0.toFixed(2)})`);
     await page.keyboard.down("Space");
     await h.pause(500);
     h.expect(await page.evaluate(() => window.__ski.state.tuck > 0.5), "space tucks");
