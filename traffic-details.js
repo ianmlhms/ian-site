@@ -30,6 +30,8 @@ const LISTS = [
   { key: 'companies', title: 'Firmen (eegen Zielung)', own: true },
   { key: 'providers', title: 'Internet-Provider (eegen Zielung)', own: true },
 ];
+const SKI_NAMES = { killy: 'Espace Killy', '3vallees': 'Les 3 Vallées', zermatt: 'Zermatt · Cervinia', arlberg: 'St. Anton · Arlberg', kronplatz: 'Kronplatz',
+  vialattea: 'Via Lattea', obertauern: 'Obertauern', livigno: 'Livigno', davos: 'Davos Klosters', laax: 'Laax', soelden: 'Sölden' };   // a new resort shows its id
 const DURATION_ORDER = ['<10 s', '10-60 s', '1-5 min', '5-15 min', '15-60 min', '> 1 h'];
 const DEPTH_ORDER = ['1', '2', '3', '4', '5+'];
 const number = new Intl.NumberFormat('de-LU', { maximumFractionDigits: 1 });
@@ -110,6 +112,26 @@ export function applyOwn(rows, own, today) {
   return { rows: [...older, ...converted].sort((a, b) => a.day.localeCompare(b.day)), ownFrom, taken };
 }
 
+/** Ski Alpen per resort over the last `days` days: { r, views, visits, seconds }, sorted by time. Only own-counter days have it. Pure. */
+export function mergeSki(rows, days, since = '') {
+  const totals = new Map();
+  rows.filter((row) => !since || row.day >= since).forEach((row) => {
+    const list = isRecord(row.details) && Array.isArray(row.details.ski) ? row.details.ski : [];
+    list.forEach((item) => {
+      if (!isRecord(item) || typeof item.r !== 'string') return;
+      const old = totals.get(item.r) ?? { views: 0, visits: 0, seconds: 0 };
+      totals.set(item.r, { views: old.views + count(item.views), visits: old.visits + count(item.visits), seconds: old.seconds + count(item.seconds) });
+    });
+  });
+  return Array.from(totals, ([r, sums]) => ({ r, ...sums }))
+    .sort((a, b) => b.seconds - a.seconds || b.views - a.views || a.r.localeCompare(b.r));
+}
+
+/** The owner's browsers are not counted: the admin traffic page marks the browser it is opened in (count.js reads this flag). */
+export function markOwnerBrowser() {
+  try { localStorage.setItem('ic_skip', '1'); } catch (error) { /* private mode: ?nocount=1 does the same on another page */ }
+}
+
 const ownCache = new Map();
 
 /** The Worker's answer, or null (down, slow, not signed in, odd answer). `only` = 'live' asks for just the live + recent lists. Never throws. */
@@ -181,6 +203,28 @@ export function fillLive(root, own) {
           Array.isArray(v.pages) ? v.pages.join(' › ') : '', count(v.seconds)])));
     }
   }
+}
+
+const minutes = (seconds) => `${number.format(Math.round(seconds / 6) / 10)} min`;
+const average = (sum, n) => (n ? minutes(sum / n) : '·');
+
+/** «Ski Alpen»: per resort the opens (views), visits (sessions), total and average time, for the last 7 and 30 days. */
+function skiPanel(rows) {
+  const box = panel('Ski Alpen: Gebidder', 'Alleguer ausser mir · Opmaachen, Visitten a Zäit pro Gebitt');
+  box.classList.add('panel-wide');
+  const since7 = luxDay(6), since30 = luxDay(29);
+  const seven = new Map(mergeSki(rows, 7, since7).map((item) => [item.r, item]));
+  const all = mergeSki(rows, 30, since30);
+  if (!all.length) { box.append(el('p', 'empty-inline', 'Nach keng Gebidder gezielt (d\'Zielung fänkt mat der neier Versioun un).')); return box; }
+  const cell = (item, field) => (item ? number.format(item[field]) : '·');
+  box.append(table(['Gebitt', 'Opmaachen 7 D', 'Visitten 7 D', 'Zäit 7 D', 'ø Zäit 7 D', 'Opmaachen 30 D', 'Visitten 30 D', 'Zäit 30 D', 'ø Zäit 30 D'],
+    all.map((item) => {
+      const week = seven.get(item.r);
+      return [SKI_NAMES[item.r] ?? item.r, cell(week, 'views'), cell(week, 'visits'), week ? minutes(week.seconds) : '·', week ? average(week.seconds, week.views) : '·',
+        number.format(item.views), number.format(item.visits), minutes(item.seconds), average(item.seconds, item.views)];
+    })));
+  box.append(el('p', 'td-note', 'Opmaachen = gestart Fuert oder Fräi Fueren an engem Gebitt; Zäit bis déi nächst Säit oder bis déi lescht Meldung (max. 30 Min. pro Opmaachen). Eege Browser (Admin-Säit) ginn net gezielt.'));
+  return box;
 }
 
 function sourceNote(ownFrom) {
@@ -350,6 +394,7 @@ function render(root, data, period) {
     orgPanel(goatOrgs.filter(inPeriod), 'company', 'Firmen op der Homepage (bis ' + (data.ownFrom ? shortDay(data.ownFrom) : 'elo') + ')', 'Nëmmen d\'Firma, ni eng Persoun oder IP'),
     playersPanel(data.players, days),
     activityPanel(data.activity.filter(inPeriod)),
+    skiPanel(data.traffic.filter((row) => row.source === 'own')),
     hoursPanel(rows), shapePanel(rows),
     ...LISTS.filter(({ own, key }) => !own || ownRows.some((row) => Array.isArray(row.details[key]) && row.details[key].length)).map(({ key, title, label, countsVisits }) => {
       const box = panel(title);
@@ -382,6 +427,7 @@ export async function showTrafficDetails(root, supabase) {
   loaded = true;
   try {
     const [data, own] = await Promise.all([load(supabase), fetchOwnStats(supabase)]);
+    if (own) markOwnerBrowser();                    // /stats only answers the admin: this browser is the owner's
     const merged = applyOwn(data.traffic, own, luxDay(0));
     data.traffic = merged.rows.map((row) => ({
       day: row.day, visits: count(row.unique_visitors), views: count(row.pageviews),

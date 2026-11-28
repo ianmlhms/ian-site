@@ -39,3 +39,20 @@ test('an empty day is all zeros', () => {
   const day = aggregateDay([], [], 0);
   assert.deepEqual([day.visits, day.views, day.details.pages, day.details.hours.length], [0, 0, [], 24]);
 });
+
+test('Ski Alpen: opens, visits and seconds per resort, a view lasts until the visit\'s next view or its last ping', () => {
+  const sessions = [session({ sid: 'a', last_ts: T + 700_000 }), session({ sid: 'b', last_ts: T + 120_000 }), session({ sid: 'c', last_ts: T + 9_000_000 })];
+  const view = (sid, path, ts) => ({ sid, hour: 11, path, kind: 'view', ts });
+  const hits = [
+    view('a', '/pb/ski.html', T), view('a', '/pb/ski.html?r=killy', T + 60_000), view('a', '/pb/ski.html?r=zermatt', T + 360_000),   // killy 300 s, zermatt until the last ping (340 s)
+    view('b', '/pb/ski.html?r=killy', T), { sid: 'b', hour: 11, path: '', kind: 'event', name: 'win', ts: T + 10_000 },               // 120 s
+    view('c', '/pb/ski.html?r=livigno', T), view('c', '/pb/ski.html?r=livigno', T + 3_600_000),                                       // gap capped at 1800 s, last capped at 7200 s
+  ];
+  const { ski } = aggregateDay(sessions, hits).details;
+  assert.deepEqual(ski, [
+    { r: 'livigno', views: 2, visits: 1, seconds: 1800 + 5400 },
+    { r: 'zermatt', views: 1, visits: 1, seconds: 340 },
+    { r: 'killy', views: 2, visits: 2, seconds: 420 },
+  ].sort((x, y) => y.seconds - x.seconds));
+  assert.deepEqual(aggregateDay([session({})], [{ sid: 's1', hour: 1, path: '/pb/ski.html?r=killy', kind: 'view' }]).details.ski, [{ r: 'killy', views: 1, visits: 1, seconds: 0 }], 'no ts: no time');
+});

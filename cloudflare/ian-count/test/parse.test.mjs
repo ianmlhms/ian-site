@@ -31,6 +31,10 @@ test('paths lose queries and hashes, except the arcade game id', () => {
   assert.equal(cleanPath('/index.html'), '/');
   assert.equal(cleanPath('/pixelbreak.html?g=snake&utm=1'), '/pixelbreak.html?g=snake');
   assert.equal(cleanPath('/pixelbreak.html?g=<bad>'), '/pixelbreak.html');
+  assert.equal(cleanPath('/pb/ski.html?r=3vallees&x=1'), '/pb/ski.html?r=3vallees', 'Ski Alpen keeps its resort id');
+  assert.equal(cleanPath('/pb/ski.html?r=Bad<id>'), '/pb/ski.html');
+  assert.equal(cleanPath('/pb/ski.html'), '/pb/ski.html');
+  assert.equal(cleanPath('/pb/mtb.html?r=killy'), '/pb/mtb.html', 'no other page keeps a query');
   assert.equal(cleanPath('/other.html?g=snake'), '/other.html');
   assert.equal(cleanPath(`/${'a'.repeat(300)}`).length, 160);
   assert.equal(cleanPath(42), null);

@@ -136,7 +136,7 @@ export class Store {
     const filter = includeTest ? '' : ` AND ${NOT_TEST}`;
     const sessions = this.run(`SELECT * FROM sessions WHERE id >= ? AND id < ? AND day = ?${filter}`,
       row.sess_from, next?.sess_from ?? Number.MAX_SAFE_INTEGER, day);
-    const hits = this.run(`SELECT hour, path, kind, name, sid FROM hits WHERE id >= ? AND id < ? AND day = ?${filter}`,
+    const hits = this.run(`SELECT ts, hour, path, kind, name, sid FROM hits WHERE id >= ? AND id < ? AND day = ?${filter}`,
       row.hit_from, next?.hit_from ?? Number.MAX_SAFE_INTEGER, day);
     return { row, sessions, hits };
   }

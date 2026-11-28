@@ -5,6 +5,10 @@ import { luxHour, screenClass } from './parse.js';
 
 export const MAX_PAGES_PER_DAY = 200;
 export const MAX_LABELS_PER_DAY = 25;
+export const MAX_SKI_RESORTS = 40;
+export const MAX_SKI_GAP_SECONDS = 1800;       // a view that is followed by another one: at most this long (the tab may have been hidden)
+export const MAX_SKI_LAST_SECONDS = 7200;      // the last view of a visit lasts until the visit's last ping (pings stop after an hour)
+const SKI_PATH = /^\/pb\/ski\.html\?r=([a-z0-9_-]{1,20})$/;
 const DURATION_STEPS = [[10, '<10 s'], [60, '10-60 s'], [300, '1-5 min'], [900, '5-15 min'], [3600, '15-60 min']];
 
 const tally = () => new Map();
@@ -19,6 +23,38 @@ const top = (map, key, limit) => [...map]
   .map(([label, { views, sids }]) => ({ [key]: label, views, visits: sids.size }))
   .sort((a, b) => b.visits - a.visits || b.views - a.views || String(a[key]).localeCompare(String(b[key])))
   .slice(0, limit);
+
+/** Ski Alpen per resort: views of '/pb/ski.html?r=<resort>', sessions that opened it and the seconds spent there. A view lasts until the
+ * same visit's next view (capped), the last one until the visit's last ping. Needs hit.ts; rows without it add no time. Pure. */
+export function skiByResort(sessions, hits) {
+  const lastTs = new Map(sessions.map((s) => [s.sid, s.last_ts]));
+  const bySid = new Map();
+  for (const hit of hits) {
+    if (hit.kind !== 'view') continue;
+    const list = bySid.get(hit.sid) ?? [];
+    list.push(hit);
+    bySid.set(hit.sid, list);
+  }
+  const resorts = new Map();
+  for (const [sid, list] of bySid) {
+    list.sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+    list.forEach((hit, i) => {
+      const resort = SKI_PATH.exec(hit.path)?.[1];
+      if (!resort) return;
+      const next = list[i + 1];
+      const seconds = !Number.isFinite(hit.ts) ? 0 : next && Number.isFinite(next.ts)
+        ? Math.min(MAX_SKI_GAP_SECONDS, (next.ts - hit.ts) / 1000)
+        : Math.min(MAX_SKI_LAST_SECONDS, Math.max(0, ((lastTs.get(sid) ?? hit.ts) - hit.ts) / 1000));
+      const entry = resorts.get(resort) ?? { views: 0, sids: new Set(), seconds: 0 };
+      entry.views += 1;
+      entry.sids.add(sid);
+      entry.seconds += seconds;
+      resorts.set(resort, entry);
+    });
+  }
+  return [...resorts].map(([r, e]) => ({ r, views: e.views, visits: e.sids.size, seconds: Math.round(e.seconds) }))
+    .sort((a, b) => b.seconds - a.seconds || b.views - a.views || a.r.localeCompare(b.r)).slice(0, MAX_SKI_RESORTS);
+}
 
 /** sessions: rows of the sessions table (sid, first_ts, last_ts, views, events, entry, exit, trail, ...); hits: {sid, hour, path, kind, name}. */
 export function aggregateDay(sessions, hits, bots = 0) {
@@ -70,6 +106,7 @@ export function aggregateDay(sessions, hits, bots = 0) {
       average_seconds: visits ? Math.round(totalSeconds / visits) : 0,
       durations, depth,
       pages: top(pages, 'path', MAX_PAGES_PER_DAY),
+      ski: skiByResort(sessions, hits),
       event_names: top(eventNames, 'name', MAX_LABELS_PER_DAY),
       hours: hours.map((h) => [h.views, h.sids.size]),
       ...Object.fromEntries(Object.entries(lists).map(([k, map]) => [k, top(map, 'name', MAX_LABELS_PER_DAY)])),

@@ -787,6 +787,15 @@ async function boot() {
     }
   }
 
+  /** Own visitor counter (count.js): the first run or free ride of this page life (one resort per page life) is one virtual page view
+   *  '/pb/ski.html?r=<resort>', so the traffic page shows opens and time per resort. The arcade frame reaches the hub's counter via top. */
+  let resortCounted = false;
+  function countResort() {
+    if (resortCounted || params.bot) return;
+    resortCounted = true;
+    try { const c = window.ianCount || (window.top !== window && window.top.ianCount); if (c && c.view) c.view(`/pb/ski.html?r=${encodeURIComponent(rid)}`, `${resort.short} · Ski Alpen`); } catch (error) { /* statistics only */ }
+  }
+
   function startRun(p, mode, lateral = 0) {     // lateral: m right of the line at the start gate (online race: side by side)
     if (!p) return;
     if (mode === MODES.run && !isRace() && !modes.isOpen(p) && !params.debug) { hud.toast('Gespaart'); return; }      // an online race may be on any piste
@@ -794,6 +803,7 @@ async function boot() {
     if (finishCard) { finishCard.close(); finishCard = null; }
     game.screen = 'ski';
     document.documentElement.dataset.skiScreen = 'ski';
+    countResort();
     game.piste = p;
     game.mode = mode;
     endCourse();
@@ -1003,6 +1013,7 @@ async function boot() {
     if (finishCard) { finishCard.close(); finishCard = null; }
     game.screen = 'ski';
     document.documentElement.dataset.skiScreen = 'ski';
+    countResort();
     game.mode = MODES.freeride;
     game.resume = null;
     if (lift) game.freeLift = lift;

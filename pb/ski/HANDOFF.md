@@ -2512,3 +2512,14 @@ Closed / abandoned lifts stand as ruins (Via Lattea Moncrons: Sciovia Moncrons /
   `world.hit`, `npcBlocked`, `botBlocked`, the camera guard. `window.__ski.ruins` (stats, builtCells, group).
 - Map: ruins are not drawn on the map (nothing reads as a rideable lift).
 - Flow `ski-ruins` (Chromium + WebKit).
+
+## Resort statistics for all players (28 Nov 2026)
+- **Game**: `main.js` `countResort()` (called from `startRun` and `startFree`) sends ONE virtual page view `ianCount.view('/pb/ski.html?r=<resortId>', '<short> · Ski Alpen')` per page life
+  (one resort per page life; a resort switch reloads, so a switch = a new view). Standalone it uses `window.ianCount` (`pb/ski.html` now loads `/count.js?v=3`), in the arcade frame
+  `window.top.ianCount` (the hub counts `/pixelbreak.html?g=ski`). The scripted skier (`?bot=1`) reports nothing. The picker/loading time is the plain `/pb/ski.html` view.
+- **Worker** (`cloudflare/ian-count`): `parse.js` keeps `?r=<[a-z0-9_-]{1,20}>` only for `/pb/ski.html`; `agg.js` `skiByResort` adds `details.ski = [{r, views, visits, seconds}]` to every day
+  (rolled into `daily`, so it is kept). A view lasts until the same visit's next view (max 30 min) or, for the last one, until the visit's last ping (max 2 h). Only days after the Worker deploy have it.
+- **Traffic page** (`traffic-details.js`, admin only): panel «Ski Alpen: Gebidder», per resort opens / visits / time / average for 7 and 30 days, sorted by 30-day time.
+- **Owner exclusion**: count.js stops when `localStorage.ic_skip === '1'`. `traffic-details.js` sets it whenever `/stats` answers (= the admin's browser); on another device open any ian.lu page with `?nocount=1`
+  (`?nocount=0` removes it). Nothing is sent or stored besides that flag. Visits before this change cannot be separated.
+- Flow `ski-count`; unit tests in `cloudflare/ian-count/test`.

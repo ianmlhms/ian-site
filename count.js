@@ -1,8 +1,10 @@
 /* ian.lu's own visitor counter (the Worker in cloudflare/ian-count). One small request per page view plus a few "still here" pings,
  * so the traffic page can show visits, pages and time on page. What it sends: a random id that lives in sessionStorage (it ends
- * with the tab and is never stored anywhere permanent), the page path (no query, except the arcade's game id), the referrer's
+ * with the tab and is never stored anywhere permanent), the page path (no query, except the arcade's game id and Ski Alpen's resort id), the referrer's
  * host, screen size, language and time zone. No cookies, no localStorage, no fingerprint; the server does not keep the address.
- * Off with Do Not Track / Global Privacy Control, in automated browsers, on local copies and inside game frames.
+ * Off with Do Not Track / Global Privacy Control, in automated browsers, on local copies and inside game frames, and in the site
+ * owner's own browsers: localStorage 'ic_skip' = '1' (set automatically when the admin traffic page loads, or by opening any ian.lu
+ * page with ?nocount=1; ?nocount=0 removes it). It is only that flag, nothing else is stored; it is not sent anywhere.
  * Plain ES5 on purpose: it has to run on old school iPads, and it must never throw or slow a page. Loaded with defer. */
 (function () {
   'use strict';
@@ -17,6 +19,11 @@
       if (host !== 'ian.lu' && host !== 'www.ian.lu') return;
       if (nav.webdriver) return;
     }
+    try {                                                                        // the owner's browsers: not counted (see the header)
+      var skip = /(?:^\?|&)nocount=([01])(?:&|$)/.exec(loc.search || '');
+      if (skip && !test) { if (skip[1] === '1') localStorage.setItem('ic_skip', '1'); else localStorage.removeItem('ic_skip'); }
+      if (localStorage.getItem('ic_skip') === '1') return;
+    } catch (error) { /* no storage: counted as usual */ }
     if (nav.doNotTrack === '1' || win.doNotTrack === '1' || nav.msDoNotTrack === '1' || nav.globalPrivacyControl) return;
     try { if (win.top !== win.self) return; } catch (error) { return; }          // a game inside an iframe: the hub page counts it
     if (win.ianCount) return;                                                    // included twice
@@ -91,7 +98,8 @@
     });
     win.addEventListener('pagehide', function () { visibleBefore = visibleMs(); leave(); });
 
-    // The arcade hub opens games without loading a page: it calls ianCount.view('/pixelbreak.html?g=<id>').
+    // The arcade hub opens games without loading a page: it calls ianCount.view('/pixelbreak.html?g=<id>'); Ski Alpen reports its resort
+    // the same way: ianCount.view('/pb/ski.html?r=<resort>', title).
     win.ianCount = { view: function (path, title) { try { if (typeof path === 'string') view(path, title || doc.title, false); } catch (error) { /* statistics only */ } } };
 
     view(pagePath(), doc.title, first);

@@ -1,5 +1,5 @@
 // Everything that turns a request into clean, bounded facts. Pure functions (tested in test/parse.test.mjs).
-// Nothing here keeps an address, a full user agent or a query string (except the arcade's `g`).
+// Nothing here keeps an address, a full user agent or a query string (except the arcade's `g` and Ski Alpen's `r`).
 
 export const MAX_BODY = 900;
 export const MAX_PATH = 160;
@@ -10,6 +10,8 @@ const EVENT_NAME = /^[\w .:/-]{1,60}$/;
 const LANG = /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/;
 const TZ = /^[A-Za-z0-9_+/-]{1,40}$/;
 const ARCADE = '/pixelbreak.html';
+const SKI = '/pb/ski.html';
+const SKI_RESORT = /^[a-z0-9_-]{1,20}$/;
 const GAME_ID = /^[A-Za-z0-9_-]{1,40}$/;
 
 const clean = (value, max) =>
@@ -19,7 +21,7 @@ const int = (value, max) => {
   return Number.isFinite(n) && n >= 0 && n <= max ? n : 0;
 };
 
-/** '/a/b?x=1#y' -> '/a/b'; only the arcade keeps `?g=<id>`. null when it is not a usable path. */
+/** '/a/b?x=1#y' -> '/a/b'; only the arcade keeps `?g=<id>` and Ski Alpen `?r=<resort>`. null when it is not a usable path. */
 export function cleanPath(value) {
   if (typeof value !== 'string' || value[0] !== '/' || value[1] === '/') return null;
   const [beforeHash] = value.split('#');
@@ -30,6 +32,9 @@ export function cleanPath(value) {
   if (path === ARCADE) {
     const game = /(?:^|&)g=([^&]*)/.exec(query)?.[1];
     if (game && GAME_ID.test(game)) path += `?g=${game}`;
+  } else if (path === SKI) {                       // Ski Alpen reports which resort is open as a virtual page: ?r=<resortId>
+    const resort = /(?:^|&)r=([^&]*)/.exec(query)?.[1];
+    if (resort && SKI_RESORT.test(resort)) path += `?r=${resort}`;
   }
   return path.slice(0, MAX_PATH);
 }

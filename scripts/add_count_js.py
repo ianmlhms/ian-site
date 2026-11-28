@@ -13,7 +13,7 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-COUNT_VERSION = 2
+COUNT_VERSION = 3
 TAG = '<script defer src="/count.js?v=%d"></script>' % COUNT_VERSION
 SKIP_DIRS = {".git", "node_modules"}
 GOATCOUNTER = re.compile(r'([ \t]*)<script\b[^>]*data-goatcounter[^>]*>\s*</script>', re.S)
@@ -33,9 +33,9 @@ def patch(text):
     """The page's new text, or the same text when nothing is to do."""
     text = OLD_VISIT_ORG.sub("", text)
     match = GOATCOUNTER.search(text)
-    if not match:
-        return text
     found = COUNT_TAG.search(text)
+    if not match:                      # a page with only count.js (pb/ski.html): just keep its version current
+        return text[:found.start()] + TAG + text[found.end():] if found and found.group(0) != TAG else text
     if found:
         return text[:found.start()] + TAG + text[found.end():] if found.group(0) != TAG else text
     return text[:match.end()] + "\n" + match.group(1) + TAG + text[match.end():]

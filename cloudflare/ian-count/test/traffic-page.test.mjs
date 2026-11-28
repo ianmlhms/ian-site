@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyOwn, ownFromDay, mergeLists } from '../../../traffic-details.js';
+import { applyOwn, ownFromDay, mergeLists, mergeSki } from '../../../traffic-details.js';
 
 const own = (first_day, days) => ({ first_day, ts: Date.parse('2026-11-26T08:00:00Z'), days, live: { count: 0 } });
 const day = (d, visits, views, pages = []) => ({ day: d, visits, views, details: { pages, entries: [{ name: '/', views: visits, visits }] } });
@@ -28,4 +28,15 @@ test('Worker down or odd: the old rows come back unchanged', () => {
 test('own days merge with the same code as old ones', () => {
   const rows = [{ details: { entries: [{ name: '/', views: 2, visits: 2 }] } }, { details: { entries: [{ name: '/', views: 3, visits: 1 }] } }];
   assert.deepEqual(mergeLists(rows, 'entries'), [{ label: '/', views: 5, visits: 3 }]);
+});
+test('Ski Alpen days add up per resort, sorted by time', () => {
+  const rows = [
+    { day: '2026-11-26', details: { ski: [{ r: 'killy', views: 2, visits: 2, seconds: 600 }, { r: 'zermatt', views: 1, visits: 1, seconds: 100 }] } },
+    { day: '2026-11-27', details: { ski: [{ r: 'zermatt', views: 3, visits: 2, seconds: 900 }] } },
+    { day: '2026-11-20', details: { ski: [{ r: 'killy', views: 9, visits: 9, seconds: 9999 }] } },
+    { day: '2026-11-27', details: {} },
+  ];
+  assert.deepEqual(mergeSki(rows, 7, '2026-11-26'), [{ r: 'zermatt', views: 4, visits: 3, seconds: 1000 }, { r: 'killy', views: 2, visits: 2, seconds: 600 }]);
+  assert.equal(mergeSki(rows, 30).length, 2);
+  assert.deepEqual(mergeSki([{ details: { ski: 'odd' } }, { details: null }], 7), []);
 });
