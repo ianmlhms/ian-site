@@ -113,6 +113,7 @@ RESORTS = {
     "zermatt": {"name": "Zermatt · Cervinia", "short": "Matterhorn", "country": "CH", "crs": "EPSG:2056",
                 "bbox": (45.862, 7.600, 46.040, 7.830), "dem": ["swissalti3d", "vda-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
                 "keep": [("Matterhorn", 7.6586, 45.9763, 800)],
+                "reserved_ids": ("stockhorn",),     # 28 Nov 2026: OSM abandoned=yes, removed with prune_pistes.py (board row stays)
                 # the Gornergrat Bahn (rack railway Zermatt -> Gornergrat, a ski lift too): its OSM ways carry no name, only usage=tourism
                 # (the Matterhorn Gotthard Bahn up the valley is usage=branch)
                 "railways": [{"match": {"railway": "narrow_gauge", "usage": "tourism"}, "name": "Gornergrat Bahn"}],
@@ -194,6 +195,10 @@ RESORTS = {
             "verbindung-sessellift-rocce-", "verbindung-sessellift-trebia", "verbindung-standard", "verbindung-tsd4-ski-lodge-la",
             "verbindung-tsd4-ski-lodge-la-2", "verbindung-tsd4-ski-lodge-la-3", "verbindung-tsd4-ski-lodge-la-4",
             "verbindung-tsd4-soleil-boeuf", "verbindung-tsd4-soleil-boeuf-2",
+            # 28 Nov 2026: the closed Moncrons sector (Rossella, 40, their links, Gran Villard) was removed with prune_pistes.py
+            "rossella", "40", "verbindung-40", "verbindung-40-40", "verbindung-36", "verbindung-gran-villard",
+            # Pragelato east side (OSM backcountry ways, no lift within 2.9 km: the old Pragelato lifts are closed)
+            "verbindung-plan", "verbindung-pattemouche", "verbindung-pattemouche-2", "verbindung", "verbindung-2",
         ),
         "ref_names": True,                         # 62 piste lines carry their number ("81 bassa", "72 alta") as ref, without a name
         # Bardonecchia (Melezet / Chesal / Colomion) reaches into the north-west corner of the box: another ski area, not Via Lattea
