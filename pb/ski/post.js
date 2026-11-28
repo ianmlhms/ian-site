@@ -10,7 +10,6 @@
 const THREE = window.THREE;
 
 const STEP = 1.09;                 // ratio between two resolution steps
-const BUDGET_MS = 1000 / 60;
 const OVER = 1.17;                 // smoothed frame time above budget x this = too slow
 const CALM = 1.07;                 // ... below budget x this = on the display's beat
 const CPU_SHARE = 0.72;            // our own JS takes more than this share of the frame: the GPU is not the limit, resolution will not help
@@ -53,6 +52,7 @@ const FRAG = `
 /** spec = QUALITY[level].res: { start, min, max, samples, sharpen, supersample } (pixel ratios against CSS pixels). */
 export function createPost({ renderer, spec, first = null }) {
   let cfg = spec, cssW = 1, cssH = 1, ratio = spec.start, target = null, dynamic = true, safe = 0;      // safe: round 7 (A) fallback level
+  let BUDGET_MS = 1000 / 60;         // 28 Nov 2026: the frame the display allows (quality-ctl.js: 1/60 s, or 1/30 s under a 30 fps cap)
   const material = new THREE.ShaderMaterial({
     uniforms: { tSrc: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) }, uSharpen: { value: 0.4 }, uGrade: { value: 1 } },
     vertexShader: VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false, fog: false,
@@ -83,8 +83,9 @@ export function createPost({ renderer, spec, first = null }) {
     }
     material.uniforms.tSrc.value = target.texture;
     material.uniforms.uTexel.value.set(1 / w, 1 / h);
-    // the more the picture is stretched, the more the sharpen may do
-    material.uniforms.uSharpen.value = cfg.sharpen * Math.min(1.6, Math.max(0.6, screenRatio() / ratio));
+    // the more the picture is stretched, the more the sharpen may do; 28 Nov 2026: up to 1.25 x (was 1.6 x: on Niddreg at its floor,
+    // 0.9 x on a 2 x screen, the strong unsharp mask turned the upscaled corduroy and grain into a crunchy block pattern)
+    material.uniforms.uSharpen.value = cfg.sharpen * Math.min(1.25, Math.max(0.6, screenRatio() / ratio));
   }
   function setRatio(next) {
     const { top, floor } = limits();
@@ -156,6 +157,12 @@ export function createPost({ renderer, spec, first = null }) {
     /** The internal pixel ratio (point sprites size themselves by it). */
     ratio: () => ratio,
     atFloor: () => ratio <= limits().floor + 1e-3,
+    atTop: () => ratio >= limits().top - 1e-3,
+    /** Our own JavaScript takes most of the frame: a lower resolution would not help (quality-ctl.js may still step the level). */
+    cpuBound: () => ctl.ema > BUDGET_MS * OVER && ctl.cpu >= ctl.ema * CPU_SHARE,
+    /** The frame time the controller aims at (the display's beat, at least 1/60 s). */
+    setBudget(ms) { if (ms > 0 && Math.abs(ms - BUDGET_MS) > 0.1) { BUDGET_MS = ms; ctl.ema = ms; ctl.over = 0; ctl.calm = 0; } },
+    get budget() { return BUDGET_MS; },
     stats: () => ({ ratio: +ratio.toFixed(3), average: ctl.n ? +(ctl.sum / ctl.n).toFixed(3) : ratio, width: target ? target.width : 0, height: target ? target.height : 0, samples: cfg.samples, screen: screenRatio(), changes: ctl.changes, frameEma: +ctl.ema.toFixed(1), cpuEma: +ctl.cpu.toFixed(1) }),
     resetStats() { ctl.sum = 0; ctl.n = 0; },
   };

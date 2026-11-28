@@ -8,7 +8,8 @@
  * neither shimmers nor blurs), the far grid's normal map lights the distant mountains per pixel (ridges, gullies and faces stay crisp on
  * coarse far tiles), corduroy is faded by its own pixel footprint (no moire), a low-sun sheen and sparkling grains on Mëttel / Héich,
  * craggy rock, a light-blue aerial haze that grows with distance.
- * `cheap` = the Niddreg variant (no sparkle, no sheen, no shadow map, fewer noise reads). */
+ * `cheap` = the Niddreg variant (no sparkle, no shadow map but a painted forest shadow, fewer noise reads; 28 Nov 2026: the sheen
+ * on every level, the lake / canopy reads only where there is a lake / canopy). */
 import { SHADOW_GLSL } from './shadows.js';
 
 const THREE = window.THREE;
@@ -143,6 +144,16 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         float sunVis = mix(1.0, texture2D(uShadow, fuv).r, uShadowOn);                                         // in a ridge's shadow?
         #ifndef CHEAP
         sunVis = min(sunVis, sunMapShadow(vWorld, N));                                                         // trees, houses, the skier, small ridges
+        #else
+        // Niddreg (28 Nov 2026): no shadow map, so the woods cast a soft painted shadow: the forest share of the 10 m raster up-sun
+        // of this point (two taps on coarser mips = soft), as far as a ~14 m tree's shadow reaches at this sun height
+        if (uForestOn > 0.5) {
+          float sh = length(uSunDir.xz);
+          vec2 sd = uSunDir.xz / max(sh, 1e-3);
+          float reach = clamp(14.0 * sh / max(uSunDir.y, 0.12), 6.0, 70.0);
+          float upSun = texture2D(uForestTex, (wp + sd * reach * 0.35) / uForestSize, 1.0).r * 0.5 + texture2D(uForestTex, (wp + sd * reach * 0.8) / uForestSize, 1.5).r * 0.5;
+          sunVis = min(sunVis, 1.0 - 0.6 * smoothstep(0.12, 0.75, upSun) * (1.0 - uOvercast));
+        }
         #endif
         float lit = snowBand(smoothstep(-0.06 + (nA.a - 0.5) * 0.12, 0.6, nl) * sunVis);
         float ao = clamp(occ - relief * 0.9, -0.7, 1.0);
@@ -167,13 +178,22 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         // ---- villages: trodden, ploughed snow and wet tracks
         snow = mix(snow, snow * vec3(0.9, 0.9, 0.92) * (0.92 + 0.1 * nA.g), built * 0.6);
         // ---- frozen lakes: dead flat, snow drifted in long streaks over grey-blue ice, a few pressure cracks, a darker icy shore
-        float iceShow = smoothstep(0.44, 0.72, nL.a * 0.6 + texture2D(uNoise, wp * 0.006 + 0.4).b * 0.4) * smoothstep(0.75, 1.0, waterSoft);
-        float crack = 1.0 - smoothstep(0.0, 0.02, abs(texture2D(uNoise, wp * 0.0045 + 0.2).g - 0.5));
-        vec3 ice = mix(vec3(0.62, 0.71, 0.8), vec3(0.74, 0.8, 0.87), nB.r) * (shade * 0.75 + uSunColor * lit * 0.45);
-        float shore = smoothstep(0.08, 0.35, waterSoft) * (1.0 - smoothstep(0.45, 0.8, waterSoft));
-        vec3 lake = mix(snow * vec3(0.94, 0.965, 1.0), ice, iceShow * 0.62);
-        lake = mix(lake, lake * vec3(0.8, 0.86, 0.92), crack * 0.35 * aa + shore * 0.5);
-        snow = mix(snow, lake, smoothstep(0.05, 0.3, waterSoft));
+        #ifdef CHEAP
+        vec2 wdx = dFdx(wp), wdy = dFdy(wp);                               // Niddreg: the lake and canopy reads only where needed
+        if (waterSoft > 0.04) {
+          float iceShow = smoothstep(0.44, 0.72, nL.a * 0.6 + textureGrad(uNoise, wp * 0.006 + 0.4, wdx * 0.006, wdy * 0.006).b * 0.4) * smoothstep(0.75, 1.0, waterSoft);
+          float crack = 1.0 - smoothstep(0.0, 0.02, abs(textureGrad(uNoise, wp * 0.0045 + 0.2, wdx * 0.0045, wdy * 0.0045).g - 0.5));
+        #else
+        {
+          float iceShow = smoothstep(0.44, 0.72, nL.a * 0.6 + texture2D(uNoise, wp * 0.006 + 0.4).b * 0.4) * smoothstep(0.75, 1.0, waterSoft);
+          float crack = 1.0 - smoothstep(0.0, 0.02, abs(texture2D(uNoise, wp * 0.0045 + 0.2).g - 0.5));
+        #endif
+          vec3 ice = mix(vec3(0.62, 0.71, 0.8), vec3(0.74, 0.8, 0.87), nB.r) * (shade * 0.75 + uSunColor * lit * 0.45);
+          float shore = smoothstep(0.08, 0.35, waterSoft) * (1.0 - smoothstep(0.45, 0.8, waterSoft));
+          vec3 lake = mix(snow * vec3(0.94, 0.965, 1.0), ice, iceShow * 0.62);
+          lake = mix(lake, lake * vec3(0.8, 0.86, 0.92), crack * 0.35 * aa + shore * 0.5);
+          snow = mix(snow, lake, smoothstep(0.05, 0.3, waterSoft));
+        }
         // ---- bare rock: the baked winter rock (aInfo.z, from the 5 m terrain: steepness, ridges, aspect, height, strata; right at every
         //      distance) and, near by or outside the baked box, whatever is too steep for snow by the normal (far away the normal map's
         //      40 m faces are smoother than the real ones: their threshold is lower). Flat bits inside the rock (ledges) keep their snow.
@@ -242,15 +262,24 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
         // beyond the last tree cards the ground itself is the forest (24 Nov, Laax: every far wood was a pale grey stain on the snow)
         float beyond = smoothstep(uForestOuter * 0.7, uForestOuter * 1.02, length(vWorld.xz - cameraPosition.xz));
         // crowns and gaps: two noise sizes (~20 m and ~70 m), the gaps show the snow between the trees
-        float crowns = texture2D(uNoise, mat2(0.8, 0.6, -0.6, 0.8) * wp * 0.0063 + 0.31).g * 0.55 + texture2D(uNoise, wp * 0.0017 + 0.72).b * 0.45;   // turned and big: no visible tiles
-        vec3 farCol = canopyCol * mix(vec3(0.62, 0.74, 0.68), vec3(1.0), crowns);
-        col = mix(col, mix(canopyCol, farCol, beyond), canopy * mix(0.3, mix(0.9, 0.66, smoothstep(0.36, 0.72, crowns)), beyond));
-        #ifndef CHEAP
-        // sheen: packed and wind-polished snow shines towards a low sun; sparkle: single grains flash as the view moves over them
+        #ifdef CHEAP
+        if (canopy > 0.002) {
+          mat2 cr = mat2(0.8, 0.6, -0.6, 0.8);
+          float crowns = textureGrad(uNoise, cr * wp * 0.0063 + 0.31, cr * wdx * 0.0063, cr * wdy * 0.0063).g * 0.55 + textureGrad(uNoise, wp * 0.0017 + 0.72, wdx * 0.0017, wdy * 0.0017).b * 0.45;
+        #else
+        {
+          float crowns = texture2D(uNoise, mat2(0.8, 0.6, -0.6, 0.8) * wp * 0.0063 + 0.31).g * 0.55 + texture2D(uNoise, wp * 0.0017 + 0.72).b * 0.45;   // turned and big: no visible tiles
+        #endif
+          vec3 farCol = canopyCol * mix(vec3(0.62, 0.74, 0.68), vec3(1.0), crowns);
+          col = mix(col, mix(canopyCol, farCol, beyond), canopy * mix(0.3, mix(0.9, 0.66, smoothstep(0.36, 0.72, crowns)), beyond));
+        }
+        // sheen: packed and wind-polished snow shines towards a low sun (Niddreg too since 28 Nov 2026: a few ALU, no texture)
         float clearSun = lit * (1.0 - rockAmt) * (1.0 - uOvercast);
         vec3 Hh = normalize(uSunDir + V);
         float ndh = max(dot(Nb, Hh), 0.0);
         col += uSunColor * (pow(ndh, 70.0) * 0.26 + pow(ndh, 12.0) * 0.05) * clearSun * (0.55 + 0.45 * piste);
+        #ifndef CHEAP
+        // sparkle: single grains flash as the view moves over them
         vec4 sA = texture2D(uDetail, wp * 0.9 + 0.13), sB = texture2D(uDetail, wp * 0.23 + 0.57);
         vec3 gA = normalize(N + vec3(sA.r - 0.5, 0.0, sA.g - 0.5) * 5.0), gB = normalize(N + vec3(sB.r - 0.5, 0.0, sB.g - 0.5) * 5.0);
         float spark = sA.b * pow(max(dot(gA, Hh), 0.0), 24.0) * 3.2 + sB.b * pow(max(dot(gB, Hh), 0.0), 24.0) * 2.2 * (1.0 - smoothstep(30.0, 90.0, vDist));

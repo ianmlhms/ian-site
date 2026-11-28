@@ -6,7 +6,7 @@
  * URL: ?resort=killy ?piste=<id> ?auto=1 (straight onto the piste, no screens) ?bot=1 (scripted skier) ?q=low|medium|high
  *      ?weather=sun|cloudy|snow|fog|random ?time=morning|midday|evening|random ?debug=1 (window.__ski)
  * The page is also loaded as a srcdoc iframe by the arcade: every URL is absolute or built from import.meta.url. */
-import { QUALITY, FRAME_BUDGET_MS, SKI, MODES, CAMERA, LATTICE, DATA, COURSE } from './config.js';
+import { QUALITY, SKI, MODES, CAMERA, LATTICE, DATA, COURSE } from './config.js';
 import { loadResortCore, createTileStreamer, loadExtras, RESORTS } from './resort-data.js';
 import { released as gpuReleased, uploadNow, textureGpuOnly } from './gpu-mem.js';
 import { createField, createPisteNet } from './field.js';
@@ -20,6 +20,7 @@ import { createScatterView } from './scatter-view.js';
 import { createFarForest } from './forest-far.js';
 import { createShadows } from './shadows.js';
 import { createPost } from './post.js';
+import { createQualityControl, LEVEL_ORDER } from './quality-ctl.js';      // 28 Nov 2026: a manual Grafik pick is final; Automatesch steps one level at a time
 import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
 import { createRuins, loadRuins } from './ruins.js';
@@ -98,6 +99,26 @@ function readNpcPref(param) {
   try { return localStorage.getItem(NPC_KEY) !== '0'; } catch (error) { return true; }
 }
 function writeNpcPref(on) { try { localStorage.setItem(NPC_KEY, on ? '1' : '0'); } catch (error) { console.warn('[ski] could not store the other-skiers setting', error); } }
+/* Grafik (28 Nov 2026). The player's own pick lives in gfx-quality.js (arcade_gfx, shared by the arcade's 3D games). Here, per device:
+ * where Automatesch settled last time (localStorage), and for this tab only (sessionStorage): the crash-recovery flags and the one hint. */
+const AUTO_KEY = 'pb_ski_gfx_auto', RECOVER_KEY = 'pb_ski_gfx_recover', ALIVE_KEY = 'pb_ski_alive', HINT_KEY = 'pb_ski_gfx_hint';
+const GFX_LEVELS = ['low', 'medium', 'high'];
+function readAutoLevel() { try { const v = localStorage.getItem(AUTO_KEY); return GFX_LEVELS.includes(v) ? v : null; } catch (error) { return null; } }
+function writeAutoLevel(l) { try { localStorage.setItem(AUTO_KEY, l); } catch (error) { console.warn('[ski] could not store the Automatesch level', error); } }
+/** True once if the last page life ended in a crash while playing (WebGL context lost while visible, or the page died while playing). */
+function readRecover() {
+  try {
+    const hit = sessionStorage.getItem(RECOVER_KEY) === '1' || sessionStorage.getItem(ALIVE_KEY) === '1';
+    sessionStorage.removeItem(RECOVER_KEY); sessionStorage.removeItem(ALIVE_KEY);
+    return hit;
+  } catch (error) { return false; }
+}
+function markRecover() { try { sessionStorage.setItem(RECOVER_KEY, '1'); } catch (error) { /* private mode: no recovery step */ } }
+let aliveWanted = false;
+function writeAlive(on) { try { if (on) sessionStorage.setItem(ALIVE_KEY, '1'); else sessionStorage.removeItem(ALIVE_KEY); } catch (error) { /* private mode */ } }
+function setAlive(on) { aliveWanted = on; writeAlive(on && document.visibilityState === 'visible'); }
+function readHinted() { try { return sessionStorage.getItem(HINT_KEY) === '1'; } catch (error) { return false; } }
+function writeHinted() { try { sessionStorage.setItem(HINT_KEY, '1'); } catch (error) { /* private mode: once per page life */ } }
 const GFX = () => window.ArcadeGfx || { level: () => 'medium', choice: () => 'auto', set() {}, onChange() {}, LEVELS: ['low', 'medium', 'high'], LABELS: { auto: 'Automatesch', low: 'Niddreg', medium: 'Mëttel', high: 'Héich', title: 'Grafik' }, pixelRatio: () => 1 };
 
 async function boot() {
@@ -105,7 +126,18 @@ async function boot() {
   const params = { resort: param('resort'), piste: param('piste'), auto: param('auto') === '1', bot: param('bot') === '1', q: param('q'), weather: param('weather'), time: param('time'), debug: param('debug') === '1' };
   // tests only: game time runs this many times faster (the physics step stays 1/120 s, so a run is the same run, only sooner)
   const timescale = params.debug ? Math.min(8, Math.max(1, Number(param('timescale')) || 1)) : 1;
-  let level = ['low', 'medium', 'high'].includes(params.q) ? params.q : GFX().level();
+  // 28 Nov 2026: the display's beat is learnt from the cheap frames of the load (quality-ctl.js: 60 / 120 Hz or a 30 fps cap)
+  const beatFrames = [];
+  let beatLast = 0, beatProbe = true;
+  const probeBeat = (t) => { if (!beatProbe) return; if (beatLast) beatFrames.push(t - beatLast); beatLast = t; if (beatFrames.length > 600) beatFrames.shift(); requestAnimationFrame(probeBeat); };
+  requestAnimationFrame(probeBeat);
+  // the Grafik level: ?q= (tests) > the player's own pick (final) > Automatesch (where it settled last time on this device, else the guess)
+  const manualPick = () => !params.q && GFX().choice() !== 'auto';
+  let level = LEVEL_ORDER.includes(params.q) ? params.q : manualPick() ? GFX().choice() : readAutoLevel() || GFX().level();
+  // a crash recovery (the WebGL context was lost while playing, or the page died while playing: out of memory) starts ONE level lower
+  // for this page life only, and says so; the player's pick stays as it is for the next time
+  const recoveredFrom = !params.q && readRecover() && level !== 'low' ? level : null;
+  if (recoveredFrom) level = LEVEL_ORDER[LEVEL_ORDER.indexOf(level) - 1];
   let quality = QUALITY[level];
   const canvas = document.getElementById('skiCanvas');
   // round 5: the scene goes through post.js (internal resolution, MSAA, FXAA + sharpen onto the canvas), so the canvas itself needs no antialias
@@ -140,6 +172,7 @@ async function boot() {
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
     glLost = true;
+    if (!leaving && document.visibilityState === 'visible') markRecover();         // 28 Nov 2026: the reload starts one level lower, once
     document.documentElement.dataset.skiGlLost = '1';
     console.warn('[ski] WebGL context lost');
     setTimeout(() => {
@@ -162,12 +195,16 @@ async function boot() {
   // closing the frame) its GPU memory is given back at once (three's programs / buffers / targets, then the context itself) instead of
   // whenever the old document is collected; a page restored from the back-forward cache has no context left: it loads again.
   window.addEventListener('pagehide', () => {
+    setAlive(false);                                                              // 28 Nov 2026: a clean exit, no crash recovery
     if (leaving) return;
     leaving = true;
     try { if (typeof streamer !== 'undefined' && streamer) streamer.stop(); } catch (error) { /* not created yet */ }
     try { scene.traverse((o) => { if (o.geometry && o.geometry.dispose) o.geometry.dispose(); }); renderer.renderLists.dispose(); renderer.dispose(); renderer.forceContextLoss(); } catch (error) { console.warn('[ski] GPU release on leave failed', error); }
   });
   window.addEventListener('pageshow', (e) => { if (e.persisted && leaving) location.reload(); });
+  // 28 Nov 2026: "alive" while the game is on screen; a page that dies while it is (iOS kills it when out of memory) finds it at its next
+  // boot. Hidden (another app / tab) clears it: iOS may drop a background tab for reasons that have nothing to do with us.
+  document.addEventListener('visibilitychange', () => writeAlive(document.visibilityState === 'visible' && aliveWanted));
 
   const noise = createNoiseTexture();
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
@@ -177,6 +214,8 @@ async function boot() {
   Object.assign(env.u, { uFarEnd: { value: quality.far } });          // round 7 (A): the horizon fade (FOG_GLSL)
   post = createPost({ renderer, spec: quality.res, first: env.sky });
   if (param('res') === 'fixed') post.setDynamic(false);                 // ?res=fixed: tests that compare pictures keep the starting resolution
+  const qctl = createQualityControl({ level, manual: manualPick() });
+  let recoverToldOnce = false;
   resize();
   const shadows = createShadows({ renderer, sun: env.sun, u: env.u });
   shadows.setLevel(level);
@@ -850,6 +889,8 @@ async function boot() {
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     post.hold(6000);                         // the countdown + the first seconds: tiles, trees and shaders still settle
+    qctl.settle(6000);                       // 28 Nov 2026: the Grafik level is not judged then either
+    setAlive(true);
     mark('start');
   }
 
@@ -1039,6 +1080,8 @@ async function boot() {
     if (window.Arcade && window.Arcade.startRun) window.Arcade.startRun();
     canvas.focus({ preventScroll: true });
     mark('free');
+    post.hold(5000); qctl.settle(6000); setAlive(true);                 // 28 Nov 2026: a teleport / resort start: tiles, houses and shaders settle first
+    if (recoveredFrom && !recoverToldOnce) { recoverToldOnce = true; setTimeout(() => hud.toast(`Grafik dës Kéier: ${GFX().LABELS[level]} (no engem Feeler)`, 4000), 1200); }
     setTimeout(startExtras, 400);                                       // round 7 (A): the houses and streets after the first frames
     if (!pictureChecks) setTimeout(pictureCheck, 3500);                 // round 7 (A): the picture check
   }
@@ -1405,7 +1448,8 @@ async function boot() {
   }
   if (window.Arcade && window.Arcade.onRestart) window.Arcade.onRestart(() => { if (!isRace()) again(); });
 
-  // quality: the shared Grafik level; a watchdog only ever steps down
+  // quality: the shared Grafik level. 28 Nov 2026 (Ian, school iPad: Héich fell to Niddreg by itself within ~20 s): a MANUAL pick is
+  // final; only Automatesch adapts (quality-ctl.js: one level at a time, hysteresis, back up with headroom)
   function applyQuality(next) {
     level = next; quality = QUALITY[level];
     post.setSpec(quality.res); resize();
@@ -1425,7 +1469,34 @@ async function boot() {
     spray.dispose(); spray = createSnowSpray({ scene, env, level, height: (x, z) => surface.height(x, z) });     // R7-C: the spray budget
     mark(`quality ${level}`);
   }
-  GFX().onChange((l) => { if (!params.q) applyQuality(l); });
+  GFX().onChange(() => {
+    if (params.q) return;
+    const choice = GFX().choice();
+    if (choice === 'auto') { qctl.setMode(false, level); writeAutoLevel(level); return; }     // Automatesch goes on from the level running now
+    if (choice !== level) applyQuality(choice);
+    qctl.setMode(true, choice);
+  });
+  /** Once a frame while the game runs (post.tick's frames): the Grafik level controller. ms = the frame time. */
+  const HINT = { high: 'Ze lues? Probéier Mëttel oder Automatesch', medium: 'Ze lues? Probéier Niddreg oder Automatesch' };
+  function qualityFrame(ms) {
+    post.setBudget(qctl.target);
+    if (params.q) return;
+    const ev = qctl.frame(ms, { limited: post.atFloor() || post.cpuBound(), atTop: post.atTop() });
+    if (!ev) return;
+    if (ev.type === 'hint') {                                            // a manual pick: one small hint, never a switch
+      if (readHinted()) return;
+      writeHinted();
+      document.documentElement.dataset.skiGfxHint = ev.level;
+      if (HINT[ev.level]) hud.toast(HINT[ev.level], 4200);
+      return;
+    }
+    if (manualPick()) return;                                            // (never: the controller is in manual mode then)
+    applyQuality(ev.level);
+    qctl.setLevel(ev.level);
+    writeAutoLevel(ev.level);
+    document.documentElement.dataset.skiGfxAuto = `${ev.type}:${ev.level}`;
+    hud.toast(`Grafik: ${GFX().LABELS[ev.level]}`, 1400);
+  }
 
   // ---------------- R7-C: camera mode, push start, the course, avalanches, Lawin ----------------
   let camYaw = 0, lastCourse = null;
@@ -1495,7 +1566,7 @@ async function boot() {
     onLawinWon: (face) => { const p = store.get(); const lw = { ...(p.lawin || {}) }; lw[rid] = (lw[rid] || 0) | (1 << face.index); store.set({ ...p, lawin: lw }); modes.cloud.push(store.get()); },
     lawinMask: () => (store.get().lawin || {})[rid] || 0,
   });
-  let slowFor = 0;
+  let slowSim = 0;
 
   // ---- round 7 (A): the picture check (WebKit / Safari safety net): a few seconds into the first ride, read the canvas back; a
   // one-colour picture or a shader error steps down: cheap snow (Niddreg shaders), then no MSAA, then no post pass ----
@@ -1528,7 +1599,7 @@ async function boot() {
     pictureChecks++;
     const step = pictureChecks;
     console.warn(`[ski] the picture looks broken (${n} colours, ${shaderErrors.length} shader errors): safety step ${step}`);
-    if (step === 1 && level !== 'low') { applyQuality('low'); }
+    if (step === 1 && level !== 'low') { applyQuality('low'); qctl.setLevel('low'); hud.toast('Grafikfeeler: dës Kéier Niddreg', 3000); }      // a broken picture: this page life only, the pick stays
     else post.fallback(Math.min(2, step - (level === 'low' ? 0 : 1)));
     document.documentElement.dataset.skiSafe = String(post.safe);
     setTimeout(pictureCheck, 1500);
@@ -1672,14 +1743,14 @@ async function boot() {
       const t0 = performance.now();
       shadows.update(camera, env.u.uSunDir.value, env.sunStrength());
       post.render(scene, camera);
-      // dynamic resolution first; the Grafik level only steps down once the resolution is at its floor
-      if ((game.phase === 'running' || game.phase === 'lift') && !game.paused) post.tick(rawDt * 1000, performance.now() - frameStart);
-      if (!params.q && game.phase === 'running' && level !== 'low' && post.atFloor()) {
-        slowFor = rawDt * 1000 > FRAME_BUDGET_MS[level] ? slowFor + rawDt : Math.max(0, slowFor - rawDt * 0.5);
-        if (slowFor > 3) { slowFor = 0; const down = level === 'high' ? 'medium' : 'low'; applyQuality(down); hud.toast(`Grafik: ${GFX().LABELS[down]}`); }
+      // dynamic resolution first; the Grafik level (Automatesch only) once the resolution can not help any more (quality-ctl.js)
+      if ((game.phase === 'running' || game.phase === 'lift') && !game.paused) {
+        const ms = rawDt * 1000 + slowSim;                                  // slowSim: flow ski-quality's forced slow frames (?debug=1)
+        post.tick(ms, performance.now() - frameStart);
+        qualityFrame(ms);
       }
       void t0;
-    }
+    } else if (game.screen !== 'ski') qctl.idleFrame(rawDt * 1000);    // picker / map / finish: no 3D frame, the display's beat
     if (sceneT >= 0.2) { sceneT = 0; audio.scene(game.screen !== 'ski' || game.paused); }          // the menu music: picker, map and menus only
     if (st && audioT >= 0.05) {
       audioT = 0;
@@ -1856,7 +1927,10 @@ async function boot() {
     /** R7-C2: watch Lawin face i from a clear spot (avalanche.js faceView); returns the spot. */
     avalancheView(i = 0, fov = 50) { const v = avalanches && avalanches.view(i); if (v) { game.camPose = { x: v.x, y: v.y, z: v.z, tx: v.tx, ty: v.ty, tz: v.tz, fov }; streamer.focus(v.x, v.z); } return v; }, start(id) { startRun(pistes.byId.get(id) || game.piste, MODES.run); }, select(id) { selectPiste(pistes.byId.get(id), true); },
     frames: () => { const f = [...frameTimes].sort((a, b) => a - b); return { n: f.length, p50: f[Math.floor(f.length * 0.5)], p95: f[Math.floor(f.length * 0.95)], max: f[f.length - 1] }; },
-    resolution: () => post.stats(), post, get shaderErrors() { return shaderErrors; }, pictureColours, pictureCheck,
+    resolution: () => post.stats(), post,
+    /** 28 Nov 2026: the Grafik controller (flow ski-quality); slow(ms) adds ms to every judged frame (a GPU-bound device, simulated). */
+    quality: () => ({ level, choice: GFX().choice(), manual: manualPick(), recoveredFrom, ...qctl.stats(), res: post.stats(), budget: post.budget }),
+    slow(ms) { slowSim = Math.max(0, Number(ms) || 0); }, get shaderErrors() { return shaderErrors; }, pictureColours, pictureCheck,
     info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, tiles: terrain.stats.leaves, trees: scatterView.stats.trees, cards: farForest.stats.cards, tilesLoaded: streamer.stats.loaded, tilesTotal: streamer.stats.total, level }),
     teleport(s) { if (game.run) { const p = game.piste.at(s, {}); placeAt(p.x, p.z, Math.atan2(p.dz, p.dx)); } },
     progress: () => store.get(),
@@ -1899,6 +1973,10 @@ async function boot() {
   farForest.update(camOut.x, camOut.z, Infinity);
   renderer.compile(scene, camera);
   mark('first build');
+  beatProbe = false;                                                     // 28 Nov 2026: the load's frames teach the controller the beat
+  for (const f of beatFrames) qctl.idleFrame(f);
+  beatFrames.length = 0;
+  qctl.settle(5000);
   requestAnimationFrame(frame);
   LOAD.set(0.95, '');
   LOAD.done();

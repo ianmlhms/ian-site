@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Developer tool: frame times, draw calls and triangles of a scripted run per graphics level, on the iPad profile of the flows
  * (1080x810, deviceScaleFactor 2, CPU throttled 4x).  node scripts/ski/perf-probe.mjs [--levels low,medium,high] [--piste id] [--resort rid] [--cpu 4]
- * [--remotes 7]: that many online-race skiers (pb/ski/net/remotes.js) ride along beside the player (the 8-player cost)
+ * [--root DIR] (serve another copy, e.g. the "before" snapshot) [--remotes 7]: that many online-race skiers (pb/ski/net/remotes.js) ride along beside the player (the 8-player cost)
  * Run it through ~/Library/Caches/browser-slot.py (one browser at a time). Numbers are relative (the Mini's GPU is not an iPad's). */
 import { launchBrowser, startServer } from "../flows/lib.mjs";
 
@@ -15,7 +15,7 @@ const remotes = Number(opt("--remotes", "0"));
 
 // --gpu: the Mac's GPU (ANGLE Metal), as the look shots; the dynamic resolution (post.js) is reported as the average internal pixel ratio
 const browser = await launchBrowser({ fullChromium: true, args: args.includes("--gpu") ? ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] : [] });
-const { server, origin } = await startServer();
+const { server, origin } = await startServer(...(opt("--root", "") ? [opt("--root", "")] : []));      // --root DIR: another copy of the site (before / after)
 try {
   for (const q of levels) {
     const ctx = await browser.newContext({ viewport: { width: 1080, height: 810 }, deviceScaleFactor: 2, hasTouch: true });

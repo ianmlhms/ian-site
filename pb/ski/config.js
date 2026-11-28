@@ -41,13 +41,14 @@ export const RELIEF = Object.freeze({
 export const QUALITY = Object.freeze({
   // res (round 5, post.js): the INTERNAL pixel ratio against CSS pixels: where it starts, the floor and ceiling of the dynamic resolution,
   // MSAA samples, how much the final pass sharpens; supersample = the ceiling on a 1x screen. The canvas is always the screen's own resolution.
-  low: { res: { start: 1.25, min: 0.9, max: 1.5, samples: 2, sharpen: 0.55 }, lodScale: 0.55, protect: 160, far: 17000, treeRadius: 240, treeDensity: 0.55, treeNear: 70, rockRadius: 160, markerRadius: 260, liftRadius: 1800, buildingRadius: 2600, snowflakes: 500, spray: 40, cheapSnow: true },
+  low: { res: { start: 1.25, min: 1.0, max: 1.5, samples: 2, sharpen: 0.55 }, lodScale: 0.55, protect: 160, far: 17000, treeRadius: 240, treeDensity: 0.55, treeNear: 70, rockRadius: 160, markerRadius: 260, liftRadius: 1800, buildingRadius: 2600, snowflakes: 500, spray: 40, cheapSnow: true },
   medium: { res: { start: 1.5, min: 1.1, max: 2, samples: 4, sharpen: 0.45, supersample: 1.25 }, lodScale: 0.66, far: 23000, treeRadius: 380, treeDensity: 0.8, treeNear: 95, rockRadius: 240, markerRadius: 380, liftRadius: 2600, buildingRadius: 4000, snowflakes: 1100, spray: 70, cheapSnow: false },
   high: { res: { start: 2, min: 1.5, max: 2, samples: 4, sharpen: 0.3, supersample: 1.5 }, lodScale: 1, far: 30000, treeRadius: 560, treeDensity: 1, treeNear: 130, rockRadius: 320, markerRadius: 520, liftRadius: 3600, buildingRadius: 6000, snowflakes: 2000, spray: 110, cheapSnow: false },
 });
 // R8c (QA: 590-910k triangles in the villages): Mëttel lodScale 0.75 -> 0.66 (the far terrain a step coarser; the far normal map
 // carries its shape), with village.js / roads.js / forest-far.js / markers.js budgets.
-export const FRAME_BUDGET_MS = Object.freeze({ low: 40, medium: 30, high: 24 });   // the watchdog steps the level down after 3 s above this
+// 28 Nov 2026: the Niddreg floor 0.9 -> 1.0 (paid for by the cheaper Niddreg ground: lake / canopy reads only where needed). The old
+// FRAME_BUDGET_MS watchdog (absolute 24 / 30 / 40 ms, ignored the player's pick) is gone: quality-ctl.js steps the level, Automatesch only.
 
 /* The other skiers (npc.js, npc-view.js; Ian: "you're not alone in the whole ski area"). Per Grafik level: how many are drawn at most
  * (skiers on the pistes, standing at the lifts, walking in the villages, riding the carriers), within which radius, how many of the
