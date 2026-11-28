@@ -22,6 +22,7 @@ import { createShadows } from './shadows.js';
 import { createPost } from './post.js';
 import { createPoles, createRunProps, createSigns } from './props.js';
 import { createLifts } from './lifts.js';
+import { createRuins, loadRuins } from './ruins.js';
 import { createLiftPath } from './lift-path.js';       // R7-B: the tree aisles along the lifts
 import { liftTreeGuard } from './lift-site.js';
 import { seatRows, createVillage } from './village.js';
@@ -264,6 +265,7 @@ async function boot() {
     // R8: the stations by their real solid parts (lift-site.js: walls, posts, roofs, huts), the camera as a 0.5 m box round its point
     // (only near a station end: the lift world's lookup allocates, and this runs ~20 times a frame)
     if (nearStation(x, z) && modes.lifts.world.hit(x, z, 0.3, y - 0.25, surfaceAt, 0.5)) return true;
+    if (ruins && ruins.hit(x, z, 0.4, y - 0.25)) return true;
     return !!scatter.hit(x, z, 1.1, y, quality.treeDensity) || !!scatter.inCrown(x, y, z, quality.treeDensity, 0.35);      // R8e: the crowns too
   }
   let stationGrid = null;                                   // R8: 50 m cells holding a station end (the camera guard's cheap pre-test)
@@ -308,6 +310,7 @@ async function boot() {
   let snowfall = createSnowfall({ scene, env, count: quality.snowflakes });
   let spray = createSnowSpray({ scene, env, level, height: (x, z) => surface.height(x, z) });          // R7-C: spray.js
   let signs = null;                                                          // R7-D
+  let ruins = null, ruinRows = null;                                          // lift ruins (ruins.js): closed lifts, solid scenery only
   let lifts = null, village = null, landmarks = null, roads = null, roadRows = null, extrasBuilt = false, liftsEarly = false, markers = null;
   let crowd = null, npcView = null, npcOn = readNpcPref(param('npcs')), npcCorridor = null, npcCorridorOf = null, queueView = null;
   /** Round 6: the lift view (lifts.js). Built once every tile is in; a ride before that builds it early on the heights there are, and it
@@ -328,6 +331,10 @@ async function boot() {
     return lifts;
   }
   // the village streets are draped on the 5 m ground: built once the extras and every height tile are in
+  const tryRuins = () => {
+    if (ruins || !ruinRows || !streamer.done()) return;
+    try { ruins = createRuins({ scene, rows: ruinRows, env, height: (x, z) => field.height(x, z) }); mark('ruins'); } catch (error) { console.warn('[ski] ruins failed', error); ruinRows = null; }
+  };
   const tryRoads = () => {
     if (roads || !roadRows || !streamer.done()) return;
     try { roads = createRoads({ scene, roads: roadRows, env, level, boxes: streetBoxes, boxIndex, height: (x, z) => surface.height(x, z), ground: (x, z) => field.baseHeight(x, z), upload: (o) => uploadNow(renderer, o, camera) }); mark('roads'); } catch (error) { console.warn('[ski] streets failed', error); roads = { update() {} }; }
@@ -363,6 +370,7 @@ async function boot() {
       if (modes) modes.ensureParkView();
       mark('lifts');
       tryRoads();
+      tryRuins();
     }
   });
   // round 7 (A): the buildings / streets download starts once the skier is on the snow (or after 6 s on a menu): they are not part of
@@ -371,6 +379,7 @@ async function boot() {
   const extrasGate = new Promise((res) => { extrasGo = res; });
   const startExtras = () => { if (!extrasStarted) { extrasStarted = true; extrasGo(); } };
   setTimeout(startExtras, 6000);
+  extrasGate.then(() => loadRuins(core.root)).then((rows) => { ruinRows = rows; tryRuins(); }).catch(() => {});
   extrasGate.then(() => loadExtras(core.root)).then(({ buildings, roads: streets }) => {
     // R7-B: the lift stations replace the OSM station buildings (and nothing stands in a lift lane); the exits keep clear of the rest
     const liftWorld = modes.lifts.setBuildings(buildings);
@@ -414,7 +423,7 @@ async function boot() {
     height: standHeight,
     normal: standNormal,
     snow: (x, z) => Math.min(1, surface.info(x, z, 0) * 1.25),
-    hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, surfaceAt) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
+    hit: (x, z, r, y) => scatter.hit(x, z, r, y, quality.treeDensity) || modes.lifts.world.hit(x, z, r, y, surfaceAt) || (ruins && ruins.hit(x, z, r, y)) || buildingHit(x, z, r, y),     // R7-B: pylons + stations; R8: houses
   };
   /* R8e (3V QA: at the spawn the station roof filled the top quarter of the screen): standing in a station (the spawn, a fast travel, a
    * lift exit) the chase camera is framed so the lift and the slope show: candidate spots round him (back / side / height) are judged
@@ -483,7 +492,7 @@ async function boot() {
     return { ...cam, x: m(cam.x, frameAt.x), y: m(cam.y, frameAt.y), z: m(cam.z, frameAt.z), tx: m(cam.tx, frameAt.tx), ty: m(cam.ty, frameAt.ty), tz: m(cam.tz, frameAt.tz) };
   }
   /** R8e: a station part / pylon / house at (x, z) (the scripted bot skis round it; window.__ski.blocked for the flows). */
-  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 2.5, y, surfaceAt) || buildingHit(x, z, 2.5, y)); };      // 2.5 m: he carves wide
+  const botBlocked = (x, z) => { const y = standHeight(x, z); return !!(modes.lifts.world.hit(x, z, 2.5, y, surfaceAt) || (ruins && ruins.hit(x, z, 2.5, y)) || buildingHit(x, z, 2.5, y)); };      // 2.5 m: he carves wide
   /** R8 (early QA: he skied through chalets): the houses collide like the station walls: out by the nearest face of the footprint box. */
   const houseHit = { nx: 0, nz: 0, pen: 0, kind: 'house' };
   function buildingHit(x, z, r, y) {
@@ -1535,6 +1544,7 @@ async function boot() {
       if (signs) signs.update(camera.position.x, camera.position.z);              // R7-D: the sign atlas follows the camera
       if (village) village.update(camera.position.x, camera.position.z, quality.buildingRadius);
       if (landmarks) landmarks.update(camera.position.x, camera.position.z, quality.buildingRadius);
+      if (ruins) ruins.update(camera.position.x, camera.position.z);
       if (roads) roads.update(camera.position.x, camera.position.z, Math.min(quality.buildingRadius, level === 'low' ? 1000 : 2400));      // round 7 (A): streets near only (R8d: Niddreg 1300 -> 1000)
       modes.update(camera.position.x, camera.position.z, quality.buildingRadius);
     }
@@ -1642,7 +1652,7 @@ async function boot() {
   let npcLive = false;
   /** Where the other skiers must not be: trees, station parts and pylons (any height), the drawn houses. */
   function npcBlocked(x, z, r) {
-    return !!(scatter.hit(x, z, r, -1e9, quality.treeDensity) || modes.lifts.world.hit(x, z, r) || (boxIndex && boxIndex.hit(x, z, r)));
+    return !!(scatter.hit(x, z, r, -1e9, quality.treeDensity) || modes.lifts.world.hit(x, z, r) || (ruins && ruins.hit(x, z, r)) || (boxIndex && boxIndex.hit(x, z, r)));
   }
   /** On in the free ride, the lift rides, a challenge outside its corridor, the online free ride; never in an online race or the park. */
   function npcActive() {
@@ -1717,7 +1727,7 @@ async function boot() {
   // debug / flows
   window.__ski = {
     audio,
-    get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, streamer, terrain, scatterView, field, surface,
+    get game() { return game; }, get state() { return game.state; }, get level() { return level; }, renderer, scene, camera, env, pistes, get landmarks() { return landmarks; }, get ruins() { return ruins; }, streamer, terrain, scatterView, field, surface,
     setInput(o) { game.override = o; }, blocked: (x, z) => botBlocked(x, z),
     /** R8e: the share of the top fifth of the current view that hits a station part / house within 40 m (the spawn framing check). */
     roofShare: () => { const d = new THREE.Vector3(); camera.getWorldDirection(d); const p = camera.position; return roofShare(p.x, p.y, p.z, p.x + d.x * 10, p.y + d.y * 10, p.z + d.z * 10, camera.fov); },

@@ -2496,3 +2496,19 @@ where they were; every new part is drawn only (det, never solid) and inside the 
 - **Removed**: Via Lattea: `rossella`, `40` (Rout 40), `verbindung-40`, `verbindung-40-40`, `verbindung-36` (the closed Moncrons / Chardonet / Scoiattolo / Costapiana sector), `verbindung-gran-villard` (Gran Villard is no longer connected by ski; the village place + houses stay, no run / lift / spawn is within 800 m of it), and five Pragelato east-side OSM backcountry links with no lift within 2.9-3.7 km (`verbindung-plan`, `verbindung-pattemouche`, `verbindung-pattemouche-2`, `verbindung`, `verbindung-2`; only the red `pattemouche` under the Pattemouche - Anfiteatro cable car is left there); Zermatt: `stockhorn` (OSM abandoned=yes). 315 -> 304 and 194 -> 193 pistes.
 - **Colour fixes** (official names, exact): Via Lattea Rout 36 -> black (now "Schwaarz 36"), Principi DX / 99 Golf / Jolly green -> blue, 12 bis red -> blue; 3 Vallées Allée -> red, Pralinette -> green, Accès UCPA -> blue, Plan du Lac -> blue; Arlberg Rennstrecke Wartherhorn -> red, Waldabfahrt-Oberlech -> blue. Star times follow `TARGET.cap[diff]`, so they shift a little for these (stars already won stay).
 - Everything else the check finds stays and is listed in the report (ski routes starting on ridges above a lift, links beside villages, Obertauern's `disused:`-tagged Sonnenlift 1 / Zentralbahn ways: unclear, never auto-removed).
+## Lift ruins (28 Nov 2026; shots ~/Library/Caches/ski-work/ruins/)
+Closed / abandoned lifts stand as ruins (Via Lattea Moncrons: Sciovia Moncrons / Chardonet / Scoiattolo / Costapiana). Scenery only: not in `resort.lifts`
+(so not in the lift list, goals, lift index, map, boarding), no rope, no carriers.
+- Data: `scripts/ski/ruins.py [resort ...]` (venv python) asks overpass.openstreetmap.fr (UA ski-map-check, cache `$SKI_WORK/ruins/<resort>.json`) for
+  `abandoned:/disused:/was:aerialway` ways (+ `aerialway=*` with abandoned=yes or a closed-for-good name) for the GEOMETRY only. Owner rule: OSM is not
+  trusted for what exists: only ways in `CONFIRMED` (an OSM id with a non-OSM source: Via Lattea Moncrons x4 + Pragelato Conca del Sole / Trampolini,
+  Davos Strelagrat, Kronplatz Lorenzi, Zermatt Triftji) become ruins; every other way is printed as "unconfirmed, skipped". Also left out: razed, goods lifts,
+  ways < 70 m, ruins on a live lift's line, and the dismantled / seasonal ones (Grenzlift, Cime Caron, Chatelet, Killy Panoramic, Gornergrat-Hohtaelli).
+  Pragelato's Belotte / Cristallo / Smeraldo lie east of the Via Lattea box (not in the world). To add a ruin: put the OSM id + source into `CONFIRMED`, re-run.
+  Writes `pb/ski/data/<resort>/ruins.json` (`[]` where none): `{name, type, pts, pylons (arc m), bottom/top {x,z,y}, state, len, osm}`.
+- Client: `pb/ski/ruins.js` (loadRuins, createRuins): one merged mesh per 1 km cell, built only when the camera is within 1.5 km (+1 draw call per visible
+  cell, no shadows, GPU-only); leaning / rusty pylons, crossarms missing or hanging, rope stubs, boarded huts (drag: drive hut at the bottom, a mast base at
+  the top; chair / gondola: concrete shed at both ends, no wheel). `ruins.hit(x, z, r, y)` = the same answer as the lift world's hit; main.js adds it to
+  `world.hit`, `npcBlocked`, `botBlocked`, the camera guard. `window.__ski.ruins` (stats, builtCells, group).
+- Map: ruins are not drawn on the map (nothing reads as a rideable lift).
+- Flow `ski-ruins` (Chromium + WebKit).
