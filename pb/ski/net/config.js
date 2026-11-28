@@ -64,3 +64,11 @@ export const FREE = Object.freeze({
   SIDE_GAP: 2.2,            // m between two players at the start
   TELEPORT: 60,             // m between two sent states within one send period: count it as a teleport (epoch + 1)
 });
+
+/* Spectators of a running race (28 Nov 2026): a latecomer watches instead of waiting. He is a peer of the session but not of the race:
+ * not in the roster, never in standings / boards, sends nothing but the transport's pings. Every racer links to him, so the number is capped. */
+export const SPEC = Object.freeze({
+  MAX: 6,                   // spectators per lobby (each one costs every racer ~12 states / s of upload)
+  SPLITS: 4,                // intermediate times per piste (at 20 / 40 / 60 / 80 % of its length)
+  AUTO_LEAVE_MS: 20000,     // after the final standings: on to the lobby wait (the rematch lobby takes him in)
+});

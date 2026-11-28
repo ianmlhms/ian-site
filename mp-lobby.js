@@ -41,6 +41,7 @@ const STARTING_POLL_MS = 1500;           // late join while the host's start is 
 const STARTING_POLL_TRIES = 14;
 const RACE_WAIT_MS = 25 * 60 * 1000;     // a late friend of a race waits this long for the new lobby
 const RACE_HOST_LOOK_MS = 15000;
+const SPEC_MAX = 6;                       // spectators of one race (pb/ski/net/config.js SPEC.MAX: every racer links to each of them)
 const START_GRACE_MS = 250;              // between telling everybody and leaving the page
 const CREATE_TRIES = 6;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,6 +74,7 @@ const S = {
     invAgain: "{name} nach eng Kéier invitéieren", waitInv: "{n} invitéiert Frënn sinn nach net do.",
     joinHint: "Gëff de Code vun dengem Frënd an (4 Buschtawen) oder setz säi Link an.", friendsLink: "👥 Frënn", cancel: "Ofbriechen",
     lateJoining: "D'Fräi-Fuer leeft schonn — du kënns derbäi…", raceWait: "D'Rennen leeft schonn. Du kanns net méi matfueren, mee ech waarden, bis et fäerdeg ass: da kënns du an déi nei Lobby.",
+    raceSpec: "D'Rennen leeft schonn. Du kanns live kucken oder op déi nei Lobby waarden.", specWatch: "👀 Live kucken", specWait: "Op d'nei Lobby waarden", eSpecFull: "Et kucke schonn genuch Leit zou.",
   },
   de: {
     lobby: "Lobby", create: "Lobby erstellen", createD: "Du bekommst einen Code und kannst Leute einladen", joinTitle: "Mit Code beitreten",
@@ -98,6 +100,7 @@ const S = {
     invAgain: "{name} noch einmal einladen", waitInv: "{n} eingeladene Freunde sind noch nicht da.",
     joinHint: "Gib den Code deines Freundes ein (4 Buchstaben) oder füge seinen Link ein.", friendsLink: "👥 Freunde", cancel: "Abbrechen",
     lateJoining: "Die freie Fahrt läuft schon — du kommst dazu…", raceWait: "Das Rennen läuft schon. Du kannst nicht mehr mitfahren, aber ich warte, bis es zu Ende ist: dann kommst du in die neue Lobby.",
+    raceSpec: "Das Rennen läuft schon. Du kannst zuschauen oder auf die neue Lobby warten.", specWatch: "👀 Zuschauen", specWait: "Auf die neue Lobby warten", eSpecFull: "Es schauen schon genug Leute zu.",
   },
   en: {
     lobby: "Lobby", create: "Create lobby", createD: "You get a code and can invite people", joinTitle: "Join with a code",
@@ -123,6 +126,7 @@ const S = {
     invAgain: "Invite {name} again", waitInv: "{n} invited friends are not here yet.",
     joinHint: "Type your friend's code (4 letters) or paste his link.", friendsLink: "👥 Friends", cancel: "Cancel",
     lateJoining: "The free ride is already running — you are joining…", raceWait: "The race is already running. You cannot ride along any more, but I will wait until it is over: then you can join the new lobby.",
+    raceSpec: "The race is already running. You can watch it or wait for the new lobby.", specWatch: "👀 Watch", specWait: "Wait for the new lobby", eSpecFull: "Enough people are watching already.",
   },
 };
 const readLang = () => { try { const v = localStorage.getItem("site_lang"); return S[v] ? v : "lb"; } catch { return "lb"; } };
@@ -525,7 +529,12 @@ export async function mountLobby(root, options = {}) {
     const members = await peekRunning(code);
     if (!members.length) return false;
     const free = members.find((m) => m.f === 1 && m.c && typeof m.c === "object");
-    if (!free) { void waitForRematch(code); return true; }
+    if (!free) {
+      // a RACE (new clients publish rc / rs / c / ro): watch it (28 Nov: a spectator is a peer of the session, never of the race), or wait for the rematch
+      const race = members.find((m) => m.rc === 1 && m.ov !== 1 && m.c && typeof m.c === "object" && Array.isArray(m.ro));
+      if (race && specState(race)) { renderSpecChoice(code, members, race); return true; }
+      void waitForRematch(code); return true;
+    }
     if (members.length >= game.max) { renderEntry(t("eFull")); return true; }
     show("busy", t("lateJoining"));
     const cfg = sanitizeCfg(game.id, { ...free.c, resort: typeof free.rs === "string" ? free.rs : free.c.resort });
@@ -533,6 +542,31 @@ export async function mountLobby(root, options = {}) {
     st.code = code;
     launch([{ i: myId, n: me.name, u: ident.uid, a: ident.avatar }], cfg, { late: true });
     return true;
+  }
+  /** the racers of a running race as the lobby's roster (from the racers' presence), or null when it is not a valid one */
+  function specState(race) {
+    const racers = race.ro.slice(0, game.max).map((r) => (Array.isArray(r) ? { i: String(r[0] || "").toLowerCase(), n: cleanName(r[1]) || "?", u: "", a: "" } : null)).filter((r) => r && ID_RE.test(r.i));
+    return racers.length >= 1 && racers.length === race.ro.length && typeof race.rs === "string" ? racers : null;
+  }
+  /** a race is running: «Zuschauen» (live, as a spectator) or wait for the rematch lobby (like before) */
+  function renderSpecChoice(code, members, race) {
+    const token = ++waitToken;
+    const full = members.filter((m) => m.sp === 1).length >= SPEC_MAX;
+    show("busy", t("raceSpec"));
+    const watch = h("button", { class: "mpl-btn", id: "mplSpectate", type: "button", disabled: full, onclick: () => { if (token !== waitToken) return; waitToken++; startSpectating(code, race); } }, t("specWatch"));
+    const wait = h("button", { class: "mpl-btn", id: "mplWaitRematch", type: "button", onclick: () => { waitToken++; void waitForRematch(code); } }, t("specWait"));
+    const cancel = h("button", { class: "mpl-btn", id: "mplCancelWait", type: "button", onclick: () => { waitToken++; leaveToEntry(); } }, t("cancel"));
+    busy.append(...(full ? [h("small", { class: "mpl-spec-full" }, t("eSpecFull"))] : []), watch, wait, cancel);
+    resetSession();
+  }
+  function startSpectating(code, race) {
+    const racers = specState(race);
+    if (!racers) { void waitForRematch(code); return; }
+    show("busy", t("lateJoining"));
+    const cfg = sanitizeCfg(game.id, { ...race.c, resort: race.rs });
+    resetSession();
+    st.code = code;
+    launch(racers, cfg, { late: true, spec: true });
   }
   let waitToken = 0;
   /** a race is running: wait (cancellable) for the host to reopen the lobby under the same code */
@@ -627,11 +661,11 @@ export async function mountLobby(root, options = {}) {
     renderLobby();
     launch(roster, sanitizeCfg(game.id, p.cfg));
   }
-  function launch(roster, cfg, { late = false } = {}) {
+  function launch(roster, cfg, { late = false, spec = false } = {}) {
     const code = st.code;
     const role = !late && roster[0]?.i === myId ? "host" : "guest";
     const ctx = {
-      v: 1, game: game.id, code, room: code.toLowerCase(), role, me: myId, cfg, at: Date.now(), ...(late ? { late: 1 } : {}),
+      v: 1, game: game.id, code, room: code.toLowerCase(), role, me: myId, cfg, at: Date.now(), ...(late ? { late: 1 } : {}), ...(spec ? { spec: 1 } : {}),
       roster: roster.map((r, i) => ({ id: r.i, name: r.n, uid: r.u, avatar: r.a, role: i === 0 ? "host" : "guest" })),
     };
     store.set(CTX_KEY, JSON.stringify(ctx), true);

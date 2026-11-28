@@ -179,6 +179,8 @@ export const flow = {
       const waitMsg = await text(max.page, ".mpl-busy");
       h.expect(/Rennen leeft schonn/.test(waitMsg) && /Lobby/.test(waitMsg), `a race is running: «${waitMsg}»`);
       await shot(max, "e-race-wait");
+      await max.page.click("#mplWaitRematch");                 // 28 Nov: the running race offers «Zuschauen» too (flow ski-mp-spectate); here he waits
+      await max.page.waitForFunction(() => /bis et fäerdeg|waarden/i.test(document.querySelector(".mpl-busy")?.textContent || "") && !document.getElementById("mplSpectate"), null, T);
       // the host returns to the lobby (rematch, the same code): Max lands in it
       await host.page.goto(h.origin + `/lobby.html?g=ski&c=${code2}&back=1&host=1`, { waitUntil: "domcontentloaded" });
       await host.page.waitForSelector("#mplRoster", T);

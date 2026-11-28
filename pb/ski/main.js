@@ -1474,7 +1474,7 @@ async function boot() {
       // R7-C: first person = a camera mode of its own (firstperson.js): only the ski tips and poles, the body hidden
       const rpOn = replay.active;
       const fpNow = (rpOn ? replay.cam === 'fp' : camMode === 'fp') && game.screen === 'ski' && !game.camPose && !game.orbit && !(mp && mp.viewState && mp.viewState());
-      skier.setVisible(!(ride && rideView === 'window' && ride.carry && ride.where().onCarrier && !game.camPose) && !(fpNow && !ride));     // in a cabin, the window view is his own eyes
+      skier.setVisible(!(ride && rideView === 'window' && ride.carry && ride.where().onCarrier && !game.camPose) && !(fpNow && !ride) && !(mp && mp.hideLocal));     // in a cabin, the window view is his own eyes
       if (game.orbit) {                                                // debug: a camera that circles the skier (model checks)
         const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
         const ox = st.x + Math.cos(a) * o.dist, oz = st.z + Math.sin(a) * o.dist;
@@ -1514,7 +1514,8 @@ async function boot() {
       spray.update(rpOn ? replay.effectDt(dt) : dt, st, rpOn ? replay.sprayAmount : game.screen === 'ski' && !ride && !game.paused ? 1 : 0, pixelRatio(), camera, (canvas.clientHeight || window.innerHeight) * pixelRatio());
     }
     // world upkeep (time-sliced)
-    const fx = st ? st.x : resort.width / 2, fz = st ? st.z : resort.depth / 2;
+    const watched = mp && mp.focusPoint ? mp.focusPoint() : null;             // a spectator: the tiles follow the racer / the pack he watches
+    const fx = watched ? watched.x : st ? st.x : resort.width / 2, fz = watched ? watched.z : st ? st.z : resort.depth / 2;
     if (game.screen === 'ski' || game.screen === 'map') {
       streamer.focus(fx, fz);
       if (meshRush && rushAt) terrain.update(rushAt.x, rushAt.z, 12);            // round 7 (A): meshing the jump target behind the fade
@@ -1772,6 +1773,7 @@ async function boot() {
     mp = createMp({ ctx: mpCtx, host: {
       game, rid, pistes, streamer, terrain, surface, scene, camera, canvas, env, hud, input, audio, chase, uiRoot: document.getElementById('ui'),
       outfit: () => outfit, level: () => level, startRun: (p, lateral) => startRun(p, MODES.run, lateral),
+      setView: (pose) => { game.camPose = pose; },                           // a spectator's overview camera (net/spectate.js); null = the chase camera again
       // R7-D: a friend on a lift is drawn in his carrier even before this device rode one (the lift view is built early, once)
       liftPath: (i) => { if (!lifts) buildLifts(); return lifts ? lifts.pathOf(i) : null; },
       // R7-D free ride

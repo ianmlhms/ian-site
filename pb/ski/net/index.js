@@ -2,7 +2,7 @@
  * (remotes.js), the race screens (hud.js) and the game (main.js, through the small `host` object it hands over).
  * main.js only calls: readMpContext() at boot, mpResort() for the resort, then createMp(...) and mp.begin(), mp.frame(), mp.render(),
  * mp.onFinish(), mp.onAction(), mp.viewState(). Without a lobby context none of this runs: solo stays exactly as it was. */
-import { NET } from './config.js';
+import { NET, SPEC } from './config.js';
 import { matchSeed, resolveResort, resolveRuns } from './plan.js';
 import { createRace } from './race.js';
 import { createSession } from './session.js';
@@ -10,6 +10,7 @@ import { createRemotes, packState, outfitOf, MEET_GAP_MS } from './remotes.js';
 import { sendSlot } from './wire.js';
 import { createMpHud, resText } from './hud.js';
 import { createFreeMp } from './freeride.js';
+import { createSpectateMp } from './spectate.js';
 import { minRunMs } from '../progress.js';
 import { OUTFITS } from '../skier-model.js';
 import { sanitizeCfg } from '../../../mp-games.js?v=16';
@@ -27,13 +28,15 @@ export function readMpContext() {
   const ctx = gate && gate.ctx;
   if (!ctx || ctx.game !== GAME || !ctx.code || !Array.isArray(ctx.roster) || ctx.roster.length < 1) return null;
   const roster = ctx.roster.filter((r) => r && typeof r.id === 'string' && ID_RE.test(r.id)).slice(0, NET.MAX_PLAYERS).map((r) => Object.freeze({ id: r.id, name: String(r.name || '?').slice(0, 16), uid: typeof r.uid === 'string' ? r.uid : '' }));      // LOW 5: names <= 16
-  let me = '', late = false;
-  try { const raw = JSON.parse(sessionStorage.getItem(CTX_KEY) || 'null'); if (raw && raw.code === ctx.code && typeof raw.me === 'string') { me = raw.me; late = raw.late === 1; } } catch (error) { /* storage blocked */ }
-  if (!roster.some((r) => r.id === me)) me = ctx.role === 'host' ? roster[0].id : '';
-  if (!me) { console.warn('[ski-mp] my roster id is unknown: solo'); return null; }
+  let me = '', late = false, spec = false;
+  try { const raw = JSON.parse(sessionStorage.getItem(CTX_KEY) || 'null'); if (raw && raw.code === ctx.code && typeof raw.me === 'string') { me = raw.me; late = raw.late === 1; spec = raw.spec === 1; } } catch (error) { /* storage blocked */ }
   const cfg = sanitizeCfg(GAME, ctx.cfg);
+  // a SPECTATOR of a running race (lobby: «Zuschauen»): his id is not in the roster (the racers' roster is), he never races
+  spec = spec && cfg.mode !== 'free' && ID_RE.test(me) && !roster.some((r) => r.id === me);
+  if (!spec && !roster.some((r) => r.id === me)) me = ctx.role === 'host' ? roster[0].id : '';
+  if (!me) { console.warn('[ski-mp] my roster id is unknown: solo'); return null; }
   const seed = matchSeed(ctx.code, roster);
-  return Object.freeze({ code: ctx.code, me, role: ctx.role, roster: Object.freeze(roster), cfg, seed, late: late && cfg.mode === 'free' });
+  return Object.freeze({ code: ctx.code, me, role: ctx.role, roster: Object.freeze(roster), cfg, seed, late: late && cfg.mode === 'free', spec });
 }
 export const mpResort = (ctx, readyIds) => resolveResort(ctx.cfg, ctx.seed, readyIds);
 
@@ -45,6 +48,7 @@ function save(key, v) { try { sessionStorage.setItem(key, JSON.stringify(v)); } 
  *         startRun(piste), level() }
  */
 export function createMp({ ctx, host }) {
+  if (ctx.spec) return createSpectateMp({ ctx, host });                       // 28 Nov: a latecomer of a running race watches (net/spectate.js)
   if (ctx.cfg.mode === 'free') return createFreeMp({ ctx, host });          // R7-D: the online free ride (net/freeride.js)
   const { game, pistes, env, hud, input, audio } = host;
   const runs = resolveRuns(ctx.cfg, host.rid, pistes.list, ctx.seed);
@@ -67,14 +71,22 @@ export function createMp({ ctx, host }) {
     onEvent, restore: loadSaved(saveKey),
   });
 
+  /* spectators (28 Nov 2026): a latecomer of this race watches. He joins the session (not the race): never in the roster, standings or boards,
+   * no figure; the racers see only «👀 N». Everything he sends is ignored; he gets the states, the sync and everybody's results. */
+  const spectators = new Set();
   session = createSession({
     code: ctx.code, me: ctx.me, roster: ctx.roster, name: nameOf.get(ctx.me),
     racing: () => race.phase === 'go',
+    // rc / rs / c / ro: what a latecomer's lobby needs to watch (mp-lobby.js runningJoin); ov = the match is over (the rematch lobby, not a spectator seat)
+    extra: { rc: 1, rs: host.rid, c: ctx.cfg, ro: ctx.roster.map((r) => [r.id, r.name]), ov: race.phase === 'over' ? 1 : 0 },
+    dynamic: { max: ctx.roster.length + SPEC.MAX, prune: true, accept: (meta) => meta.sp === 1, onJoin: ({ id }) => { spectators.add(id); }, onLeave: (id) => { spectators.delete(id); showWatchers(); } },
     onMessage, onPeer,
   });
+  const showWatchers = () => mpHud.watchers([...spectators].filter((id) => session.status(id) === 'here' || session.status(id) === 'away').length);
 
   /* ---------- messages ---------- */
   function onMessage(from, m) {
+    if (spectators.has(from)) return;                    // a spectator never influences anything
     if (m.k === 's') {
       if (m.r !== race.run || !remotes.get(from)) return;
       const t = session.toLocal(from, Number(m.t));
@@ -100,6 +112,11 @@ export function createMp({ ctx, host }) {
     remotes.setLink(id, session.viaRelay(id));
   }
   function onPeer(id, status) {
+    if (spectators.has(id)) {                             // not a racer: «👀 N», his link, what the race knows
+      if (status === 'here') { session.send(id, { k: 'hi', o: host.outfit() }, true); race.welcomeSpectator(id); }
+      showWatchers();
+      return;
+    }
     race.setStatus(id, status);
     if (status === 'here') { session.send(id, { k: 'hi', o: host.outfit() }, true); if (!remotes.get(id)) meet(id, ''); }
     if (status === 'gone') remotes.remove(id);
@@ -112,6 +129,7 @@ export function createMp({ ctx, host }) {
   function onEvent(e) {
     save(saveKey, race.snapshot());
     root.dataset.skiMp = `${race.phase}:${race.run}`;
+    if (e.type === 'over' && session) session.setExtra({ ov: 1 });         // a latecomer now waits for the rematch lobby instead of watching
     if (e.type === 'prepare') prepare(e.run);
     else if (e.type === 'go') { local.goAt = e.goAt; maybeLate(); }
     else if (e.type === 'end' || e.type === 'over') endRun(e.type === 'over');

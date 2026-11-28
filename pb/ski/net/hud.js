@@ -18,7 +18,8 @@ export function createMpHud(root) {
   const board = el('div', 'mp-board'); board.setAttribute('aria-label', 'Klassement live');
   const banner = el('div', 'mp-banner'); banner.setAttribute('role', 'status'); banner.hidden = true;
   const bar = el('div', 'mp-bar'); bar.hidden = true;
-  box.append(board, banner, bar);
+  const watch = el('div', 'mp-watch'); watch.hidden = true; watch.setAttribute('aria-label', 'Zuschauer');
+  box.append(board, banner, bar, watch);
   root.appendChild(box);
   let card = null;
 
@@ -27,6 +28,8 @@ export function createMpHud(root) {
   return {
     el: box,
     show(v) { box.hidden = !v; },
+    /** the small «👀 N» of the racers: how many are watching (no figure on the course) */
+    watchers(n) { watch.hidden = !(n > 0); watch.textContent = `👀 ${n}`; },
     banner(text) { banner.hidden = !text; banner.textContent = text || ''; },
     /** rows: [{ name, me, state ('race' | 'done' | 'wait'), text, place, away }] in display order */
     board(title, rows) {

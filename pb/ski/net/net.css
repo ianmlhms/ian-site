@@ -36,3 +36,11 @@
 .mp-lobby{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);z-index:40;min-height:40px;padding:0 14px;border:1px solid rgba(255,255,255,.85);background:rgba(22,23,26,.45);color:#fff;font-weight:700;font-size:14px;border-radius:0}
 .mp-lobby[data-over="1"]{background:var(--green);border-color:var(--green)}
 #resortScreen header .btn{min-height:40px}
+/* spectators: the racers only see a small count; a spectator's own bar / board */
+.mp-watch{position:absolute;left:calc(12px + env(safe-area-inset-left));top:calc(92px + env(safe-area-inset-top));color:#fff;text-shadow:var(--halo);font-size:14px;font-weight:700}
+.mp-watch[hidden]{display:none}
+.mp-row .t.gap{opacity:.95}
+.mp-row.lead .n{color:#ffe08a}
+html[data-ski-spec="1"] .mp-bar{bottom:calc(14px + env(safe-area-inset-bottom))}
+html[data-ski-spec="1"] #touchControls,html[data-ski-spec="1"] .pad{display:none !important}
+.mp-bar .on{background:var(--ink);color:#fff}

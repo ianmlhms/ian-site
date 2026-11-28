@@ -53,7 +53,9 @@ const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
  * me, roster [{id, name}] (lobby order), runs = number of runs, now() = local ms, send(to | null, msg) (null = everybody),
  * latency(id) = one-way ms estimate of that link, minMs(run) = the fastest honest time of that run's piste, onEvent(e).
  */
-export function createRace({ me, roster, runs, now, send, latency = () => 0, minMs = () => 0, onEvent = () => {}, restore = null }) {
+export function createRace({ me, roster, runs, now, send: sendRaw, latency = () => 0, minMs = () => 0, onEvent = () => {}, restore = null, spectator = false }) {
+  /* a SPECTATOR (round 28 Nov) is not in the roster: he only listens. He never paces (tick), never reports, never sends anything. */
+  const send = spectator ? () => {} : sendRaw;
   const ids = roster.map((r) => r.id);
   const rank = (id) => ids.indexOf(id);
   const status = new Map(ids.map((id) => [id, id === me ? 'here' : 'wait']));
@@ -117,7 +119,7 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     enterGo(goAt);
   }
   function tick() {
-    if (!isCoord()) return;
+    if (spectator || !isCoord()) return;
     const t = now();
     if (s.phase === 'prep') {
       const here = ids.filter((id) => status.get(id) === 'here');
@@ -215,7 +217,15 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     });
   }
 
+  /* a spectator (not in the roster) arrived: the coordinator tells him where the match stands, everybody re-sends his own results */
+  function welcomeSpectator(id) {
+    if (spectator || id === me || rank(id) >= 0) return;
+    welcome(id);
+  }
+
   return {
+    get spectator() { return spectator; },
+    welcomeSpectator,
     get run() { return s.run; }, get phase() { return s.phase; }, get goAt() { return s.goAt; }, get runs() { return runs; },
     get started() { return s.started; },
     status: (id) => status.get(id),
@@ -223,7 +233,7 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     coordinator, isCoord, tick, receive, setStatus,
     /** the local piste of this run is loaded and the skier stands at the start */
     localReady(run) {
-      if (run !== s.run || s.phase !== 'prep') return;
+      if (spectator || run !== s.run || s.phase !== 'prep') return;
       s.ready.add(me);
       send(null, { k: 'rdy', r: run });
     },
@@ -231,7 +241,7 @@ export function createRace({ me, roster, runs, now, send, latency = () => 0, min
     localStarted(run) { s.started = run; emit('save'); },
     /** the local run ended: result { ms, valid, penalty } or null (gave up / closed / too late) */
     localFinish(run, result) {
-      if (!isInt(run, 0, runs - 1) || s.results[run][me]) return;
+      if (spectator || !isInt(run, 0, runs - 1) || s.results[run][me]) return;
       const entry = result ? { ms: Math.round(result.ms), valid: !!result.valid && result.ms >= minMs(run), pen: Math.round(result.penalty || 0) } : { dnf: true };
       send(null, entry.dnf ? { k: 'dnf', r: run } : { k: 'fin', r: run, ms: entry.ms, v: entry.valid, pen: entry.pen });
       noteFinish(me, run, entry);
