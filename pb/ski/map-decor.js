@@ -13,12 +13,16 @@ const ROW = 5;                          // numbers per tree / house while buildi
 const hash = (i, j, k) => { let h = Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(k, 1274126177); h = Math.imul(h ^ (h >>> 13), 1103515245); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 const css = (r, g, b) => `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 
-function treeSprite(lit) {
+/** painted (28 Nov 2026, panorama.style 'painted'): lighter stamps, fewer of them, snow between (the twin of panorama.py's painted trees). */
+const PAINTED = { treePx: 7.0, keep: 0.6, size: 5.4, dark: [62, 108, 96], light: [116, 160, 118] };
+
+function treeSprite(lit, painted = false) {
   const c = document.createElement('canvas'); c.width = SPRITE; c.height = SPRITE;
   const g = c.getContext('2d');
   const cx = SPRITE / 2, base = SPRITE - 4, hw = SPRITE * 0.30;
   g.fillStyle = 'rgba(60,84,130,.22)'; g.beginPath(); g.ellipse(cx + 5, base, hw * 0.95, 4.5, 0, 0, 7); g.fill();
-  const dark = css(46, 80, 80), light = css(82 + 26 * lit, 122 + 26 * lit, 98 + 18 * lit);
+  const dark = painted ? css(...PAINTED.dark) : css(46, 80, 80);
+  const light = painted ? css(PAINTED.light[0] * (0.82 + 0.3 * lit), PAINTED.light[1] * (0.82 + 0.3 * lit), PAINTED.light[2] * (0.82 + 0.3 * lit)) : css(82 + 26 * lit, 122 + 26 * lit, 98 + 18 * lit);
   for (let k = 0; k < 3; k++) {                      // three skirts, the lit side left
     const y1 = base - k * 15, y0 = y1 - 25 + k * 1.5, w = hw * (1 - k * 0.24);
     g.fillStyle = dark; g.beginPath(); g.moveTo(cx, y0); g.lineTo(cx + w, y1); g.lineTo(cx - w * 0.15, y1 + 1.5); g.closePath(); g.fill();
@@ -44,7 +48,7 @@ function houseSprite(wall, roof) {
 }
 
 /** createDecor(...) -> { build(done), ready, draw(g, x0, y0, x1, y1, s), dispose } in map pixels (s = CSS px per map pixel). */
-export function createDecor({ pano, resort, classes, height, buildingsUrl }) {
+export function createDecor({ pano, resort, classes, height, buildingsUrl, painted = false }) {
   const W = pano.w, H = pano.h, nbx = Math.ceil(W / CELL), nby = Math.ceil(H / CELL);
   let buckets = null, sprites = null, state = 'idle', stopped = false, timer = 0;
 
@@ -66,8 +70,8 @@ export function createDecor({ pano, resort, classes, height, buildingsUrl }) {
     state = 'building';
     const near = nearGrid(), b = resort.classes.bits, cs = resort.classes.step, cnx = classes.nx, cnz = classes.nz, data = classes.data;
     const cls = (x, z) => data[Math.min(cnz - 1, Math.max(0, Math.floor(z / cs))) * cnx + Math.min(cnx - 1, Math.max(0, Math.floor(x / cs)))];
-    const m = Math.max(MIN_TREE_M, TREE_PX / pano.k), nx = Math.floor(resort.width / m), nz = Math.floor(resort.depth / m);
-    const unit = pano.k / 0.16, size0 = 6.6 * Math.max(unit, 0.56);
+    const m = Math.max(MIN_TREE_M, (painted ? PAINTED.treePx : TREE_PX) / pano.k), nx = Math.floor(resort.width / m), nz = Math.floor(resort.depth / m);
+    const unit = pano.k / 0.16, size0 = (painted ? PAINTED.size : 6.6) * Math.max(unit, 0.56), keepForest = painted ? PAINTED.keep : 0.96;
     let flat = new Float32Array(ROW * 8192), count = 0;                      // rows of s, px, py, size, sprite (no array per tree: garbage)
     const add = (x, z, size, sprite, slack) => {
       const y = height(x, z), [px, py] = pano.project(x, z, y);
@@ -92,7 +96,7 @@ export function createDecor({ pano, resort, classes, height, buildingsUrl }) {
         fill.set(key, at + 4);
       }
       flat = null;
-      sprites = [treeSprite(0), treeSprite(0.5), treeSprite(1), houseSprite([224, 196, 160], [176, 124, 96]), houseSprite([206, 168, 128], [204, 212, 226]), houseSprite([238, 224, 200], [204, 212, 226]), houseSprite([186, 142, 104], [176, 124, 96])];
+      sprites = [treeSprite(0, painted), treeSprite(0.5, painted), treeSprite(1, painted), houseSprite([224, 196, 160], [176, 124, 96]), houseSprite([206, 168, 128], [204, 212, 226]), houseSprite([238, 224, 200], [204, 212, 226]), houseSprite([186, 142, 104], [176, 124, 96])];
       state = 'ready';
       done();
     };
@@ -113,7 +117,7 @@ export function createDecor({ pano, resort, classes, height, buildingsUrl }) {
           const x = (i + hash(i, row, 1)) * m, z = (row + hash(i, row, 2)) * m, c = cls(x, z);
           if (!(c & (b.forest | b.scrub)) || c & (b.water | b.built | b.piste)) continue;
           const h3 = hash(i, row, 3);
-          if (c & b.forest ? h3 > 0.96 : h3 > 0.16) continue;
+          if (c & b.forest ? h3 > keepForest : h3 > 0.16) continue;
           if (!near(x, z)) continue;
           if ((cls(x + 22, z) | cls(x - 22, z) | cls(x, z + 22) | cls(x, z - 22)) & b.piste) continue;
           const gr = (height(x + 40, z) - height(x - 40, z)) * Math.cos((pano.cam.az * Math.PI) / 180) + (height(x, z + 40) - height(x, z - 40)) * Math.sin((pano.cam.az * Math.PI) / 180);

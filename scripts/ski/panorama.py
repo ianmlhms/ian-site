@@ -47,7 +47,16 @@ CAMERAS = {
     "kronplatz": {"az": 208},                              # from above Bruneck
     "davos": {"az": 15, "f0": 0.78, "f1": 0.6},            # from above Glaris looking north up the valley: Rinerhorn and Jakobshorn in front, Davos and the Parsenn in the middle, Klosters and Madrisa behind
     "soelden": {"az": 200},                                # from above the Windach valley looking north: Sölden bottom-left, Giggijoch / Gaislachkogl in the middle, the glaciers top-right
+    "vialattea": {"az": 170, "f0": 0.76, "f1": 0.58, "E": 1.55},   # painted test (28 Nov 2026): from above the Susa valley looking south, one long panorama: Sauze d'Oulx in front, Sestriere left, Montgenèvre right
 }
+# 28 Nov 2026 (owner: "make it look like a classic hand-painted piste map", a test on Via Lattea first): "painted" = very light and clean,
+# white snow with soft blue shade, rock only on steep faces, forests as small light tree stamps on snow, a pale sky. The style is written
+# into resort.json panorama.style, which map.js reads (thin lines, number badges, village altitudes ...). Resorts not listed keep "print".
+STYLES = {"vialattea": "painted"}
+# villages the OSM places lack, printed on the painted map (map.js panorama.places): Sansicario = its ski school area (Campo Scuola, 1700 m)
+PLACES = {"vialattea": [{"name": "Sansicario", "x": 11590, "z": 9010}]}
+# the villages' official altitudes (town signs); without an entry map.js prints the ground height under the OSM place point
+PLACE_ELE = {"vialattea": {"Sestriere": 2035, "Sauze d'Oulx": 1509, "Sansicario": 1700, "Cesana Torinese": 1354, "Claviere": 1760, "Montgenèvre": 1860, "Pragelato": 1524, "Sauze di Cesana": 1560}}
 
 
 def log(*a):
@@ -256,6 +265,7 @@ def sample(grid, x, z, step, order=1):
 
 
 def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
+    painted = STYLES.get(rid) == "painted"
     scale = 0.5 if draft else SUPER
     t0 = time.time()
     G = gbuffer(cam, far, w, h, scale)
@@ -313,6 +323,9 @@ def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
     band = np.round(q * steps) / steps
     q = q * 0.55 + band * 0.45
     hi, mid, lo, deep = C(255, 254, 250), C(232, 240, 250), C(188, 208, 236), C(142, 168, 214)
+    if painted:                                                          # brighter: the shade is a hue (blue), hardly a value
+        q = light * 0.78 + 0.22 * band + 0.014 * strokes + 0.014 * wide
+        hi, mid, lo, deep = C(255, 255, 253), C(237, 244, 252), C(196, 215, 242), C(148, 175, 226)
     t = np.clip((q - 0.22) / 0.66, 0, 1)
     col = np.where((t < 0.33)[..., None], mix(np.broadcast_to(deep, (H, W, 3)), lo, np.clip(t / 0.33, 0, 1)),
           np.where((t < 0.68)[..., None], mix(np.broadcast_to(lo, (H, W, 3)), mid, np.clip((t - 0.33) / 0.35, 0, 1)),
@@ -329,13 +342,18 @@ def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
     col = mix(col, col * C(222, 243, 252) + 0.02, np.clip(glacier, 0, 1) * 0.55)
 
     # rock: steep faces and mapped rock, painted in warm grey-brown strokes
-    rk = smooth(37, 52, slope + 4.5 * wide + 3.0 * strokes)
-    rk = np.maximum(rk, smooth(0.35, 0.9, np.maximum(cover("rock", 1.2), 0.75 * cover("scree", 1.2)) * smooth(26, 40, slope) + 0.12 * strokes) * 0.9)
+    if painted:                                                          # only the steep faces: crisp warm rock with blue-grey shade
+        rk = smooth(41, 54, slope + 4.0 * wide + 3.5 * strokes)
+        rk = np.maximum(rk, smooth(0.45, 0.95, np.maximum(cover("rock", 1.2), 0.6 * cover("scree", 1.2)) * smooth(33, 44, slope) + 0.12 * strokes) * 0.8)
+    else:
+        rk = smooth(37, 52, slope + 4.5 * wide + 3.0 * strokes)
+        rk = np.maximum(rk, smooth(0.35, 0.9, np.maximum(cover("rock", 1.2), 0.75 * cover("scree", 1.2)) * smooth(26, 40, slope) + 0.12 * strokes) * 0.9)
     piste = cover("piste", 2.0)
     rk = rk * (1 - np.clip(piste * 1.6, 0, 1))
     rl = np.clip(light * 1.05 + 0.10 * strokes, 0, 1.1)
-    rock = mix(np.broadcast_to(C(82, 80, 96), (H, W, 3)), C(196, 178, 160), np.clip(rl, 0, 1)).astype(np.float32)
-    col = mix(col, rock, np.clip(rk, 0, 1) * 0.86)
+    r_dark, r_light = (C(118, 120, 146), C(222, 206, 190)) if painted else (C(82, 80, 96), C(196, 178, 160))
+    rock = mix(np.broadcast_to(r_dark, (H, W, 3)), r_light, np.clip(rl, 0, 1)).astype(np.float32)
+    col = mix(col, rock, np.clip(rk, 0, 1) * (0.8 if painted else 0.86))
 
     # ---- valley ground below the tree line, and the forest floor
     forest = cover("forest", 0.9)
@@ -343,12 +361,18 @@ def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
     tree_line = float(np.percentile(hgt[inbox & (forest > 0.5)], 97)) if (inbox & (forest > 0.5)).any() else 2000.0
     out_f = np.where(inbox | sky, 0, smooth(tree_line + 60, tree_line - 120, hgt + 60 * wide) * smooth(46, 36, slope) * smooth(-0.6, 0.6, wide + 0.4)).astype(np.float32)
     floor = np.clip(forest * 1.15 + scrub * 0.35, 0, 1)
-    fcol = mix(np.broadcast_to(C(52, 82, 86), (H, W, 3)), C(124, 152, 118), np.clip(light * 1.1 + 0.06 * strokes, 0, 1)).astype(np.float32)
-    col = mix(col, fcol, floor * 0.82)
+    if painted:                                                          # the snow shows between the trees: a faint grey-green ground only
+        fcol = mix(np.broadcast_to(C(170, 192, 196), (H, W, 3)), C(232, 240, 236), np.clip(light * 1.1, 0, 1)).astype(np.float32)
+        col = mix(col, fcol, floor * 0.45)
+    else:
+        fcol = mix(np.broadcast_to(C(52, 82, 86), (H, W, 3)), C(124, 152, 118), np.clip(light * 1.1 + 0.06 * strokes, 0, 1)).astype(np.float32)
+        col = mix(col, fcol, floor * 0.82)
     # outside the box (no land cover there): a snow-dusted, pale forested valley instead of the dark green floor, which turned the brush
     # strokes of the steep slopes into green-grey fern streaks (Davos, 24 Nov 2026); no stroke term, a soft light-driven tint
     ocol = mix(np.broadcast_to(C(140, 168, 162), (H, W, 3)), C(222, 234, 232), np.clip(light * 1.1, 0, 1)).astype(np.float32)
-    col = mix(col, ocol, out_f * 0.62)
+    if painted:
+        ocol = mix(np.broadcast_to(C(178, 198, 200), (H, W, 3)), C(236, 242, 240), np.clip(light * 1.1, 0, 1)).astype(np.float32)
+    col = mix(col, ocol, out_f * (0.4 if painted else 0.62))
     built = cover("built", 2.2)
     col = mix(col, C(236, 226, 210) * (0.75 + 0.3 * light[..., None]), np.clip(built, 0, 1) * 0.55)
     water = cover("water", 0.8)
@@ -363,18 +387,22 @@ def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
     dist = ndimage.distance_transform_edt(g40).astype(np.float32) * 40
     away = np.where(inbox, sample(dist, x, z, 40.0), 4000)
     pale = smooth(900, 4200, away)
-    col = mix(col, col * 0.62 + C(222, 232, 243) * 0.38, pale * 0.75)
+    col = mix(col, col * 0.62 + C(222, 232, 243) * 0.38, pale * (0.55 if painted else 0.75))
     haze = np.clip((s - cam["L"] * 0.8) / (9000.0 + 0.5 * cam["L"]), 0, 1)
     haze = 1 - np.exp(-2.0 * haze)
-    col = mix(col, C(196, 217, 240), haze * 0.80)
+    col = mix(col, C(214, 228, 245) if painted else C(196, 217, 240), haze * (0.7 if painted else 0.80))
 
     # ---- sky: painted bands with soft clouds
     yy = (np.arange(H) / H)[:, None]
     sk = np.clip(yy / max(1e-3, 0.26), 0, 1)
-    sc = mix(np.broadcast_to(C(92, 152, 214), (H, W, 3)), C(214, 231, 246), np.broadcast_to(sk ** 0.8, (H, W))).astype(np.float32)
+    if painted:                                                          # a pale gradient, deeper blue only at the very top
+        sk = np.clip(yy / max(1e-3, 0.30), 0, 1)
+        sc = mix(np.broadcast_to(C(124, 172, 224), (H, W, 3)), C(234, 243, 251), np.broadcast_to(sk ** 0.7, (H, W))).astype(np.float32)
+    else:
+        sc = mix(np.broadcast_to(C(92, 152, 214), (H, W, 3)), C(214, 231, 246), np.broadcast_to(sk ** 0.8, (H, W))).astype(np.float32)
     cl = ndimage.gaussian_filter(rng.standard_normal((H, W)).astype(np.float32), (7 * unit * 1.3, 46 * unit * 1.3))
     cl = (cl - cl.mean()) / (cl.std() + 1e-9)
-    sc = mix(sc, C(255, 255, 255), smooth(0.5, 2.0, cl) * 0.6)
+    sc = mix(sc, C(255, 255, 255), smooth(0.5, 2.0, cl) * (0.35 if painted else 0.6))
     col = np.where(sky[..., None], sc, col)
     # a thin light rim where land meets the sky or a nearer ridge stands before a further one (ink-less silhouettes read on print)
     jump = np.zeros((H, W), np.float32)
@@ -386,7 +414,7 @@ def paint(rid, resort, far, cam, w, h, data_dir, classes, draft):
     img = Image.fromarray((np.clip(col, 0, 1) * 255).astype(np.uint8), "RGB")
     log("  colours %.0f s" % (time.time() - t0))
     draw_roads(img, resort, far, cam, scale, data_dir, G)
-    draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, tree_line, dist)
+    draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, tree_line, dist, painted)
     log("  trees and houses %.0f s" % (time.time() - t0))
     # paper grain, very light
     a = np.asarray(img, np.float32)
@@ -441,7 +469,7 @@ def draw_roads(img, resort, far, cam, scale, data_dir, G):
                 d.line([px[i], py[i], px[i + 1], py[i + 1]], fill=(247, 240, 224), width=w)
 
 
-def draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, tree_line, dist):
+def draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, tree_line, dist, painted=False):
     """Conifers and houses, sorted back to front."""
     d = ImageDraw.Draw(img)
     pr = G["pr"]
@@ -449,7 +477,7 @@ def draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, t
     k = cam["k"] * scale
     items = []
     # trees: one per TREE_M square of forest (jittered), thinner in the scrub; bigger than life like on any printed map
-    tree_m = max(20.0, 4.6 / k)
+    tree_m = max(20.0, (7.0 if painted else 4.6) / k)                   # painted: single stamps with snow between them
     nx, nz = int(resort["width"] / tree_m), int(resort["depth"] / tree_m)
     jj, ii = np.mgrid[0:nz, 0:nx]
     tx = (ii.ravel() + rng.random(ii.size)) * tree_m
@@ -459,7 +487,7 @@ def draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, t
     r1 = rng.random(ii.size)
     aisle = np.ones(classes.shape, bool)
     aisle &= ndimage.distance_transform_edt((classes & bits["piste"]) == 0) > 2.0      # 20 m free along the groomed snow
-    keep = (((c & bits["forest"]) > 0) & (r1 < 0.96)) | (((c & bits["scrub"]) > 0) & (r1 < 0.16))
+    keep = (((c & bits["forest"]) > 0) & (r1 < (0.6 if painted else 0.96))) | (((c & bits["scrub"]) > 0) & (r1 < 0.16))
     keep &= aisle[cj, ci] & ((c & (bits["water"] | bits["built"])) == 0)
     # and lone trees out in the painted far forest are left to the floor colour (haze)
     tx, tz = tx[keep], tz[keep]
@@ -471,7 +499,7 @@ def draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, t
     lit = np.clip(0.55 + 0.55 * (gx * pr.ca + gz * pr.sa), 0, 1)          # slopes that fall to the left are in the sun
     away = dist[np.clip((tz / 40).astype(int), 0, dist.shape[0] - 1), np.clip((tx / 40).astype(int), 0, dist.shape[1] - 1)]
     pale = smooth(900, 4200, away) * 0.5 + np.clip((s - cam["L"] * 0.8) / 14000, 0, 0.6)
-    size = (6.6 * max(unit, 0.75) * (0.8 + 0.45 * rng.random(len(tx)))) * np.clip(pr.R(s), 0.5, 1.05)
+    size = ((5.4 if painted else 6.6) * max(unit, 0.75) * (0.8 + 0.45 * rng.random(len(tx)))) * np.clip(pr.R(s), 0.5, 1.05)
     for i in range(len(tx)):
         items.append((s[i], 0, px[i], py[i], size[i], lit[i], pale[i], rng.random()))
     # houses
@@ -493,6 +521,10 @@ def draw_things(img, resort, far, cam, scale, data_dir, classes, G, rng, unit, t
             hh, hw = sz * 1.25, sz * 0.46
             dark = np.array([54, 90, 84]) * (0.92 + 0.2 * rnd)
             light = np.array([98, 140, 108]) * (0.80 + 0.34 * lt)
+            if painted:                                                  # lighter stamps, a soft blue shadow on the snow
+                dark = np.array([62, 108, 96]) * (0.92 + 0.16 * rnd)
+                light = np.array([116, 160, 118]) * (0.82 + 0.3 * lt)
+                d.polygon([(X - hw * 0.2, Y + 0.6), (X + hw * 1.6, Y + 0.2), (X + hw * 0.9, Y - hh * 0.18)], fill=(196, 210, 236))
             if pl > 0:
                 dark, light = dark + (np.array([176, 196, 214]) - dark) * pl, light + (np.array([206, 220, 230]) - light) * pl
             tip = (X, Y - hh)
@@ -571,7 +603,7 @@ def main():
         rp = os.path.join(data_dir, "resort.json")
         with open(rp, encoding="utf-8") as fh:
             raw = json.load(fh)
-        raw["panorama"] = {"file": "panorama.webp", "w": w, "h": h, "cam": cam}
+        raw["panorama"] = {"file": "panorama.webp", "w": w, "h": h, "cam": cam, **({"style": STYLES[rid]} if rid in STYLES else {}), **({"places": PLACES[rid]} if rid in PLACES else {}), **({"ele": PLACE_ELE[rid]} if rid in PLACE_ELE else {})}
         with open(rp, "w", encoding="utf-8") as fh:
             json.dump(raw, fh, ensure_ascii=False, separators=(",", ":"))
         log("  %s %.0f KB (quality %d), %.0f s" % (path, size / 1024, q, time.time() - t0))

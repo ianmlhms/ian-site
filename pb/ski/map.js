@@ -13,7 +13,7 @@
 import { DIFF, DIFF_IDS } from './config.js';
 import { createPano } from './pano.js';
 import { createDecor } from './map-decor.js';
-import { INK, LIFT_PICK, YOU, VIOLET, FONT, SOFT, roundRect, liftSign, liftBadge, pisteDisc, flag, raceSign, parkSign, landmarkSign, peakSign, haloText, compass, drawYou, drawYouEdge } from './map-symbols.js';
+import { INK, LIFT_PICK, YOU, VIOLET, FONT, SOFT, VILLAGE_INK, midSign, roundRect, liftSign, liftBadge, pisteDisc, flag, raceSign, parkSign, landmarkSign, peakSign, haloText, compass, drawYou, drawYouEdge } from './map-symbols.js';
 
 const DIFF_OF_LETTER = { g: 'green', b: 'blue', r: 'red', k: 'black' };
 const HIT_PX = 18;
@@ -32,6 +32,9 @@ const MARGIN_PX = 24;              // dragged to the edge: at most this much bes
 const FOOT_PX = 46;                // the whole map keeps this much free at the bottom (the legend's line)
 const VIEW_KEY = 'pb_ski_mapview';
 const MINOR_NAME = /^Verbindung|\(Variante|^Raccordo|^Liaison|^Verbindungs/i;
+const ARROW_PX = 92;               // painted: one arrowhead per this many px of piste line
+const PAINT_MIN_FILL = 0.6, PAINT_TALL_ZOOM = 2.2;   // painted: the whole sheet opens when it fills this much of the box height, else this much closer
+const MID_M = 15;                  // painted: a lift's top this near the next lift's bottom = a mid station
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const ease = (t) => 1 - (1 - t) ** 3;
@@ -43,6 +46,23 @@ const writeView = (v) => { try { localStorage.setItem(VIEW_KEY, v); } catch (err
 const placeName = (name) => { const p = name.split(' - '); return p.length === 3 ? p[1] : p[0]; };
 /** "S 01" -> "S1", "D 87B" -> "D87B": what fits a disc ('' = no number). */
 const discText = (ref) => { const t = String(ref || '').replace(/\s+/g, '').replace(/^([A-Za-z]?)0+(?=\d)/, '$1'); return t.length > 5 ? '' : t; };
+
+// 28 Nov 2026, the "painted" style (resort.json panorama.style, a test on Via Lattea): like a classic hand-painted piste map: thin lines
+// with small arrows, number badges instead of long names, thin black lifts, villages with their altitude, mid stations, the whole area first
+const QUAL = /(^|\s)(alta|bassa|media|bis|tris|stadio|variante|vecchia)(?=\s|$)/gi;
+/** The piste number for its badge: ref "9 alta" -> "9", "KN alta" -> "KN"; without a ref from the name: "Schwaarz 36" -> "36" ('' = none). */
+function pisteNumber(p) {
+  const ref = String(p.src.ref || '').replace(QUAL, ' ').replace(/\s+/g, ' ').trim();
+  if (ref && ref.length <= 4) return ref.replace(/\s+/g, '');
+  const m = p.name.match(/(?:^|\s)(\d{1,4})(?=\s|$)/);
+  return m ? m[1] : '';
+}
+/** The name worth writing beside the badge: "3 Fournéous" -> "Fournéous", "92 alta (3)" / "Rout 47" -> '' (the badge says it all). */
+function pisteTitle(p, num) {
+  let t = p.name.replace(/\s*\((Gréng|Blo|Rout|Schwaarz)( \d+)?\)$/, '').replace(/\s*\(\d+\)$/, '').replace(/^(Gréng|Blo|Rout|Schwaarz)\s+/, '');
+  if (num) t = t.replace(new RegExp(`(^|\\s)${num.replace(/[^\w]/g, '')}(?=\\s|$)`), ' ').replace(/\s+/g, ' ').trim();
+  return /[A-Za-zÀ-ÿ]{3,}/.test(t.replace(QUAL, ' ')) ? t : '';
+}
 
 /** A polyline (flat x, z) as a smooth curve through its points, sampled every STEP_M: [[x, z], ...] (Hermite, tangents by chord length). */
 function smoothLine(p, step = STEP_M) {
@@ -68,6 +88,9 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   const W = resort.width, D = resort.depth;
   const drawnLifts = resort.lifts.filter((l) => l.kind !== 'carpet');
   const hasPano = !!(resort.panorama && height);
+  const painted = hasPano && resort.panorama.style === 'painted';
+  /** The painted style is on (its panorama is shown; the plan from above stays as it was). */
+  const isPainted = () => painted && !!sheet && sheet.id === 'relief';
   let view = { s: 1, x: 0, z: 0 };          // sheet point at the canvas centre, CSS pixels per sheet pixel
   let selected = null, hover = null;
   // round 4A (modes): stars per piste id (mask), locked piste ids, the snow park line, the lifts of the free ride and the picked one
@@ -108,6 +131,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   }
   /** Everything of the resort projected once onto the sheet. */
   function buildGeo(sh) {
+    const relief = sh.id === 'relief';
     const proj = (pts) => {
       const n = pts.length, xs = new Float32Array(n), ys = new Float32Array(n), cs = new Float32Array(n);
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -140,7 +164,8 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       if ((p.n - 1) % every) pts.push([p.x[p.n - 1], p.z[p.n - 1]]);
       const gp = proj(pts), path = new Path2D();
       for (let i = 0; i < gp.n; i++) { if (i) path.lineTo(gp.xs[i], gp.ys[i]); else path.moveTo(gp.xs[i], gp.ys[i]); }
-      piste.set(p, { ...gp, pts, path, minor: MINOR_NAME.test(p.name), disc: discText(p.src.ref) });
+      const num = painted && relief ? pisteNumber(p) : '';
+      piste.set(p, { ...gp, pts, path, minor: MINOR_NAME.test(p.name), disc: painted && relief ? num : discText(p.src.ref), title: painted && relief ? pisteTitle(p, num) : null });
     }
     const lift = new Map();
     for (const src of drawnLifts) {
@@ -162,10 +187,24 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     const netPts = [];
     for (const q of net) for (let i = 0; i < q.pts.length; i += 5) netPts.push(q.pts[i]);
     const atSki = (x, z) => netPts.some((q) => Math.abs(q[0] - x) < NEAR_VILLAGE_M && Math.abs(q[1] - z) < NEAR_VILLAGE_M);
-    const places = resort.places.map((q) => ({ ...q, big: q.kind === 'town' || (q.kind === 'village' && atSki(q.x, q.z)), text: placeName(q.name), ...spot(q.x, q.z) })).filter((q) => !q.off);
+    const paint = painted && relief;
+    // painted: the resort villages the data has no place for (panorama.places, e.g. Sansicario) and every village's altitude
+    const extra = paint ? (resort.panorama.places || []).map((q) => ({ kind: 'village', ...q })) : [];
+    const onSheet = (q) => q.X >= 0 && q.Y >= 0 && q.X <= sh.w && q.Y <= sh.h;
+    const places = [...resort.places, ...extra].map((q) => ({ ...q, big: q.kind === 'town' || (q.kind === 'village' && atSki(q.x, q.z)), text: placeName(q.name), ele: paint ? ((resort.panorama.ele || {})[q.name] || (height ? Math.round(height(q.x, q.z) / 5) * 5 : 0)) : 0, ...spot(q.x, q.z) }))
+      .filter((q) => !q.off || (paint && q.big && onSheet(q)));       // painted: a ski village behind a ridge keeps its name (Claviere)
     const peaks = resort.peaks.filter((q) => q.ele).sort((a, b) => b.ele - a.ele).map((q) => ({ ...q, ...spot(q.x, q.z) })).filter((q) => !q.off).slice(0, 70);
     const landmarks = (resort.landmarks || []).filter((q) => q.house !== false).map((q) => ({ ...q, ...spot(q.x, q.z) })).filter((q) => !q.off);
-    return { net, areas, piste, lift, places, peaks, landmarks, vivid: null, inked: null };
+    // painted: mid stations = the top of a lift where the next section starts (a chain, like modes/freeride.js sectionAfter)
+    const mids = [];
+    if (paint) {
+      for (const a of drawnLifts) {
+        if (!a.top) continue;
+        const next = drawnLifts.find((b) => b !== a && b.bottom && Math.hypot(b.bottom.x - a.top.x, b.bottom.z - a.top.z) < MID_M);
+        if (next && !mids.some((q) => Math.hypot(q.x - a.top.x, q.z - a.top.z) < MID_M)) mids.push({ x: a.top.x, z: a.top.z, ...spot(a.top.x, a.top.z) });
+      }
+    }
+    return { net, areas, piste, lift, places, peaks, landmarks, mids: mids.filter((q) => !q.off), vivid: null, inked: null };
   }
   /** The network's lines as paths, each { q, casing, full, soft }: with the discovery the undiscovered parts go into `soft`. */
   function inkPaths() {
@@ -203,11 +242,26 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   box.appendChild(ov);
   box.appendChild(pulse);
   let ovBase = null;                 // the inset's static picture (image + pistes), built once the image is in
+  // painted style: the compact legend line also shows the lift symbols, the list a mid station (removed again with the map)
+  const legendEl = box.querySelector('.legend');
+  const paintKeys = [];
+  if (painted && legendEl) {
+    const sum = legendEl.querySelector('summary'), more = legendEl.querySelector('summary + div');
+    const item = (sign, label) => { const el = document.createElement('span'); el.className = 'lg-paint'; el.innerHTML = `<canvas data-sign="${sign}" aria-hidden="true"></canvas>${label}`; paintKeys.push(el); return el; };
+    const b = sum && sum.querySelector('b');
+    if (b) {
+      const br = document.createElement('span'); br.className = 'lg-paint'; br.style.cssText = 'flex-basis:100%;height:0'; paintKeys.push(br);
+      sum.insertBefore(br, b);
+      for (const [k, l] of [['gondola', 'Gondel'], ['chair', 'Sesselbunn'], ['drag', 'Schlepplift']]) sum.insertBefore(item(k, l), b);
+    }
+    if (more) more.insertBefore(item('mid', 'Tëschestatioun'), more.firstChild);
+    legendEl.style.maxWidth = 'min(400px, calc(100% - 76px))';          // two lines; never under the compass
+  }
   for (const c of box.querySelectorAll('canvas[data-sign]')) {            // the legend's pictograms, the same drawing as on the map
     c.width = c.height = 36;
     const cg = c.getContext('2d'); cg.scale(2, 2);
     const s = c.dataset.sign;
-    if (s === 'park') parkSign(cg, 9, 9, 7.5); else if (s === 'race') raceSign(cg, 9, 9, 7.5); else if (s === 'view') landmarkSign(cg, 9, 9, 7); else if (s === 'flag') flag(cg, 5.5, 16, '#c8372d', 0.95); else if (s === 'peak') peakSign(cg, 9, 12); else liftBadge(cg, 9, 9, 8, s);
+    if (s === 'mid') midSign(cg, 9, 9, 5); else if (s === 'park') parkSign(cg, 9, 9, 7.5); else if (s === 'race') raceSign(cg, 9, 9, 7.5); else if (s === 'view') landmarkSign(cg, 9, 9, 7); else if (s === 'flag') flag(cg, 5.5, 16, '#c8372d', 0.95); else if (s === 'peak') peakSign(cg, 9, 12); else liftBadge(cg, 9, 9, 8, s);
   }
 
   function size() {
@@ -226,7 +280,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
   /** The whole sheet in the middle of the box (above the legend's line). */
   const wholeView = (s) => ({ s, x: sheet.w / 2, z: sheet.h / 2 + FOOT_PX / 2 / s });
   /** Without a skier the map opens whole; on a tall screen a little closer (the panorama is wide). */
-  const startScale = () => { const { w, h } = size(); return sheet.id === 'relief' ? clamp(Math.max(w / sheet.w, h / sheet.h), fitScale, fitScale * 1.7) : fitScale; };
+  const startScale = () => { const { w, h } = size(); return isPainted() ? fitScale : sheet.id === 'relief' ? clamp(Math.max(w / sheet.w, h / sheet.h), fitScale, fitScale * 1.7) : fitScale; };
   const toScreen = (X, Y, { w, h }) => [(X - view.x) * view.s + w / 2, (Y - view.z) * view.s + h / 2];
   const toSheet = (px, py, { w, h }) => [(px - w / 2) / view.s + view.x, (py - h / 2) / view.s + view.z];
   const worldToScreen = (x, z, sz) => { const [X, Y] = sheet.to(x, z); return toScreen(X, Y, sz); };
@@ -368,12 +422,13 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     drawBase(sz, k, m);
 
     // ---- pistes: white edge, softer ink first, full colour on top; areas faintly
-    const lw = clamp(1.8 + m * 11, 2.3, 7.5), ink = inkPaths();
+    const paint = isPainted();
+    const lw = paint ? clamp(1.1 + m * 7.5, 1.7, 4.6) : clamp(1.8 + m * 11, 2.3, 7.5), ink = inkPaths();
     g.lineCap = 'round'; g.lineJoin = 'round';
     sheetTransform(sz, k);
     if (m > 0.07) for (const ar of gd.areas) if (onScreen(ar, sz)) { g.fillStyle = DIFF[ar.diff].css + '26'; g.fill(ar.path); }
     const lines = ink.lines.filter((it) => onScreen(it.q, sz));
-    g.strokeStyle = '#ffffff'; g.lineWidth = (lw + 1.6 + lw * 0.32) / s;
+    g.strokeStyle = paint ? '#ffffffcc' : '#ffffff'; g.lineWidth = (paint ? lw + 1.5 : lw + 1.6 + lw * 0.32) / s;
     for (const it of lines) g.stroke(it.casing);
     g.lineWidth = lw * 0.9 / s;
     for (const it of lines) if (it.soft) { g.strokeStyle = SOFT[it.q.diff]; g.stroke(it.soft); }
@@ -397,7 +452,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       }
     }
     // ---- lifts
-    const liftW = clamp(0.85 + m * 3.6, 0.95, 2.4);          // the pistes lead, the lifts stay thin on the whole map
+    const liftW = paint ? clamp(0.65 + m * 2.4, 0.8, 1.6) : clamp(0.85 + m * 3.6, 0.95, 2.4);          // the pistes lead, the lifts stay thin on the whole map
     const picked = (mode === 'freeride' || ride) && liftSel ? gd.lift.get(resort.lifts[liftSel.index]) : null;
     if (picked) { g.strokeStyle = LIFT_PICK; g.lineWidth = (liftW + 9) / s; g.globalAlpha = 0.9; g.stroke(picked.path); g.globalAlpha = 1; }
     for (const q of gd.lift.values()) if (onScreen(q, sz)) { g.strokeStyle = '#ffffffd9'; g.lineWidth = (liftW + 1.7) / s; g.stroke(q.path); }
@@ -414,10 +469,15 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       }
     }
     g.setTransform(k, 0, 0, k, 0, 0);
-    const rB = m < 0.06 ? 1.7 : m < 0.16 ? 3.2 : 4.6, rT = rB * 0.72;
+    const rB = paint ? (m < 0.06 ? 1.8 : m < 0.16 ? 2.4 : 3.2) : m < 0.06 ? 1.7 : m < 0.16 ? 3.2 : 4.6, rT = paint ? rB : rB * 0.72;
     for (const q of gd.lift.values()) {
       if (!onScreen(q, sz)) continue;
       const [ax, ay] = toScreen(q.xs[0], q.ys[0], sz), [bx, by] = toScreen(q.xs[q.n - 1], q.ys[q.n - 1], sz);
+      if (paint) {                                                          // small black station dots, a thin white ring
+        g.fillStyle = INK; g.strokeStyle = '#ffffff'; g.lineWidth = 1;
+        for (const [x, y] of [[ax, ay], [bx, by]]) { g.beginPath(); g.arc(x, y, rB, 0, Math.PI * 2); g.fill(); g.stroke(); }
+        continue;
+      }
       g.fillStyle = INK; g.beginPath(); g.arc(bx, by, rT, 0, Math.PI * 2); g.fill();
       g.fillStyle = '#ffffff'; g.strokeStyle = INK; g.lineWidth = 1.5; g.beginPath(); g.arc(ax, ay, rB, 0, Math.PI * 2); g.fill(); g.stroke();
     }
@@ -462,6 +522,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
 
   /** Small white arrows down the pistes once the lines are wide enough. */
   function drawDownhill(sz, lw) {
+    if (isPainted()) { drawArrowheads(sz, lw); return; }
     if (lw < 3.3) return;
     const a = lw * 0.34, every = 64;
     g.strokeStyle = '#ffffff'; g.lineWidth = Math.max(1.1, lw * 0.24); g.lineCap = 'round'; g.lineJoin = 'round';
@@ -480,12 +541,33 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     g.stroke();
   }
 
+  /** Painted style: small arrowheads in the piste's colour on the thin lines, downhill, one per ARROW_PX of line (none on short bits). */
+  function drawArrowheads(sz, lw) {
+    const a = 2.6 + lw * 0.75, every = ARROW_PX;
+    g.lineJoin = 'round'; g.lineWidth = 1; g.strokeStyle = '#ffffff';
+    for (const [p, q] of sheet.geo.piste) {
+      if (!onScreen(q, sz, 0)) continue;
+      const L = q.len * view.s, n = Math.floor(L / every);
+      if (!n) continue;
+      g.fillStyle = isDone(p.x[0], p.z[0]) || mode !== 'freeride' ? DIFF[p.diff].css : SOFT[p.diff];
+      g.beginPath();
+      for (let i = 0; i < n; i++) {
+        const c = (L * (i + 0.5)) / n / view.s, [x, y] = toScreen(...lineAt(q, c), sz);
+        if (x < 0 || y < 0 || x > sz.w || y > sz.h) continue;
+        const [x2, y2] = toScreen(...lineAt(q, c + 3 / view.s), sz);
+        const d = Math.hypot(x2 - x, y2 - y) || 1, ux = (x2 - x) / d, uy = (y2 - y) / d;
+        g.moveTo(x + ux * a, y + uy * a); g.lineTo(x - ux * a * 0.7 - uy * a * 0.75, y - uy * a * 0.7 + ux * a * 0.75); g.lineTo(x - ux * a * 0.7 + uy * a * 0.75, y - uy * a * 0.7 - ux * a * 0.75); g.closePath();
+      }
+      g.stroke(); g.fill();
+    }
+  }
+
   /** The painting (and, zoomed in, the crisp trees and houses) on a layer a little larger than the view: panning only moves the layer,
    *  it is painted again when the view has settled or left it (a 2600 px picture scaled every frame is slow on a tablet). */
   function drawBase(sz, k, m) {
     const alpha = sheet.pano && classes ? smooth(DECOR_M[0], DECOR_M[1], m) : 0;
     if (alpha > 0) {
-      if (!decor) decor = createDecor({ pano: sheet.pano, resort, classes, height, buildingsUrl: `${root}buildings.json` });
+      if (!decor) decor = createDecor({ pano: sheet.pano, resort, classes, height, buildingsUrl: `${root}buildings.json`, painted: isPainted() });
       if (decor.idle) decor.build(() => { if (layer) layer.key = ''; requestDraw(); });
     }
     if (!sheet.ready) return;
@@ -573,10 +655,23 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     const signAlt = (x, y, r, fn) => ({ boxes: [boxAt(x, y, r * 2, r * 2, 1)], draw: fn });
     const inBox = (x, y, pad = 0) => x > pad && y > pad && x < sz.w - pad && y < sz.h - pad;
 
+    const paint = isPainted();
     for (const q of gd.places) {
       if (!q.big && m < 0.16) continue;
       const [x, y] = toScreen(q.X, q.Y, sz);
       if (!inBox(x, y)) continue;
+      if (paint && q.big) {                                                 // "SESTRIERE 2035 m": caps, the altitude smaller beside it
+        const text = q.text.toUpperCase(), f1 = `800 ${m < 0.06 ? 12 : 14}px ${FONT}`, f2 = `700 ${m < 0.06 ? 9.5 : 11}px ${FONT}`;
+        const alt = q.ele ? `${q.ele} m` : '', w1 = textWidth(text, f1), w2 = alt ? textWidth(alt, f2) + 4 : 0, tw = w1 + w2;
+        const villageAlt = (cx, cy) => ({ boxes: [boxAt(cx, cy, tw, 16)], draw: () => {
+          g.textAlign = 'left'; g.textBaseline = 'middle';
+          g.font = f1; haloText(g, text, cx - tw / 2, cy, VILLAGE_INK, '#ffffffee', 3.6);
+          if (alt) { g.font = f2; haloText(g, alt, cx - tw / 2 + w1 + 4, cy + 1, VILLAGE_INK, '#ffffffee', 3); }
+          g.textAlign = 'center';
+        } });
+        cands.push({ tier: 0, d: q.kind === 'town' ? -1 : 0, text, x, y, alts: [[0, 14], [0, -10], [0, 30], [-50, 22], [50, 22], [0, -26], [0, 46]].map(([dx, dy]) => villageAlt(x + dx, y + dy)) });
+        continue;
+      }
       const font = q.big ? `800 ${m < 0.06 ? 12.5 : 15}px ${FONT}` : `700 12px ${FONT}`, text = q.big ? q.text.toUpperCase() : q.text;
       cands.push({ tier: q.big ? 0 : 6, d: q.kind === 'town' ? -1 : 0, text, x, y, alts: [[0, 14], [0, -2], [0, 30], [-46, 22], [46, 22], [0, -20], [0, 46], [-70, 8], [70, 8]].slice(0, q.big ? 9 : 4).map(([dx, dy]) => textAlt(text, x + dx, y + dy, font, '#5a2f12', q.big ? 16 : 12)) });
     }
@@ -588,12 +683,12 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       if (m > 0.04) cands.push({ tier: 1, d: 1, needs: sign, text: name, x, y, alts: [textAlt(name, x + 14 + tw / 2, y - 12, font, VIOLET, 12), textAlt(name, x - 14 - tw / 2, y - 12, font, VIOLET, 12)] });
     }
     // lifts: the pictogram on the line, the name beside it
-    const badgeR = m < 0.055 ? 5.6 : m < 0.12 ? 7.4 : 9.2;
+    const badgeR = paint ? (m < 0.055 ? 4.4 : m < 0.12 ? 5.4 : 6.8) : m < 0.055 ? 5.6 : m < 0.12 ? 7.4 : 9.2;
     const liftOf = new Map(lifts.map((l) => [resort.lifts[l.index], l]));
     for (const [src, q] of gd.lift) {
       if (!onScreen(q, sz, 0)) continue;
       const L = q.len * s, l = liftOf.get(src), sel = !!l && l === liftSel && mode === 'freeride';
-      if (L < (m < 0.045 ? 56 : m < 0.12 ? 38 : 24) && !sel) continue;
+      if (L < (paint ? (m < 0.045 ? 70 : m < 0.12 ? 44 : 26) : m < 0.045 ? 56 : m < 0.12 ? 38 : 24) && !sel) continue;
       const alts = [];
       for (const t of [0.5, 0.4, 0.62, 0.28, 0.75]) {
         const [x, y] = toScreen(...lineAt(q, q.len * t), sz);
@@ -603,15 +698,16 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       const c = { tier: sel ? 1 : 2.5, d: near(alts[0].x, alts[0].y) - L * 0.8, text: '', key: `l${src.osm || ''}${q.xs[0]}`, x: alts[0].x, y: alts[0].y, alts, at: null };
       for (const a of alts) a.draw = () => { c.at = a; liftBadge(g, a.x, a.y, badgeR, q.sign, sel ? { bg: LIFT_PICK, fg: INK, ring: INK } : undefined); };
       cands.push(c);
-      if (!l || !(sel || L >= (m < 0.1 ? 120 : 64))) continue;
-      const text = /^\d[\d\s.]*$/.test(l.name) ? `Lift ${l.name}` : l.name, font = `700 11.5px ${FONT}`, tw = textWidth(text, font), o = badgeR + 5 + tw / 2;
+      if (!l || !(sel || L >= (paint ? (m < 0.1 ? 110 : 60) : m < 0.1 ? 120 : 64))) continue;
+      const text = /^\d[\d\s.]*$/.test(l.name) ? `Lift ${l.name}` : l.name, font = paint ? `600 10.5px ${FONT}` : `700 11.5px ${FONT}`, tw = textWidth(text, font), o = badgeR + 4 + tw / 2;
       cands.push({
         tier: sel ? 1 : 3.5, d: c.d, needs: c, text, x: c.x, y: c.y,
         get alts() { const a = c.at || c; return [[o, 0], [-o, 0], [o * 0.9, -13], [-o * 0.9, 13], [0, badgeR + 9]].map(([dx, dy]) => textAlt(text, a.x + dx, a.y + dy, font, INK, 12)); },
       });
     }
     // pistes: number discs on the line, names along it
-    const discR = m < 0.055 ? 6.4 : m < 0.14 ? 8 : 9.5, discFont = `800 ${m < 0.055 ? 8.5 : m < 0.14 ? 10 : 11.5}px ${FONT}`;
+    const discR = paint ? (m < 0.055 ? 5.6 : m < 0.14 ? 6.8 : 8) : m < 0.055 ? 6.4 : m < 0.14 ? 8 : 9.5;
+    const discFont = paint ? `800 ${m < 0.055 ? 7.5 : m < 0.14 ? 9 : 10.5}px ${FONT}` : `800 ${m < 0.055 ? 8.5 : m < 0.14 ? 10 : 11.5}px ${FONT}`;
     for (const p of pistes.list) {
       const q = gd.piste.get(p), L = q.len * s;
       if (!onScreen(q, sz, 0) || L < 30) continue;
@@ -619,7 +715,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       const [cx, cy] = toScreen((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, sz), d = near(cx, cy) - L * 0.7 + (q.minor ? 900 : 0);
       if (q.disc) {
         const tw = textWidth(q.disc, discFont);
-        const reps = L > 620 ? [0.5, 0.18, 0.82] : L > 300 ? [0.35, 0.8] : [0.5];
+        const reps = paint ? (L > 900 ? [0.5, 0.16, 0.84] : L > 420 ? [0.32, 0.78] : [0.5]) : L > 620 ? [0.5, 0.18, 0.82] : L > 300 ? [0.35, 0.8] : [0.5];
         for (const t0 of reps) {
           const alts = [];
           for (const dt of [0, 0.07, -0.07, 0.14, -0.14]) {
@@ -632,6 +728,12 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
         }
       }
       if (q.minor && m < 0.36 && !sel) continue;
+      if (paint) {                                                          // only real names, along longer lines, where there is room
+        if (!q.title || (!sel && L < (m < 0.06 ? 170 : m < 0.12 ? 100 : 60))) continue;
+        const font = `italic ${sel ? 800 : 700} ${m < 0.06 ? 10 : 11.5}px ${FONT}`, alts = alongAlts(q, q.title, font, DIFF[p.diff].css, 11.5, lw / 2 + 7, sz);
+        if (alts.length) cands.push({ tier: sel ? 1 : 4, d, text: `${q.title}${p.diff}`, x: cx, y: cy, alts });
+        continue;
+      }
       if (!sel && L < (m < 0.06 ? 96 : m < 0.12 ? 70 : 48)) continue;
       const font = `${sel ? 800 : 700} ${m < 0.055 ? 11 : 12.5}px ${FONT}`;
       const fill = DIFF[p.diff].css;
@@ -644,6 +746,11 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
         if (inBox(x, y)) alts.push(textAlt(name, x, y - lw / 2 - 9, font, fill, 12.5), textAlt(name, x, y + lw / 2 + 9, font, fill, 12.5));
       }
       if (alts.length) cands.push({ tier: sel ? 1 : 4, d, text: `${name}${p.diff}`, x: cx, y: cy, alts });
+    }
+    for (const q of gd.mids || []) {                                      // painted: mid stations
+      if (m < 0.05) continue;
+      const [x, y] = toScreen(q.X, q.Y, sz);
+      if (inBox(x, y, 6)) cands.push({ tier: 2.4, d: near(x, y), key: 'mid', gap: 14, text: '', x, y, alts: [signAlt(x, y, 4.5, () => midSign(g, x, y, 4.2))] });
     }
     for (const q of gd.landmarks) {
       const [x, y] = toScreen(q.X, q.Y, sz);
@@ -658,7 +765,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     gd.peaks.slice(0, many).forEach((q, i) => {
       const [x, y] = toScreen(q.X, q.Y, sz);
       if (!inBox(x, y)) return;
-      const text = `${q.name} ${Math.round(q.ele)} m`, font = `italic 600 ${i < 6 ? 12.5 : 11}px ${FONT}`;
+      const text = `${q.name} ${Math.round(q.ele)} m`, font = `italic 600 ${paint ? (i < 6 ? 11.5 : 10.5) : i < 6 ? 12.5 : 11}px ${FONT}`;
       const t = textAlt(text, x, y - 15, font, '#33405a', 12), b = textAlt(text, x, y + 11, font, '#33405a', 12);
       const withSign = (a) => ({ boxes: [...a.boxes, [x - 6, y - 8, x + 6, y + 3]], draw: () => { peakSign(g, x, y); a.draw(); } });
       cands.push({ tier: i < 6 ? 2.2 : 5, d: i, key: 'peak', gap: i < 6 ? 120 : 60, text, x, y, alts: [withSign(t), withSign(b)] });
@@ -985,6 +1092,14 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     const keep = (v, half, full) => (full > 2 * half ? clamp(v, half, full - half) : full / 2);
     return { s, x: keep(X, hx, sheet.w), z: keep(Y, hy, sheet.h) };
   }
+  /** Painted style: the whole area; in a tall, narrow box (iPad portrait beside the list) where the whole sheet would be a thin strip, a
+   *  little closer (PAINT_TALL_ZOOM) with his part of the panorama in the middle. */
+  function paintedOpenView() {
+    const { h } = size(), fill = (fitScale * sheet.h) / Math.max(1, h - FOOT_PX);
+    if (fill >= PAINT_MIN_FILL || !player) return wholeView(fitScale);
+    const s = fitScale * PAINT_TALL_ZOOM, [X] = sheet.to(player.x, player.z);
+    return { s, x: X, z: sheet.h / 2 + FOOT_PX / 2 / s };
+  }
   function centerOnPlayer(ms = ANIM_MS) {
     if (!player) return;
     animateTo(playerView(), ms);
@@ -1002,6 +1117,7 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     fit();
     if (at) { const [x, z] = sheet.to(clamp(at[0], 0, W), clamp(at[1], 0, D)); view = clampView({ x, z, s: m / sheet.k }); }
     box.dataset.mapview = sheet.id;
+    for (const el of paintKeys) el.hidden = !isPainted();
     if (viewBtn) { viewBtn.textContent = sheet.id === 'relief' ? '2D' : '3D'; viewBtn.title = sheet.id === 'relief' ? 'Vun uewen' : 'Pistekaart'; viewBtn.setAttribute('aria-label', viewBtn.title); }
     draw();
   }
@@ -1028,6 +1144,8 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     cancelAnimationFrame(anim); cancelAnimationFrame(frame); clearTimeout(resizeTimer); clearTimeout(settleTimer); ro.disconnect();
     dropSheet();
     ov.remove(); pulse.remove();
+    for (const el of paintKeys) el.remove();
+    if (painted && legendEl) legendEl.style.maxWidth = '';
     ov.width = ov.height = 0; canvas.width = canvas.height = 0;
     widthCache.clear();
   }
@@ -1046,7 +1164,8 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
       box.dataset.you = player ? '1' : '';
       if (player) {
         hold = true; setTimeout(() => { hold = false; }, 0);
-        view = clampView(playerView());
+        // painted style: the whole area first (like the printed panorama), "Du" marked on it; ◎ goes close to him
+        view = clampView(isPainted() ? paintedOpenView() : playerView());
         pulse.classList.remove('go'); void pulse.offsetWidth; pulse.classList.add('go');
       }
       draw();
@@ -1079,6 +1198,8 @@ export function createPisteMap({ canvas, resort, imageUrl, pistes, onPick, onPic
     },
     /** 'relief' (the panorama) | 'flat' (the plan). */
     setView, get view() { return sheet ? sheet.id : null; },
+    /** The panorama's style: 'painted' (Via Lattea test, 28 Nov 2026) or 'print'. */
+    get style() { return painted ? 'painted' : 'print'; },
     selectLift(l, center = false) { liftSel = l; if (center && l) focusBox(Math.min(l.top.x, l.bottom.x), Math.min(l.top.z, l.bottom.z), Math.max(l.top.x, l.bottom.x), Math.max(l.top.z, l.bottom.z), 1400); else draw(); },
     focusBox, liftAt,
     /** Map clarity: the piste drawn under a world point (within HIT_PX on screen), for the tap card. */

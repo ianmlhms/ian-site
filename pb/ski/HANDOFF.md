@@ -2739,3 +2739,29 @@ text list; the maps were read piece by piece (crops, zoom). OSM stays the geomet
 - **Added** (12): Arlberg `fang` 34 (OSM 100864552 + 29709866 + 1460164424), `piste-angerlift` (1385515395, 127 m), `furka-steinmahder-zugerberg` 220 (way 149174679: Zugerbergbahn top 2096 m -> the hairpin; this is the owner's "~100 m further to the hut": the track of 18 Feb runs exactly there; flat, 2 m drop, so it is a separate Variante, the old line is untouched). Davos `rinerhorn-3` (1584224459), `rinerhorn-18` Rennpiste (1584224460), `schatzalp-2` (abandoned-tagged way 1443367196, the 2025/26 map still draws blue 2), `gotschnaboden-klosters` 48 (ski ROUTE per the DKM map: highway=track Gotschnabodenweg ways, shortest path Gotschnaboden -> Klosters, 3.2 km, 463 m drop). Obertauern `sonnenlift-1-15e` (disused:piste:ref 15e, lies on the same corridor as 15d). Zermatt `baby-cretaz` 14, `riedweg-2a`, `howette-3` (OSM calls it Riedweg 3), `murmelbodmen-15b` (OSM 15b "Tufternkumme"; same corridors as existing Ried / Tuftern pistes). Sölden: `verbindung-38` (ref 80) renamed "Skiroute 80" (route 80 was already in the data under a link name).
 - **Still missing, and why**: no OSM geometry in any tag state and the official maps are panoramas (not geographic): Arlberg 150 Muggengrat, 307 Sichelmahd, 8 Gampbergloch, Piste Rauzlift, Piste Fun Slope (only a snow-park AREA), Paulis Abenteuerland / Sonnenkopf Übungshang (kids areas); Davos 4 Spina, 9 Heimeli - Langwies, 12 Meder (routes; OSM has only skitour lines that do not match), 16 Usser Isch Abfahrt (OSM ref 16 way exists but lies inside the black Usser Isch line); Obertauern 2e 3c 3f 3g 4c 6b 8c 8d 9c 10c 11b 11c 13a 13c 14c 15d 16f 18b 18c (short branches, no ways); Zermatt 10 Paradise, 19a, 30 Mittelritz + 31 Platte (routes), 75, 7bis, 16bis, 27 Snowpark piste, 5 Manca, 20 Skicross; Sölden routes 60 and 63 (tiny connectors at the Gaislachkogl mid station, not in OSM; the painted map is not north-up so no honest constructed line). A camera fit of the Intermaps / painted panoramas to the lifts would be the next step (earlier fit was 25 px / ~250 m off).
 - Checks: reach-check, deadend-check, cloud-size-test, goals-check, floors-check, check_site green; flow `ski-missing-pistes`; shots tool `scripts/ski/missing-piste-shots.mjs`.
+
+
+## Painted piste map (28 Nov 2026; owner, comparing with a classic painted resort panorama: "make the big map look like a hand-painted piste map"; a TEST on Via Lattea only; shots ~/Library/Caches/ski-work/painted-map/)
+The genre, our own rendering (no official artwork looked at for the drawing, traced or copied). Switch per resort: `resort.json panorama.style = 'painted'`
+(written by `scripts/ski/panorama.py STYLES`); every other resort has no `style` and draws exactly as before (map.js `isPainted()` gates every change; the
+2D plan is unchanged for Via Lattea too). To roll it out: add the resort id to `STYLES` (+ `PLACE_ELE` / `PLACES` if wanted), re-run `panorama.py <rid>`
+(≈ 60 s), check the camera with `--draft --lines`, then `gamedata_manifest.py` + `pano-check.mjs`.
+- **Painter** (`panorama.py`, `painted` branch): snow brighter with the shade as a blue hue (not a value), rock only on faces steeper than ~45° (lighter
+  warm grey, blue-grey shade), the forest floor nearly snow (0.45 of a pale grey-green) with single light tree stamps on it (one per 7 px, 60 %, smaller,
+  with a soft blue shadow), valleys outside the box pale, a pale sky gradient with faint clouds. Camera `CAMERAS["vialattea"] = {az 170, f0 .76, f1 .58, E 1.55}`:
+  from above the Susa valley looking south, one long panorama (Pragelato / Sauze d'Oulx left-front, Sestriere, Sansicario / Cesana in the middle, Claviere /
+  Montgenèvre right), 1.76:1. The old az 105 was 1.32:1 with Montgenèvre in front. 2324 x 1324 (3.1 Mpx, was 4.2), 292 KB WebP (quality ~33: the
+  trees are expensive; the size loop shrank it). pano-check: 100 % on the page, 99.39 % visible.
+- **map.js** (painted only): opens on the WHOLE area (`paintedOpenView`: fit; in a tall narrow box, iPad portrait beside the list, where the sheet would
+  fill < 60 % of the height: 2.2x the fit centred on him); ◎ still goes close to him, the pulse / "Du" / view cone as before. Thinner piste lines
+  (1.7-4.6 px) with small arrowheads in the piste colour every 92 px; number badges from the ref or the name (`pisteNumber`: "9 alta" -> 9, "KN alta" ->
+  KN, "Schwaarz 36" -> 36), smaller; names only when they are more than a number (`pisteTitle`: "3 Fournéous" -> Fournéous, "92 alta (3)" -> none),
+  italic, along lines ≥ 170 / 100 / 60 px only; lifts thinner with small black station dots, smaller badges, names 10.5 px on longer lines; villages
+  «SESTRIERE 2035 m» (navy caps + altitude: `panorama.ele` official values, else the ground height rounded to 5 m; `panorama.places` adds Sansicario,
+  which OSM lacks; a ski village behind a ridge keeps its name: Claviere); mid stations (a lift top ≤ 15 m from the next lift's bottom) = small framed
+  squares; the legend line gets Gondel / Sesselbunn / Schlepplift symbols on a second row (max 400 px, never under the compass), its list
+  «Tëschestatioun». No restaurants: the data has no huts. Labels go through the same collision grid (no overlaps; more appear zoomed in).
+- `map-decor.js`: `createDecor({ painted })`: the crisp zoomed-in trees use the same lighter stamps and density as the painting.
+- **Checks**: flow `ski-painted-map` (whole on open, "Du" on it, ◎, piste tap card, 2D unchanged, «Bei den éischte Lift», the lift map, Killy
+  unchanged) Chromium PASS. map-memory vialattea x10: heap +0.49 MB, nodes / listeners +0. pano-shots: open 80-85 ms (before 86-105), pan frame
+  16.5 ms (before 16.5-21), draw 0.5-1.1 ms. WebKit (after the lib.mjs retry fix): ski + ski-painted-map PASS (the first painted-map try timed out in page.goto, the retry passed); shot painted-map/flow-webkit-*.png. Real iPad untested.

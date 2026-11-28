@@ -5,6 +5,7 @@ export const LIFT_PICK = '#ffc400';
 export const YOU = '#ff6a00';              // the skier's marker: no piste colour, no lift black
 export const VIOLET = '#6b3fa0';
 export const FONT = 'Geist, system-ui, sans-serif';
+export const VILLAGE_INK = '#1f2d4d';     // painted style: village names (navy, like the print)
 
 /** Undiscovered pistes are printed in a softer ink of the same colour. */
 export const SOFT = Object.freeze({ green: '#58b471', blue: '#588ae4', red: '#e1635a', black: '#5d6168' });
@@ -114,6 +115,13 @@ export function landmarkSign(g, x, y, r = 7) {
   g.closePath();
   g.lineJoin = 'round'; g.lineWidth = 3.4; g.strokeStyle = '#ffffff'; g.stroke();
   g.fillStyle = VIOLET; g.fill();
+}
+
+/** A mid station (painted style): a small white square with an ink frame on the station. */
+export function midSign(g, x, y, r) {
+  g.fillStyle = '#ffffff'; g.strokeStyle = INK; g.lineWidth = 1.6;
+  g.beginPath(); g.rect(x - r, y - r, r * 2, r * 2); g.fill(); g.stroke();
+  g.fillStyle = INK; g.fillRect(x - r * 0.35, y - r * 0.35, r * 0.7, r * 0.7);
 }
 
 export function peakSign(g, x, y) {
