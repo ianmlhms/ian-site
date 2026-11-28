@@ -1192,7 +1192,7 @@ async function boot() {
       const loadU = path.shuttle ? null : path.upU(Math.min(RIDE.enter[site.key], path.len * 0.2));
       const after = crowd && npcLive ? crowd.lineInfo(lift.index).after : 0;          // lift lines: after the group ahead of him
       const next = loadU === null ? null : view.nextCarrier(lift.index, loadU, path.spec.speed * Math.max(1.6, after));
-      ride = createRide({ lift, path, site, height, from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
+      ride = createRide({ lift, path, site, height, beltHeight: (x, z) => field.height(x, z), from: { x: st.x, z: st.z, heading: st.heading }, startU: next ? next.u : null, shuttle: path.shuttle ? view.shuttleBoard(lift.index) : null,
         chainNext: modes.lifts.sectionAfter(lift), stops: stopsFor(lift, height, tree), exitAt: () => modes.lifts.world.exitOf(lift.index, height, tree, pistes.list) });
     }
     carrier = createCarrier({ scene, kind: path.kind, seats: path.seats, sub: path.sub, doorSide: path.sign, src: path.src });      // (the door on the boarding side)

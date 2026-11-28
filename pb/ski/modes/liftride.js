@@ -12,7 +12,7 @@
  *           in. Then he stands still (main.js holds him at 0 km/h until the player steers or pushes)
  * The ride state that goes on the wire (multiplayer: a friend on the same lift sits in his own chair) is { lift index, s, kind } while
  * he is on the carrier. The camera: 'chase' = third person beside / behind, 'window' = from the rider's eyes along the line. */
-import { LIFT_SPEC, carrierBox, CARPET_FACTOR } from '../lift-path.js';
+import { LIFT_SPEC, carrierBox, CARPET_FACTOR, BELT_TOP } from '../lift-path.js';
 import { BOARD, UNLOAD, stationCrawl } from '../lift-site.js';
 
 export const RIDE = Object.freeze({
@@ -160,7 +160,7 @@ export function riderAt(path, s, height, out = {}, down = false) {
   out.s = s; out.heading = c.heading; out.pitch = 0; out.roll = out.roll || 0;
   out.cx = c.x; out.cz = c.z;
   if (k === 'train') { out.cy = c.y; out.pitch = Math.atan(path.slope(s)); }
-  else if (k === 'carpet') out.cy = height(c.x, c.z) + 0.18;
+  else if (k === 'carpet') out.cy = height(c.x, c.z) + BELT_TOP;
   else out.cy = c.y;
   if (k === 'drag') {
     const lat = path.sub === 'rope' ? -0.45 * path.sign : 0;       // a rope tow: the rope at his outer hand
@@ -215,7 +215,10 @@ function rodHand(w, cx, cy, cz, hip) {
  */
 // R8e (3V QA: a cable car boarded with no cabin at the bottom station): shuttle = lifts.js shuttleBoard(): the boarding waits until the
 // scheduled up-track cabin has come down and docked (the cabin drawn coming in), never a cabin out of nowhere
-export function createRide({ lift, path, site: siteIn, height, factor = RIDE.factor, from = null, startU = null, exitAt = null, shuttle = null, through = false, chainNext = null, stops = null, fromStop = null }) {
+export function createRide({ lift, path, site: siteIn, height, factor = RIDE.factor, from = null, startU = null, exitAt = null, shuttle = null, through = false, chainNext = null, stops = null, fromStop = null, beltHeight = null }) {
+  // standing lifts (28 Nov 2026): a carpet rider stands on the DRAWN belt (beltHeight = the ground lifts.js lays it on), not on the
+  // drawn snow, which can lie 15 cm off it (Killy Snowtubing); walking on / off it uses height as before
+  const rideH = path.kind === 'carpet' && beltHeight ? beltHeight : height;
   const k = path.kind;
   const [s0Line, s1] = rideSpan(path);
   // Mid stations: boarding at a train's stop (the frame, the waiting spot and the loading line of the stop stand in for the bottom's) /
@@ -226,7 +229,7 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
   const carry = CARRY.has(k);
   const start = from || site.wait;
   const load = site.load;
-  const seatAt0 = riderAt(path, s0, height, {});
+  const seatAt0 = riderAt(path, s0, rideH, {});
   const doorSpot = (f, a, side) => doorSpotOf(path, f, a, side);
   // the boarding timeline
   const tStep = carry ? RIDE.stepOut : 0;
@@ -348,7 +351,8 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
         grounded: true, air: 0, crash: 0, tuck: 0, brake: 0, edge: 0, steer: 0, slip: 0, landed: 0, spin: 0, flip: 0, grab: 0, rail: -1, ride: w.pose, walk: w.walk || 0 };
       st.dragHand = k === 'drag' && (w.onCarrier || w.grab) && w.hand ? w.hand : null;      // R8e: the hand on the rod (skier-model.js poseDrag)
       // standing lifts (28 Nov 2026): on a carpet the skis lie on the belt: its pitch here (skier-model.js: a plane through his feet)
-      if (k === 'carpet' && w.onCarrier) st.beltPitch = Math.atan(path.slope(Math.max(0, Math.min(path.len, s)))); else delete st.beltPitch;
+      // (its pitch from the ground it is laid on, 0.8 m ahead / behind: what the drawn belt does there; the line's own slope is a chord)
+      if (k === 'carpet' && w.onCarrier) { const fx = Math.cos(w.heading) * 0.8, fz = Math.sin(w.heading) * 0.8; st.beltPitch = Math.atan2(rideH(w.x + fx, w.z + fz) - rideH(w.x - fx, w.z - fz), 1.6); } else delete st.beltPitch;
       if (w.onCarrier) { st.rideLift = lift.index; st.rideS = s; st.rideKind = KIND_CODE[k]; }
       else { delete st.rideLift; delete st.rideS; delete st.rideKind; }
       return st;
@@ -359,7 +363,7 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
   };
   function beginAlight(stop = null) {
     phase = 'alight';
-    const inCar = riderAt(path, stop ? stop.s : s1, height, {});
+    const inCar = riderAt(path, stop ? stop.s : s1, rideH, {});
     const off = stop ? stop.off : site.off;
     const ex = (stop ? stop.exitAt && stop.exitAt() : exitAt && exitAt()) || { x: off.x, z: off.z, heading: inCar.heading };
     const tOut = k === 'drag' || k === 'carpet' ? 0.5 : RIDE.getOut;
@@ -384,7 +388,7 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
     const w = pose;
     w.onCarrier = false; w.walk = 0; w.glide = 0; w.boardCam = null; w.doorCam = null; w.doorK = 0; w.grab = false; w.barK = 1;
     if (phase === 'ride' || phase === 'through' || (phase === 'board' && t >= tArrive)) {
-      riderAt(path, s, height, w);
+      riderAt(path, s, rideH, w);
       w.onCarrier = true; w.pose = POSE_OF[k];
       w.barK = barK(); w.barDown = w.barK < 0.5;
       if (cab && phase === 'ride' && tRide < 1.2 && !through) w.doorCam = cab.cam;                  // (the camera eases out of the door view)
@@ -400,7 +404,7 @@ export function createRide({ lift, path, site: siteIn, height, factor = RIDE.fac
       // the carrier comes in; the rider steps out of his skis (cabins), walks / skates to the loading line, gets in as it arrives
       const cu = boardU(t);
       const cb = cabin(t), c = path.shuttle ? path.shuttleAt(cb.s, 1, cb.up, {}) : path.loopAt(cu, {});
-      w.cx = c.x; w.cz = c.z; w.cy = k === 'carpet' ? height(c.x, c.z) + 0.18 : c.y; w.heading = c.heading; w.pitch = k === 'train' ? Math.atan(path.slope(s0)) : 0;
+      w.cx = c.x; w.cz = c.z; w.cy = k === 'carpet' ? rideH(c.x, c.z) + BELT_TOP : c.y; w.heading = c.heading; w.pitch = k === 'train' ? Math.atan(path.slope(s0)) : 0;
       w.barDown = false;
       w.hip = undefined;
       if (cab) { cab.rider(t, w); return w; }
