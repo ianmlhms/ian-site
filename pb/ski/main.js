@@ -510,12 +510,14 @@ async function boot() {
   // ---- round 6: ski types (physics per type; timed / scored runs use the reference set: modes/skis.js FAIRNESS) ----
   let skiType = DEFAULT_SKI;
   const fairNow = () => isRace() || game.mode === MODES.run || game.mode === MODES.park;
+  const isBoard = () => !!(SKI_BY_ID.get(skiType) || {}).board;
   function applySkiPhysics() { world.ski = skiParams(skiType, fairNow()); document.documentElement.dataset.skiPhysics = fairNow() ? 'fair' : skiType; }
   function setSki(id, save = true) {
     const t = SKI_BY_ID.get(id);
     if (!t || !skiOpen(id, modes.skiStats())) return false;
     skiType = id;
     skier.setSki(t.look);
+    skier.setBoard(!!t.board); ghostModel.setBoard(!!t.board);              // 28 Nov 2026: the snowboard
     if (typeof fp !== 'undefined' && fp) fp.setLook(t.look);                 // R7-C: the first-person skis
     applySkiPhysics();
     document.documentElement.dataset.skiType = id;
@@ -580,7 +582,7 @@ async function boot() {
   function openSkiCard() {
     if (skiCard) return;
     game.paused = true; input.setEnabled(false);
-    skiCard = showSkiCard(document.getElementById('ui'), { stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) hud.toast(`Ski: ${SKI_BY_ID.get(id).name}`); }, onClose: () => { skiCard = null; game.paused = false; input.setEnabled(game.phase === 'running'); } });
+    skiCard = showSkiCard(document.getElementById('ui'), { stats: modes.skiStats(), selected: skiType, onPick: (id) => { if (setSki(id)) hud.toast(SKI_BY_ID.get(id).board ? SKI_BY_ID.get(id).name : `Ski: ${SKI_BY_ID.get(id).name}`); }, onClose: () => { skiCard = null; game.paused = false; input.setEnabled(game.phase === 'running'); } });
   }
   // ---- round 6: the challenge start gates on the mountain ----
   markers = createMarkers({ scene, list: markerList(pistes, parkLayout, gateAt), height: (x, z) => surface.height(x, z), overlay: document.getElementById('ui'), starsOf: (m) => (m.piste ? pisteStars(store.get(), rid, m.piste.id) : 0) });
@@ -1782,6 +1784,7 @@ async function boot() {
     mp = createMp({ ctx: mpCtx, host: {
       game, rid, pistes, streamer, terrain, surface, scene, camera, canvas, env, hud, input, audio, chase, uiRoot: document.getElementById('ui'),
       outfit: () => outfit, level: () => level, startRun: (p, lateral) => startRun(p, MODES.run, lateral),
+      board: () => isBoard(),                                                 // 28 Nov 2026: the others see my snowboard (wire flag 8)
       setView: (pose) => { game.camPose = pose; },                           // a spectator's overview camera (net/spectate.js); null = the chase camera again
       // R7-D: a friend on a lift is drawn in his carrier even before this device rode one (the lift view is built early, once)
       liftPath: (i) => { if (!lifts) buildLifts(); return lifts ? lifts.pathOf(i) : null; },

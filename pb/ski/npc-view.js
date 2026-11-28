@@ -7,15 +7,16 @@
  * two of them per instance (aPose = pose A, pose B, blend, outfit) and paints the outfit's colours (OUTFITS) into the jacket / accent /
  * trousers / helmet / ski parts. No name tags. A skier who appears or goes close to the camera grows / shrinks in 0.25 s (no pop). */
 import { createSkierModel, OUTFITS, slotOutfitIndex } from './skier-model.js';
-import { POSE, POSE_COUNT, OUTFIT_COUNT } from './npc.js';
+import { POSE, POSE_COUNT, OUTFIT_COUNT, BOARD_POSE } from './npc.js';
 import { NPC } from './config.js';
 import { riderAt } from './modes/liftride.js';
 
 const THREE = window.THREE;
 const TEX_W = 1024;
 
-/** The states the poses are baked from (flat snow, heading +x). */
+/** The states the poses are baked from (flat snow, heading +x); p >= BOARD_POSE: the same pose on a snowboard. */
 function poseState(p) {
+  if (p >= BOARD_POSE) p -= BOARD_POSE;
   const s = { x: 0, y: 0, z: 0, heading: 0, speed: 10, edge: 0, tuck: 0.12, brake: 0, stop: 0, grounded: true, air: 0, crash: 0, landed: 0, vx: 10, vy: 0, vz: 0, ride: '', walk: 0 };
   if (p === POSE.carveL) { s.edge = -0.9; s.speed = 14; s.tuck = 0.1; }
   else if (p === POSE.carveR) { s.edge = 0.9; s.speed = 14; s.tuck = 0.1; }
@@ -47,6 +48,7 @@ export function bakeFigure(detail) {
   const visibleUp = (o) => { for (let q = o; q && q !== group; q = q.parent) if (!q.visible) return false; return true; };
   for (let p = 0; p < POSE_COUNT; p++) {
     const st = poseState(p);
+    if ((p >= BOARD_POSE) !== model.board) model.setBoard(p >= BOARD_POSE);      // 28 Nov 2026: the board poses (skis + poles fold away)
     for (let i = 0; i < 50; i++) model.pose(st, flat, i * 0.1 + p * 10, ground);     // settles every smoothed driver of pose()
     group.updateMatrixWorld(true);
     let base = 0;
@@ -87,7 +89,7 @@ export function bakeFigure(detail) {
   geometry.setAttribute('aSlot', new THREE.BufferAttribute(slot, 1));
   geometry.setIndex(idx);
   geometry.computeBoundingSphere();
-  // 28 Nov 2026: half floats: ~1 mm at the figure's 2 m, half the memory of the float texture
+  // 28 Nov 2026: half floats (the board poses doubled the rows): ~1 mm at the figure's 2 m, half the memory of the float texture
   const half = new Uint16Array(data.length);
   for (let i = 0; i < data.length; i++) half[i] = THREE.DataUtils.toHalfFloat(data[i]);
   const tex = new THREE.DataTexture(half, TEX_W, rows, THREE.RGBAFormat, THREE.HalfFloatType);

@@ -128,12 +128,26 @@ ok(T.powder.powder > AM.powder + 5, `Powder floats off piste (${T.powder.powder.
 ok(T.powder.piste < AM.piste - 2, `Powder is slow on the hard piste (${T.powder.piste.toFixed(1)} vs ${AM.piste.toFixed(1)} km/h)`);
 ok(T.park.spin > AM.spin * 1.1 && T.park.landing > AM.landing * 1.1 && T.park.piste < AM.piste, `Park twin-tip spins easier, lands softer, is slower (${T.park.piste.toFixed(1)} km/h)`);
 ok(skiParams('race', true) === SKI && skiParams('powder', true) === SKI, 'fair runs: every ski = the reference set');
+// 28 Nov 2026: the snowboard: carves on its edges, floats in powder, no poles (shuffles slowly on a flat), fair runs = the reference
+function flatPush(ski, seconds = 10) {            // standing on a flat, pushing (skating / shuffling): km/h after `seconds`
+  const w = slopeWorld(0, 1, ski);
+  let s = { ...createSkierState(0, 0, 0, 0), hold: 0 };
+  for (let i = 0; i < seconds / SKI.dt; i++) s = stepSkier(s, { steer: 0, tuck: 0, brake: 0, push: 1, jump: false }, w);
+  return s.speed * 3.6;
+}
+const SB = T.snowboard, flatAM = flatPush(skiParams('allmountain')), flatSB = flatPush(skiParams('snowboard'));
+console.log(`flat push 10 s: All-Mountain ${flatAM.toFixed(1)} km/h, Snowboard ${flatSB.toFixed(1)} km/h`);
+ok(SKI_TYPES.find((t) => t.id === 'snowboard').board === true && SKI_TYPES.find((t) => t.id === 'snowboard').look.board === true, 'the snowboard is a board (model + look)');
+ok(SB.turn < AM.turn * 0.95, `Snowboard carves on its edges (${SB.turn.toFixed(2)} vs ${AM.turn.toFixed(2)} s for 90°)`);
+ok(SB.powder > AM.powder + 3, `Snowboard floats in powder (${SB.powder.toFixed(1)} vs ${AM.powder.toFixed(1)} km/h)`);
+ok(flatSB < 9 && flatSB > 3 && flatAM > flatSB * 2, `no poles: on a flat the board shuffles slowly (${flatSB.toFixed(1)} km/h vs skating ${flatAM.toFixed(1)} km/h)`);
+ok(skiParams('snowboard', true) === SKI, 'fair runs: the snowboard rides the reference set too (one list)');
 ok(Object.isFrozen(SKI) && SKI.cdaTuck === 0.42, 'config.js SKI is never touched');
 
 /* ---------------- unlocks, saves ---------------- */
 const fresh = emptyProgress();
 const st0 = skiStatsOf(fresh, 0);
-ok(SKI_TYPES.filter((t) => skiUnlock(t, st0).open).map((t) => t.id).join() === 'allmountain', 'a new player: only the All-Mountain ski');
+ok(SKI_TYPES.filter((t) => skiUnlock(t, st0).open).map((t) => t.id).join() === 'allmountain,snowboard', 'a new player: the All-Mountain ski and the snowboard');
 const p1 = addSkiStats(fresh, { off: 10200, top: 26 });
 ok(p1 !== fresh && fresh.stats.off === 0 && p1.stats.off === 10200, 'addSkiStats returns a NEW progress');
 const st1 = skiStatsOf({ ...p1, park: { killy: 5200 } }, 31);
@@ -144,6 +158,7 @@ ok(saved.stats.off === 10200 && saved.ski === 'powder' && normalize({ v: 1, best
 const rec = encodeCloud({ ...p1, stars: { 'killy/abcde': 7 }, park: {}, bestHash: {}, ski: 'carving' });
 const back = decodeCloud(JSON.parse(JSON.stringify(rec)));
 ok(back.stats.off === 10200 && Math.abs(back.stats.top - 26) < 0.11 && back.ski === 'carving' && back.stars['killy/abcde'] === 7, 'cloud record: stats + ski round-trip, stars kept');
+ok(decodeCloud(JSON.parse(JSON.stringify(encodeCloud({ ...p1, stars: {}, park: {}, bestHash: {}, ski: 'snowboard' })))).ski === 'snowboard', 'cloud record: the snowboard round-trips');
 const old = decodeCloud({ v: 1, tb: 3, s: { killy: 'zzzzz7' }, p: {}, b: {} });
 ok(old && old.stats.off === 0 && old.stars['killy/zzzzz'] === 7, 'an old cloud record (no x) still reads');
 const merged = mergeCloud({ ...fresh, stats: { off: 50, top: 30 } }, back);
@@ -157,6 +172,11 @@ ok(a.length === 19 && u.ride === 'sit' && u.rideLift === 12 && u.rideKind === 1 
 const plain = packState({ ...rs, ride: '' }, 0, false);
 ok(plain.length === 16 && !unpackState(plain).ride, 'not riding: the old 16 numbers');
 ok(!unpackState([...plain.slice(0, 8), 4 | 1, ...plain.slice(9), 9, 1, 1]).ride, 'a bad kind code is ignored');
+// 28 Nov 2026: the snowboard flag (8): set only when asked, read back, never confused with riding; an old sender never sets it
+const boardA = packState({ ...rs, ride: '' }, 0, false, true), boardR = packState(rs, 0, false, true);
+ok(boardA.length === 16 && (boardA[8] & 8) === 8 && unpackState(boardA).board === true && !unpackState(boardA).ride, 'a snowboarder: flag 8, still the 16 numbers');
+ok(unpackState(boardR).board === true && unpackState(boardR).ride === u.ride && unpackState(plain).board === false, 'board + riding together; skis read as no board');
+ok((boardA[8] & 1) === (plain[8] & 1) && (boardA[8] & ~8) === plain[8], 'the other flags unchanged (an old client ignores bit 8)');
 
 console.log(`${checks - fails} / ${checks} checks green`);
 process.exit(fails ? 1 : 0);

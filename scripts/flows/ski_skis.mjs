@@ -27,15 +27,16 @@ export const flow = {
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
     const toMap = () => page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 30000 });
 
-    h.step("the Skier tab: five skis, only the All-Mountain open");
+    h.step("the Skier tab: five skis + the snowboard, only the All-Mountain and the snowboard open");
     await h.goto("/pb/ski.html?resort=killy&map=1&debug=1&bot=1&timescale=8&q=low");
     await toMap();
     await page.click('.modetabs [data-mode="skis"]');
     await page.waitForSelector(".skicard");
     const cards = await page.$$eval(".skicard", (c) => c.map((x) => ({ id: x.dataset.ski, locked: x.classList.contains("locked"), sel: x.classList.contains("sel"), lock: (x.querySelector(".lock") || {}).textContent || "" })));
-    h.eq(cards.map((c) => c.id), ["allmountain", "carving", "race", "powder", "park"], "five ski types");
-    h.expect(cards[0].sel && !cards[0].locked && cards.slice(1).every((c) => c.locked), "All-Mountain picked, the other four locked");
-    h.expect(/10 ★/.test(cards[1].lock) && /30 ★.*90 km\/h/.test(cards[2].lock) && /10 km/.test(cards[3].lock) && /5.000 Punkten/.test(cards[4].lock), `what they need: ${cards.slice(1).map((c) => c.lock.replace("🔒 ", "")).join(" | ")}`);
+    h.eq(cards.map((c) => c.id), ["allmountain", "carving", "race", "powder", "snowboard", "park"], "five ski types + the snowboard (28 Nov 2026)");
+    const by = Object.fromEntries(cards.map((c) => [c.id, c]));
+    h.expect(by.allmountain.sel && !by.allmountain.locked && !by.snowboard.locked && ["carving", "race", "powder", "park"].every((id) => by[id].locked), "All-Mountain picked, the snowboard open from the start, the other four locked");
+    h.expect(/10 ★/.test(by.carving.lock) && /30 ★.*90 km\/h/.test(by.race.lock) && /10 km/.test(by.powder.lock) && /5.000 Punkten/.test(by.park.lock), `what they need: ${cards.filter((c) => c.locked).map((c) => c.lock.replace("🔒 ", "")).join(" | ")}`);
     h.expect(/fair/.test(await page.textContent(".fairnote")), "the fairness note is on the tab");
     await h.shot("skis-locked");
 

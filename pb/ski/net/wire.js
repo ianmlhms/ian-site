@@ -1,6 +1,7 @@
 /* The wire format of one skier state (pure: Node tests import it; remotes.js re-exports it). 16 numbers, and since round 6 three more
  * while the player rides a lift ("riding lift X at s": the kind code of modes/liftride.js KIND_CODE, the lift's index in resort.json
- * lifts, metres along its line), so a friend on the same lift is drawn in his own chair / cabin. An old client sends 16 (never riding). */
+ * lifts, metres along its line), so a friend on the same lift is drawn in his own chair / cabin. An old client sends 16 (never riding).
+ * 28 Nov 2026: flag 8 = he rides a snowboard (an old client ignores the bit and draws skis; an old sender never sets it). */
 const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const num = (v, d = 0) => (Number.isFinite(v) ? v : d);
@@ -9,14 +10,15 @@ const TAU = Math.PI * 2;
 /** any finite angle into [-pi, pi) in constant time (security: a while-loop on 1e300 never ends; % is exact even for huge values) */
 export const wrapAngle = (a) => { const r = a % TAU; return r >= Math.PI ? r - TAU : r < -Math.PI ? r + TAU : r; };
 export const RIDE_FLAG = 4;
+export const BOARD_FLAG = 8;
 const MAX_FIELDS = 19;
 const POSE_OF_CODE = { 1: 'sit', 2: 'carry', 3: 'carry', 4: 'drag', 5: 'carry', 6: 'belt' };      // R7-B: skis on the shoulder in cabins; 6 = carpet
 // ride down: the kind code + 10 (liftride.js DOWN_CODE; drag lifts / carpets never go down)
 POSE_OF_CODE[11] = 'sit'; POSE_OF_CODE[12] = 'carry'; POSE_OF_CODE[13] = 'carry'; POSE_OF_CODE[15] = 'carry';
 
-export function packState(st, progress, finished) {
+export function packState(st, progress, finished, board = false) {
   const riding = !!st.ride && Number.isInteger(st.rideLift);
-  const flags = (st.grounded ? 1 : 0) | (finished ? 2 : 0) | (riding ? RIDE_FLAG : 0);
+  const flags = (st.grounded ? 1 : 0) | (finished ? 2 : 0) | (riding ? RIDE_FLAG : 0) | (board ? BOARD_FLAG : 0);
   const a = [r2(st.x), r2(st.y), r2(st.z), r3(st.heading), r2(st.speed), r3(st.edge), r2(st.tuck), r2(st.brake), flags, r2(st.air || 0), r2(st.crash || 0), r2(st.landed || 0), Math.round(progress || 0), r2(st.vx || 0), r2(st.vz || 0), r2(st.vy || 0)];
   if (riding) a.push(st.rideKind | 0, st.rideLift | 0, Math.round((st.rideS || 0) * 10) / 10);
   return a;
@@ -30,6 +32,7 @@ export function unpackState(a) {
     tuck: Math.max(0, Math.min(1, num(v[6]))), brake: Math.max(0, Math.min(1, num(v[7]))), grounded: (v[8] & 1) === 1, finished: (v[8] & 2) === 2,
     air: clamp(num(v[9]), 0, 30), crash: Math.max(0, Math.min(3, num(v[10]))), landed: Math.max(0, Math.min(1, num(v[11]))), progress: clamp(num(v[12]), 0, 1e5),
     vx: Math.max(-60, Math.min(60, num(v[13]))), vz: Math.max(-60, Math.min(60, num(v[14]))), vy: Math.max(-60, Math.min(60, num(v[15]))),
+    board: (v[8] & BOARD_FLAG) === BOARD_FLAG,
   };
   if ((v[8] & RIDE_FLAG) && v.length >= 19 && POSE_OF_CODE[v[16]] && Number.isInteger(v[17]) && v[17] >= 0 && v[17] < 4096 && Number.isFinite(v[18])) {
     st.ride = POSE_OF_CODE[v[16]]; st.rideKind = v[16]; st.rideLift = v[17]; st.rideS = Math.max(0, Math.min(1e5, v[18]));

@@ -33,7 +33,15 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** The poses npc-view.js bakes (one row of its pose texture each); a drawn skier blends two of them. */
 export const POSE = Object.freeze({ ski: 0, carveL: 1, carveR: 2, tuck: 3, plough: 4, stand: 5, sit: 6, cabin: 7, walkA: 8, walkB: 9, drag: 10 });
-export const POSE_COUNT = 11;
+/** 28 Nov 2026: every pose again on a snowboard (pose + BOARD_POSE: riding / heel side / toe side / crouch / skid / standing on it,
+ *  the board off the front foot on a chair, in the hand in a cabin and walking, on a drag lift). */
+export const BOARD_POSE = 11;
+export const POSE_COUNT = 22;
+/** Is this person a snowboarder? u = his own random number 0..1 (NPC.boardShare of them are). */
+export const isBoarder = (u) => u < NPC.boardShare;
+/** a person's raw outfit number (lift-queue.js outfitOf: 0..999) as his board coin: the same person in the line and on the chair */
+const boardCoin = (raw) => ((raw * 7919 + 13) % 1000) / 1000;
+const boardOf = (o, on) => { if (on) { o.poseA += BOARD_POSE; o.poseB += BOARD_POSE; } o.board = !!on; return o; };
 export const OUTFIT_COUNT = 10;                     // skier-model.js OUTFITS (all of them, the star ones too)
 
 /** The identity of a loop carrier (lifts.js): its lattice slot, constant while it travels once round the loop. */
@@ -214,7 +222,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       skiers.push({
         id: (pIndex.get(p) + 1) * 4096 + i, i, skill, v, k: S.k, amp, len: lerp(S.len[0], S.len[1], r(10)), phase: r(11) * Math.PI * 2, lane,
         stopS, stopSide, stopFor, stopLane: stopSide * Math.max(0, hw - 3.5), rest, lineT, period, t0: r(12) * period,
-        outfit: Math.floor(r(13) * OUTFIT_COUNT) % OUTFIT_COUNT, active: r(14), scale: lerp(0.9, 1.06, r(15)),
+        outfit: Math.floor(r(13) * OUTFIT_COUNT) % OUTFIT_COUNT, active: r(14), scale: lerp(0.9, 1.06, r(15)), board: isBoarder(r(16)),
       });
     }
     pop = { p, skiers, T, f, n };
@@ -396,7 +404,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       if (blocked(w.x, w.z, NPC.bodyR + 0.25) || (liftNet.world.hit(w.x, w.z, NPC.bodyR + 0.25) !== null)) continue;
       if (out.some((q) => Math.hypot(q.x - w.x, q.z - w.z) < 1.05)) continue;
       const i = out.length;
-      out.push({ id: 2e6 + index * 64 + i, index, x: w.x, z: w.z, heading: site.wait.heading + (rand01(seed, ls, i, 5) - 0.5) * 0.7, outfit: Math.floor(rand01(seed, ls, i, 6) * OUTFIT_COUNT) % OUTFIT_COUNT, share: rand01(seed, ls, i, 7), phase: rand01(seed, ls, i, 8) * 6.28, scale: lerp(0.9, 1.06, rand01(seed, ls, i, 9)) });
+      out.push({ id: 2e6 + index * 64 + i, index, x: w.x, z: w.z, heading: site.wait.heading + (rand01(seed, ls, i, 5) - 0.5) * 0.7, outfit: Math.floor(rand01(seed, ls, i, 6) * OUTFIT_COUNT) % OUTFIT_COUNT, share: rand01(seed, ls, i, 7), phase: rand01(seed, ls, i, 8) * 6.28, scale: lerp(0.9, 1.06, rand01(seed, ls, i, 9)), board: isBoarder(rand01(seed, ls, i, 10)) });
     }
     return out;
   }
@@ -446,7 +454,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       for (let i = 0; i < n; i++) {
         const rr = (k) => rand01(seed, 9001, ri, i, k);
         const side = (rr(1) < 0.5 ? -1 : 1) * Math.max(0.8, Math.min(r.hw * 0.55, r.hw - 0.9));
-        const wk = { id: 3e6 + ri * 8 + i, road: r, cum, L, side, v: lerp(1.05, 1.45, rr(2)), t0: rr(3) * 1000, outfit: Math.floor(rr(4) * OUTFIT_COUNT) % OUTFIT_COUNT, share: rr(5), scale: lerp(0.9, 1.06, rr(6)), x: mid[0], z: mid[1] };
+        const wk = { id: 3e6 + ri * 8 + i, road: r, cum, L, side, v: lerp(1.05, 1.45, rr(2)), t0: rr(3) * 1000, outfit: Math.floor(rr(4) * OUTFIT_COUNT) % OUTFIT_COUNT, share: rr(5), scale: lerp(0.9, 1.06, rr(6)), board: isBoarder(rr(7)), x: mid[0], z: mid[1] };
         // the whole lane must be clear (a house at a street corner: that walker stays home)
         let clear = true;
         const o = {};
@@ -488,7 +496,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       const order = [...Array(S).keys()].sort((x, y) => rand01(seed, index, id, x, 5) - rand01(seed, index, id, y, 5));
       for (let k = 0; k < Math.min(want, S, riderBuf.length); k++) {
         const o = riderBuf[n++];
-        o.a = -0.05; o.b = (order[k] - (S - 1) / 2) * pitch; o.y = SEAT_Y.chair; o.yaw = 0; o.pose = POSE.sit; o.outfit = Math.floor(r(10 + k) * OUTFIT_COUNT) % OUTFIT_COUNT; o.scale = lerp(0.92, 1.04, r(30 + k));
+        o.a = -0.05; o.b = (order[k] - (S - 1) / 2) * pitch; o.y = SEAT_Y.chair; o.yaw = 0; o.pose = POSE.sit + (isBoarder(r(80 + k)) ? BOARD_POSE : 0); o.outfit = Math.floor(r(10 + k) * OUTFIT_COUNT) % OUTFIT_COUNT; o.scale = lerp(0.92, 1.04, r(30 + k));
       }
     } else if (kind === 'gondola' || kind === 'cable' || kind === 'train') {
       const spots = kind === 'gondola' ? (sub === 'funitel' ? [[0.7, 0.9], [-0.7, 0.9], [0.7, -0.9], [-0.7, -0.9], [0, 0.2], [0.75, 0], [-0.75, 0]] : [[0.5, 0.45], [-0.5, 0.45], [0.5, -0.45], [-0.5, -0.45]])
@@ -500,12 +508,12 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       const y = kind === 'gondola' ? (sub === 'funitel' ? SEAT_Y.funitel : SEAT_Y.gondola) : kind === 'cable' ? SEAT_Y.cable : SEAT_Y.train;
       for (let k = 0; k < want; k++) {
         const o = riderBuf[n++], sp = spots[order[k]];
-        o.a = sp[0] + (r(40 + k) - 0.5) * 0.12; o.b = sp[1] + (r(50 + k) - 0.5) * 0.1; o.y = y; o.yaw = (r(60 + k) < 0.5 ? 0 : Math.PI) + (r(70 + k) - 0.5) * 0.8; o.pose = POSE.cabin;
+        o.a = sp[0] + (r(40 + k) - 0.5) * 0.12; o.b = sp[1] + (r(50 + k) - 0.5) * 0.1; o.y = y; o.yaw = (r(60 + k) < 0.5 ? 0 : Math.PI) + (r(70 + k) - 0.5) * 0.8; o.pose = POSE.cabin + (isBoarder(r(80 + k)) ? BOARD_POSE : 0);
         o.outfit = Math.floor(r(10 + k) * OUTFIT_COUNT) % OUTFIT_COUNT; o.scale = lerp(0.92, 1.04, r(30 + k));
       }
     } else if (kind === 'drag' && sub !== 'rope') {
       const o = riderBuf[n++];
-      o.a = 0; o.b = 0; o.y = 0; o.yaw = 0; o.pose = POSE.drag; o.outfit = Math.floor(r(10) * OUTFIT_COUNT) % OUTFIT_COUNT; o.scale = lerp(0.92, 1.04, r(30));
+      o.a = 0; o.b = 0; o.y = 0; o.yaw = 0; o.pose = POSE.drag + (isBoarder(r(80)) ? BOARD_POSE : 0); o.outfit = Math.floor(r(10) * OUTFIT_COUNT) % OUTFIT_COUNT; o.scale = lerp(0.92, 1.04, r(30));
     }
     return n;
   }
@@ -518,7 +526,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       const S = Math.max(1, seats || 4), W = Math.max(1.6, Math.min(4.2, S * 0.52)), pitch = (W - 0.25) / S;
       for (let m = 0; m < Math.min(gr.n, riderBuf.length); m++) {
         const o = riderBuf[n++];
-        o.a = -0.05; o.b = (gr.order[m] - (S - 1) / 2) * pitch; o.y = SEAT_Y.chair; o.yaw = 0; o.pose = POSE.sit;
+        o.a = -0.05; o.b = (gr.order[m] - (S - 1) / 2) * pitch; o.y = SEAT_Y.chair; o.yaw = 0; o.pose = POSE.sit + (isBoarder(boardCoin(line.outfitOf(gr.k, m))) ? BOARD_POSE : 0);
         o.outfit = line.outfitOf(gr.k, m) % OUTFIT_COUNT; o.scale = line.scaleOf(gr.k, m);
       }
     } else {
@@ -526,7 +534,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
       const y = sub === 'funitel' ? SEAT_Y.funitel : SEAT_Y.gondola;
       for (let m = 0; m < Math.min(gr.n, spots.length, riderBuf.length); m++) {
         const o = riderBuf[n++], sp = spots[gr.order[m] % spots.length];
-        o.a = sp[0]; o.b = sp[1]; o.y = y; o.yaw = (m % 2 ? Math.PI : 0) + (rand01(seed, gr.k, m, 61) - 0.5) * 0.8; o.pose = POSE.cabin;
+        o.a = sp[0]; o.b = sp[1]; o.y = y; o.yaw = (m % 2 ? Math.PI : 0) + (rand01(seed, gr.k, m, 61) - 0.5) * 0.8; o.pose = POSE.cabin + (isBoarder(boardCoin(line.outfitOf(gr.k, m))) ? BOARD_POSE : 0);
         o.outfit = line.outfitOf(gr.k, m) % OUTFIT_COUNT; o.scale = line.scaleOf(gr.k, m);
       }
     }
@@ -627,10 +635,12 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
         else if (c.k.skill === 'beginner') { o.poseA = POSE.plough; o.poseB = e > 0 ? POSE.carveR : POSE.carveL; o.blend = Math.min(0.35, Math.abs(e) * 0.5); }
         else if (c.k.skill === 'tuck') { o.poseA = POSE.tuck; o.poseB = e > 0 ? POSE.carveR : POSE.carveL; o.blend = Math.min(0.4, Math.abs(e)); }
         else { o.poseA = POSE.ski; o.poseB = e > 0 ? POSE.carveR : POSE.carveL; o.blend = Math.abs(e); }
+        boardOf(o, c.k.board);
       } else if (c.kind === 'queue') {
         const q = c.q;
         o.x = q.x + st.sx; o.z = q.z + st.sz; o.heading = q.heading + Math.sin(t * 0.21 + q.phase) * 0.18; o.outfit = q.outfit; o.scale = q.scale;
         o.vx = 0; o.vz = 0; o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.12 + 0.1 * Math.sin(t * 0.13 + q.phase);
+        boardOf(o, q.board);
       } else {
         const w = c.w, P = 2 * w.L / w.v, u = (((t + w.t0) % P) + P) % P;
         const fwd = u < P / 2, s = fwd ? u * w.v : w.L - (u - P / 2) * w.v;
@@ -641,6 +651,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
         // the turn at each end of his stretch: a short stand
         const endK = Math.min(s, w.L - s);
         o.poseA = POSE.walkA; o.poseB = POSE.walkB; o.blend = endK < 0.6 ? 0.5 : 0.5 - 0.5 * Math.sin(s * 2.6);
+        boardOf(o, w.board);
       }
       if (view.hidden && view.hidden(o.x, o.z)) { pool.push(o); continue; }
       o.st = st;
@@ -664,6 +675,7 @@ export function createCrowd({ resort, pistes, liftNet, height, standY = height, 
           o.heading = p.heading + (p.moving ? 0 : Math.sin(t * 0.21 + ph) * 0.12);
         } else if (p.moving) { o.poseA = POSE.ski; o.poseB = POSE.plough; o.blend = 0.35 + 0.25 * Math.sin(t * 6 + ph); o.heading = p.heading; }
         else { o.poseA = POSE.stand; o.poseB = POSE.plough; o.blend = 0.12 + 0.1 * Math.sin(t * 0.13 + ph); o.heading = p.heading + Math.sin(t * 0.21 + ph) * 0.15; }
+        boardOf(o, isBoarder(boardCoin(p.outfit)));
         o.st = null;
         list.push(o);
       }

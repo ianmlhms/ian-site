@@ -64,6 +64,7 @@ export function stepSkier(prev, input, world, dt = SKI.dt) {
   s.steer = approach(s.steer, clamp(input.steer || 0, -1, 1), 7, dt);
   s.tuck = approach(s.tuck, input.tuck ? 1 : 0, 5, dt);
   s.brake = approach(s.brake, input.brake ? 1 : 0, 6, dt);
+  s.push = (input.push || 0) > 0 ? 1 : 0;                  // 28 Nov 2026: the look only (a snowboarder steps with his back foot)
   return s.grounded ? groundStep(s, input, world, dt) : airStep(s, input, world, dt);
 }
 
@@ -185,7 +186,10 @@ function groundStep(s, input, world, dt) {
     const dx = moves ? vx / v : fx, dy = moves ? vy / v : fy, dz = moves ? vz / v : fz;
     const gAlong = -G * dy;                                               // m/s2 of gravity along that direction (< 0: uphill)
     const wants = (input.push || 0) > 0 || (input.tuck || 0) > 0;
-    const gate = wants ? 1 - smoothstep(RISE_FULL, RISE_NONE, -gAlong) : smoothstep(0.05, 0.25, gAlong);
+    // 28 Nov 2026: assistWant scales the push on flats and rises (a snowboard has no poles and does not skate: it shuffles); downhill
+    // the assist is the same (max(): with assistWant 1, i.e. every ski, this is exactly the old gate)
+    const down = smoothstep(0.05, 0.25, gAlong);
+    const gate = wants ? Math.max(down, (1 - smoothstep(RISE_FULL, RISE_NONE, -gAlong)) * (K.assistWant ?? 1)) : down;
     const a = (K.assistAccel + (K.assistFlat || 0) * (1 - smoothstep(0, RISE_FULL, gAlong))) * gate * (1 - smoothstep(K.assistFull, K.assistTo, v));
     if (a > 0) { vx += dx * a * dt; vy += dy * a * dt; vz += dz * a * dt; }
   }

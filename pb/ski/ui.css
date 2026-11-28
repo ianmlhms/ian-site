@@ -343,6 +343,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .skicard .need{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:2px 10px;font-family:var(--mono);font-size:11px;color:var(--muted)}.skicard .need .ok{color:var(--green)}
 .skidraw{display:block;height:22px;position:relative}
 .skidraw i{position:absolute;left:4%;top:50%;width:var(--len);height:var(--wid);transform:translateY(-50%);border:1px solid var(--ink);border-radius:2px 11px 11px 2px;box-shadow:inset -14px 0 0 var(--tip)}
+.skidraw.board i{width:62%;height:17px;border-radius:9px;box-shadow:inset 11px 0 0 var(--tip),inset -11px 0 0 var(--tip)}
 .skidraw.twin i{border-radius:11px;box-shadow:inset -14px 0 0 var(--tip),inset 14px 0 0 var(--tip)}
 .skicardbox{width:min(520px,calc(100% - 24px))}
 /* R7-C: map teleport (fog, pin, confirm, "Bei den éischte Lift"), first person streak, challenge course HUD, avalanche */

@@ -206,7 +206,7 @@ export function createFreeMp({ ctx, host }) {
       if (local.sent && !(st.ride && local.sent.ride && st.rideLift === local.sent.rideLift) && Math.hypot(st.x - local.sent.x, st.z - local.sent.z) > FREE.TELEPORT * Math.max(1, (now - local.sentAt) / 1000)) local.epoch++;
       local.lastSend = slot; local.sentAt = now; local.sends++; if (moving) local.movingSends++;
       local.sent = { x: st.x, z: st.z, ride: st.ride, rideLift: st.rideLift };
-      session.broadcast({ k: 's', e: local.epoch, t: Math.round(now), p: game.screen === 'map' || game.paused ? 1 : 0, a: packState(st, 0, false) }, false);
+      session.broadcast({ k: 's', e: local.epoch, t: Math.round(now), p: game.screen === 'map' || game.paused ? 1 : 0, a: packState(st, 0, false, !!(host.board && host.board())) }, false);
       root.dataset.skiMpEpoch = String(local.epoch);
     }
     if (now - local.lastPos >= FREE.POS_EVERY && game.phase === 'running' && finite(st.x, st.z)) {

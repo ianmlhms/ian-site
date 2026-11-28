@@ -34,7 +34,7 @@ const { housesOnStreets, decodeRoads } = await imp('roads.js');
 const { buildingBoxes, createBoxIndex } = await imp('look.js');
 const { liftTreeGuard } = await imp('lift-site.js');
 const { createLiftPath, chairWidth, carrierBox } = await imp('lift-path.js');
-const { createCrowd, corridorOf, carrierId, strHash, POSE } = await imp('npc.js');
+const { createCrowd, corridorOf, carrierId, strHash, POSE, BOARD_POSE } = await imp('npc.js');
 const { NPC } = await imp('config.js');
 
 const args = process.argv.slice(2);
@@ -188,7 +188,7 @@ for (const rid of rids.length ? rids : ALL) {
 
   // ---- lifts: carrier ids along the loop, riders ----
   {
-    let carriers = 0, idBreaks = 0, seatBad = 0, riderTotal = 0, riderDet = 0, over = 0;
+    let carriers = 0, idBreaks = 0, seatBad = 0, riderTotal = 0, riderDet = 0, over = 0, boardRiders = 0, chairRiders = 0;
     for (const l of lifts.list) {
       const p = lifts.paths.get(l.index);
       if (!p || p.shuttle || !(p.spec.gap > 0) || p.kind === 'carpet' || (p.kind === 'drag' && p.sub === 'rope')) continue;
@@ -214,8 +214,9 @@ for (const rid of rids.length ? rids : ALL) {
         riderTotal += n;
         if (p.kind === 'chair') {
           if (n > (p.seats || 4)) over++;
+          chairRiders += n;
           const W = chairWidth(p.seats);
-          for (const r of rows) if (Math.abs(r.b) > W / 2 - 0.1 || r.pose !== POSE.sit) seatBad++;
+          for (const r of rows) { if (Math.abs(r.b) > W / 2 - 0.1 || r.pose % BOARD_POSE !== POSE.sit) seatBad++; if (r.pose >= BOARD_POSE) boardRiders++; }
           const bs = rows.map((r) => r.b).sort((x, y) => x - y);
           for (let i = 1; i < bs.length; i++) if (bs[i] - bs[i - 1] < 0.4) seatBad++;
         } else if (p.kind === 'gondola') {
@@ -226,6 +227,8 @@ for (const rid of rids.length ? rids : ALL) {
     }
     check(idBreaks === 0, `every loop carrier keeps its id round the up lane and the top (${idBreaks} breaks over 40 s)`);
     check(seatBad === 0 && over === 0 && riderDet === 0, `riders: ${riderTotal} on ${carriers} carriers going up, ${seatBad} badly seated, ${over} over the seats, ${riderDet} not deterministic`);
+    // 28 Nov 2026: some ride a snowboard (seated with the board, BOARD_POSE + sit): about NPC.boardShare of the chair riders
+    check(!chairRiders || (boardRiders > chairRiders * 0.1 && boardRiders < chairRiders * 0.32), `snowboarders on the chairs: ${boardRiders} of ${chairRiders}`);
     // the jig-back cable cars carry a crowd too
     const cab = lifts.list.find((l) => l.kind === 'cable');
     if (cab) { const p = lifts.paths.get(cab.index); const n = crowd.riders(cab.index, 0, 'cable', p.seats, p.sub, 1); const box = carrierBox('cable'); check(n >= 4 && crowd.riderBuf.slice(0, n).every((r) => Math.abs(r.a) < box.hl && Math.abs(r.b) < box.hw), `cable car ${cab.name}: ${n} standing inside the cabin`); }

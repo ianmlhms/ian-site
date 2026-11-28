@@ -230,7 +230,7 @@ export function createMp({ ctx, host }) {
     const slot = game.state ? sendSlot(local.lastSend, now, hz) : null;      // cleanup round: on the wall clock, not every n-th frame
     if (slot !== null) {
       local.lastSend = slot;
-      session.broadcast({ k: 's', r: race.run, t: Math.round(now), a: packState(game.state, game.run ? game.run.progress : 0, game.phase === 'finished') }, false);
+      session.broadcast({ k: 's', r: race.run, t: Math.round(now), a: packState(game.state, game.run ? game.run.progress : 0, game.phase === 'finished', !!(host.board && host.board())) }, false);
     }
     if (local.spectate) { const rem = remotes.get(local.spectate); if (!rem || !rem.state || rem.state.finished) nextSpectate(); }
   }

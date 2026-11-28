@@ -74,6 +74,7 @@ export const NPC = Object.freeze({
   selectEvery: 0.3, bandBudget: 64,
   corridorMargin: 12,         // m beyond a running challenge's piste edge where nobody is drawn
   fadeNear: 110,              // m: closer than this a skier who appears / goes grows / shrinks (no pop)
+  boardShare: 0.2,            // 28 Nov 2026: share of the others on a snowboard (npc.js: deterministic per person)
 });
 
 /* Skier physics (arcade, not a simulator). See skier.js for how each number is used. */
@@ -109,6 +110,7 @@ export const SKI = Object.freeze({
   assistFlat: 0.9,          // m/s2 more where gravity does not help (flat or a rise; nothing extra from 6 degrees downhill)
   assistFull: 10.5,         // m/s (38 km/h)
   assistTo: 13.9,           // m/s (50 km/h): no assist from here on
+  assistWant: 1,            // 28 Nov 2026: share of that assist that push / tuck gives on flats and rises (the snowboard: little)
   climbSpeed: 2.2,          // below this the push walks uphill (herringbone): no flat, rise or hollow leaves a player stuck
   climbMax: 4.6,            // m/s2: the steepest it climbs is about 20 degrees (40 %) on the piste
   leaveGround: 0.95,        // the ground falls away faster than this many g: the skier takes off

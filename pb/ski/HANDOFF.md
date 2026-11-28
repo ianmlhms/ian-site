@@ -2396,3 +2396,32 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   (before/, v1-v4/ = the iterations, before-game/ vs after-game/).
 - Open: the figure's self-shadow shows a little sawtooth on the round shoulder caps on Mëttel / Héich (shadow-map resolution, as before
   on the old spheres); faces are covered by gaiter + goggles on purpose (a strip of skin between them).
+
+## Snowboard (28 Nov 2026; Ian: "snowboard as a choice next to the skis")
+- **Choice**: a sixth entry of `modes/skis.js SKI_TYPES` (`id: 'snowboard', board: true`, open from the start, its look has `board: true`),
+  so it is picked, saved (`progress.ski`, cloud `x.k`; an old client reads the unknown id and falls back to All-Mountain) and shown like
+  the skis (Skier tab / 🎿 card: a board drawing `.skidraw.board`, toast "Snowboard"; ui.css v+1).
+- **Handling** (free ride only; FAIRNESS as for the skis: timed runs, the park board and online races ride the reference set, so board times
+  go to the same lists): carveGain 1.3, edgeLock 1.4 (90° turn 2.34 s vs All-Mountain 2.65 s), floats in powder (64 vs 51 km/h on 22°), no
+  skating / poling: pushAccel x0.4, pushMaxSpeed x0.4, assistFlat 0 and the new SKI.assistWant (the share of the flat / rise assist that push /
+  tuck gives; 1 for every ski = exactly the old gate) x0.1: 10 s pushing on a flat = 7.3 km/h (skis 45 km/h); climbs up to ~12°.
+  round6-test checks all of it. skier.js keeps `state.push` (look only: the back foot steps while shuffling).
+- **Model** (skier-model.js `setBoard`): the board group under `lean` (lofted plank, rounded rising ends, two angled bindings with
+  highbacks and straps, BOARD = foot 0.27 m, front +0.21 / back -0.1 rad); skis + poles hidden (collapsed bones in the skinned mesh).
+  `stance` turns the body sideways (regular: the left foot forward, facing the toe edge +z), the legs go to the bindings (setLeg `footZ`).
+  Poses: carve toe side (edge > 0) / heel side (sitting back, arms over the toes), crouch (tuck), skid stop (brake: the board across, on the
+  heel edge), jump + grab (the back hand on the toe edge via reachHand), crash (the generic tumble, the board stays on the feet), shuffle.
+  `plantBoard`: the lowest edge point touches the snow. Lifts: chair = the board across on the footrest, strapped to the front foot; cabin =
+  upright in the right hand; walking = held by its top edge; drag = front foot strapped, the back foot on the board, the hand on the bar.
+- **First person** (firstperson.js `setLook` with a board look): the board + bindings + boots in one mesh, the poles mesh becomes gloves only.
+- **Online** (net/wire.js): flag 8 = rides a board (packState 4th argument, `host.board()`); an old client ignores the bit (draws skis), an
+  old sender never sets it. remotes.js calls `model.setBoard(st.board)`.
+- **Others** (npc.js): NPC.boardShare 0.2 of them ride boards, deterministic per person (piste skiers r(16), queues, walkers; the lines and
+  their chair / cabin riders from the person's raw outfit number, so the same person is a boarder in the line and on the chair). The board
+  poses are the ski poses + BOARD_POSE (11) in the same baked texture (22 rows of poses, half floats: 0.96 MB for both figures, was 0.89 MB
+  float with 11); still 2 draw calls, the near figure 1824 triangles (the board folds away in ski poses and vice versa).
+- **Checks**: flow `ski-snowboard` (Chromium + WebKit), ski-skis (six cards), round6-test (board handling, flat shuffle, fair set, wire flag,
+  cloud), npc-check (boarders on the chairs ~20 %), cloud-size-test (the id fits). Shots: ~/Library/Caches/ski-work/snowboard/ (game/ =
+  skier-shots.mjs --board; the close-up sheets are in ~/Library/Caches/ski-work/skier/v4/fig-board*.png).
+- Open: no grab / trick names specific to the board; goofy stance not offered; the ride DOWN boarding keeps the ski carry poses for the board
+  (board in the hand); a board NPC's beginner "plough" is a heel-side skid blended with the carve poses (a little shrink in the blend).

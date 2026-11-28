@@ -174,11 +174,12 @@ export function skiDrawing(look) {
     dots: `radial-gradient(circle, ${a} 30%, transparent 34%) 0 0 / 14px 100%`,
     zigzag: `repeating-linear-gradient(-55deg, transparent 0 8px, ${a} 8px 12px)`,
   }[look.pattern] || 'none';
+  if (look.board) return `<span class="skidraw board" style="--base:${hex(look.base)};--tip:${hex(look.tip)}"><i style="background:linear-gradient(${a}, ${a}) 50% 50% / 64% 26% no-repeat, var(--base)"></i></span>`;
   return `<span class="skidraw${look.twin ? ' twin' : ''}" style="--base:${hex(look.base)};--tip:${hex(look.tip)};--len:${Math.round(look.length * 88)}%;--wid:${Math.round(10 * look.width)}px"><i style="background:${pat}, var(--base)"></i></span>`;
 }
 /** The ski cards: drawing, name, handling, the unlock (with progress) and the pick button. opts = { stats, selected } */
 export function skiCardsHtml({ stats, selected }) {
-  return `<p class="m fairnote">Zäitleef (Challengen, Bestenlëschten), Snowpark-Punkten an Online-Rennen: all Ski fuere gläich (All-Mountain), fir datt et fair bleift. Beim fräie Fueren mécht de Ski den Ënnerscheed.</p>
+  return `<p class="m fairnote">Zäitleef (Challengen, Bestenlëschten), Snowpark-Punkten an Online-Rennen: all Ski an de Snowboard fuere gläich (All-Mountain), fir datt et fair bleift. Beim fräie Fueren mécht de Ski den Ënnerscheed.</p>
   <div class="skis">${SKI_TYPES.map((t) => {
     const u = skiUnlock(t, stats);
     const on = t.id === selected;

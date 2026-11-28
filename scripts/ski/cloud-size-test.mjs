@@ -64,6 +64,9 @@ console.log(`${resortCount} resorts, ${pisteCount} pistes`);
   ok(JSON.stringify(back.goals) === JSON.stringify(p.goals) && JSON.stringify(back.lifts) === JSON.stringify(p.lifts) && back.daily && back.daily.last === 20785 && back.daily.streak === 365 && back.daily.best === 365, 'badges, ridden lifts and the daily streak round-trip');
   console.log(`  info new fields: g ${bytes(rec.g)} + l ${bytes(rec.l)} + y ${bytes(rec.y)} bytes (of ${size})`);
   console.log(`  info stars alone: ${bytes({ s2: rec.s2 })} bytes of ${size}`);
+  // 28 Nov 2026: the snowboard is saved like a ski type (its id is the longest: 'snowboard', 3 bytes more than 'powder')
+  const sb = { ...p, ski: 'snowboard' }, recSb = encodeCloud(sb, []);
+  ok(bytes(recSb) < 7500 && bytes(recSb) - size <= 3 && decodeCloud(JSON.parse(JSON.stringify(recSb))).ski === 'snowboard', `the snowboard choice fits and round-trips (${bytes(recSb)} bytes)`);
 }
 // 2. stars only (no times, no fog): nothing dropped, exact
 {

@@ -1,5 +1,7 @@
 /* Ski types (round 6, pure: no THREE, no DOM). Five skis with clearly different handling and their own look; the handling is a set of
- * factors on the physics numbers of config.js SKI (skier.js reads world.ski, a full SKI copy).
+ * factors on the physics numbers of config.js SKI (skier.js reads world.ski, a full SKI copy). 28 Nov 2026: and the snowboard (board:
+ * true; skier-model.js setBoard draws it): carves hard on its edges, floats in powder, no poles: on a flat it only shuffles slowly
+ * (pushAccel / pushMaxSpeed / assistWant), walks up rises slower. Its timed / scored runs follow the same FAIRNESS rule as the skis.
  *
  *   allmountain  the start ski: balanced (the reference: every factor 1)
  *   carving      grips and turns sharp on hard snow, sinks and slows in powder
@@ -39,6 +41,12 @@ export const SKI_TYPES = Object.freeze([
     look: { base: 0x2f8f5b, art: 0xf2b21c, tip: 0xf2b21c, length: 1.04, width: 1.55, twin: false, pattern: 'dots' },
     mods: { powderDrag: 0.42, muPowder: 0.62, gripPowder: 1.35, muGroomed: 1.35, gripGroomed: 0.82, carveGain: 0.9 },
     bars: { grip: 2, speed: 2, powder: 5, park: 3 }, unlock: { offKm: 10 },
+  },
+  {
+    id: 'snowboard', name: 'Snowboard', board: true, short: 'Kanten a Pulver', text: 'Säitlech um Board: hält gutt op de Kanten a schwëmmt am Pulver. Keng Stécker: op der Flaach geet et nëmme lues.',
+    look: { base: 0x2a3f5f, art: 0xf2b21c, tip: 0xf4f1ea, length: 1, width: 1, twin: false, pattern: 'stripe', board: true },
+    mods: { carveGain: 1.3, edgeLock: 1.4, gripGroomed: 1.0, pivotRate: 0.85, skidLoss: 1.1, powderDrag: 0.6, muPowder: 0.75, gripPowder: 1.25, pushAccel: 0.4, pushMaxSpeed: 0.4, climbMax: 0.55, climbSpeed: 0.8, assistWant: 0.1, assistFlat: 0, maxSpeed: 0.95, cdaTuck: 1.05, spinClean: 1.2, spinCrash: 1.15 },
+    bars: { grip: 4, speed: 3, powder: 4, park: 4 }, unlock: null,
   },
   {
     id: 'park', name: 'Park Twin-Tip', short: 'Tricks', text: 'Béid Enner opgebéit: dréit a flippt méi liicht, verzeit méi bei der Landung, mee e bësse méi lues.',
