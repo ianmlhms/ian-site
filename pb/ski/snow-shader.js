@@ -158,6 +158,9 @@ export function createSnowMaterial(env, { cheap = false, treeRadius = 400, fores
           vec2 sd = uSunDir.xz / max(sh, 1e-3);
           float reach = clamp(14.0 * sh / max(uSunDir.y, 0.12), 6.0, 70.0);
           float upSun = texture2D(uForestTex, (wp + sd * reach * 0.35) / uForestSize, 1.0).r * 0.5 + texture2D(uForestTex, (wp + sd * reach * 0.8) / uForestSize, 1.5).r * 0.5;
+          // (only inside the raster's box: beyond it the clamped edge texels would smear into stripes down the far mountains)
+          vec2 fBox = min(wp, uForestSize - wp);
+          upSun *= smoothstep(reach, reach + 120.0, min(fBox.x, fBox.y));
           sunVis = min(sunVis, 1.0 - 0.6 * smoothstep(0.12, 0.75, upSun) * (1.0 - uOvercast));
         }
         #endif
