@@ -301,7 +301,7 @@ button:focus-visible{outline:2px solid var(--green);outline-offset:2px}
 .card .time small{font-size:16px;color:var(--muted)}
 .seg.swatches button.locked{opacity:.5;position:relative}.seg.swatches button em{position:absolute;bottom:-2px;right:0;font-style:normal;font-size:9px;font-family:var(--mono);background:var(--white);padding:0 2px}
 .hud .freehud{font-family:var(--mono);margin-top:2px}.hud .freehud .day{font-size:22px}.hud .freehud .fstats{font-size:13px}
-.hud .minimap{position:relative;margin-top:6px;margin-left:auto;margin-right:50px;width:132px;height:132px;border:1px solid rgba(255,255,255,.85);box-shadow:0 1px 6px #0006}
+.hud .minimap{position:relative;margin-top:6px;margin-left:auto;margin-right:104px;width:132px;height:132px;border:1px solid rgba(255,255,255,.85);box-shadow:0 1px 6px #0006}
 .hud .minimap canvas{display:block}.hud .minimap .north{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-size:11px;color:#16171a;text-shadow:0 0 2px #fff}
 .hud .tr .minimap + *{margin-top:0}
 .hud .minimap.open{pointer-events:auto;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}

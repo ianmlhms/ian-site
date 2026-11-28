@@ -2289,3 +2289,23 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   else an `<a download>`; a card then shows the picture (long press saves it where share / download do not work, e.g. a sandboxed srcdoc frame). Nothing is uploaded (the flow counts POST / PUT).
   Depth of field NOT done (not cheap without a depth pass).
 - **Flows** `ski-replay`, `ski-photo` (Chromium + WebKit; shots `~/Library/Caches/ski-work/replay/`). Debug: `__ski.replay`, `__ski.photo`, `__ski.recorder`, `__ski.openReplay(s)`, `__ski.openPhoto()`.
+## iPad simulator check (28 Nov 2026; agent in worktree, iPad (10th generation) 25C09CD2-..., iOS 17.4, Safari 17.4)
+- **Recipe that works** (the Mini / this Mac: no Accessibility permission for osascript / CGEvent, Simulator.app cannot be granted to computer-use):
+  `xcrun simctl boot <udid>` (Simulator.app is NOT needed; killing Simulator.app shuts the device down), `xcrun simctl openurl` / `io <udid> screenshot x.png`
+  for pictures, and **Safari WebDriver**: `safaridriver -p 4444 &`, `POST /session {"browserName":"Safari","platformName":"iOS","safari:useSimulator":true,"safari:deviceUDID":"<udid>"}`
+  (works, JS `execute/sync`, W3C Actions with `pointerType: touch`, two-finger multi touch too). Live https://ian.lu only (localhost hangs).
+  The session turns Safari's address bar orange; a stuck/slow action wedges the driver: `kill -9` safaridriver + its HTTPService xpc, `simctl terminate com.apple.mobilesafari`, new session.
+- **Landscape**: the sim stays in portrait (820 x 1180 pt). Rotating it needs the Simulator menu (blocked) or the private GSEvent via PurpleWorkspacePort
+  (tried: message sent, ignored). Workaround used: open `https://ian.lu/robots.txt`, replace the body by a `1006 x 820` div rotated -90 deg
+  (`transform: translate(0,1006px) rotate(-90deg)`) holding an iframe of `/pb/ski.html?...`; real Safari WebKit, real touch events, real Web Audio, memory;
+  screenshot then `sips -r 90` gives a landscape picture. Keep the iframe 100 px shorter than the screen: the pad at the bottom edge triggered the iPadOS dock / window shelf.
+  Not representative: Safari's toolbar side, on-screen keyboard position, `vh` units, safe areas.
+- **WebDriver touch taps send touchstart / pointerdown / pointerup / touchend but NO click** (even on a plain button): the HUD touch buttons (pointer events) and
+  the pad work, click handlers (minimap, Astegen, picker cards, menu) need `el.click()` from JS. The on-screen keyboard never appeared (focus from script / WebDriver does not raise it), so the code field with keyboard is untested.
+- **Found + fixed**: picker cards had NO pictures on Safari (iOS 17.4): `.rp-card` is a `<button>`; Safari's button default `align-items:flex-start` shrank `.rp-pic` to 0 px wide (only the hero row card, flex row, showed its picture).
+  Fix `align-items:stretch` on `.rp-card` (ui.css v20). Chromium / Playwright WebKit never showed it.
+- **Found + fixed**: the replay / photo buttons (`.hbtns2`, right 60 px) lay on top of the minimap (margin-right 50 px, 132 px wide): minimap `margin-right:104px` (ui.css v21).
+- Passed in the sim: all 11 picture cards load (naturalWidth > 0, lazy), Sölden + Laax + Killy + Davos start (free ride), HUD touch pad (steer by drag), tuck / jump buttons, 3-finger multi touch,
+  map opens + closes (click), «Bei de Lift», gondola ride + window view + skip, first person, AudioContext `running` after the first touch (48 kHz), 5 resort loads in a row in one tab, no reload / "A problem repeatedly occurred",
+  lobby choice screen (create / Mat Code bäitrieden), code "zz zz" -> ZZZZ -> «Dëse Code gëtt et net (méi).». Frame times in the sim (Mac GPU, NOT the iPad): p50 17-18 ms, p95 19-29 ms, 315k triangles in Sölden, level `low`.
+- Not tested: on-screen keyboard layout, joining by code between the sim and a desktop page, real iPad GPU speed / memory, rotation by the user.
