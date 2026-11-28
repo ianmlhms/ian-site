@@ -2270,3 +2270,22 @@ where they were; every new part is drawn only (det, never solid) and inside the 
   Shots (~/Library/Caches/ski-work/soelden/): queues (gondola + chair mazes with people), ground (park sign, village from the ground and from above, glacier lift), map (printed map
   + the game's map screen), picker (iPad landscape 11 cards in one screen, iPad portrait / phone scroll as with ten), pick (picture candidates).
 - **Not run / open**: real iPad untested; the iPad portrait picker scrolls (11 cards; unchanged behaviour); the other ten resorts were not re-baked; Obergurgl-Hochgurgl / Vent are not in.
+
+## Replay + photo mode (28 Nov 2026; sections used: Engine, camera from above, first person, map = pause overlay, other skiers, Round 6)
+- **New modules** `replay.js` (recorder + playback + bar) and `photo.js` (orbit camera, looks, PNG save); `main.js` wires them (search "replay + photo mode"), `ui.js` has the buttons
+  (finish card `Replay`, pause menu `Lescht 30 s nach eemol kucken`), `input.js` the key `P`, `ui.css` (v20) the bars (`.rpbar`, `.phbar`, `.phcard`).
+- **Recorder** (`createRecorder`): ring of 90 s at 20 Hz, allocated once at the first frame (~0.21 MB, `recorder.bytes`; no growth). A frame is EVERY number / boolean / short
+  string field of the skier STATE (the key list comes from the first state), so a field the new skier model / snowboard adds is replayed without a change here (the clip's
+  `template` = the newest full state object supplies non-numeric fields such as `kick`). A jump of > 25 m is a cut (no interpolation across a teleport, lift or respawn); `recorder.reset()` runs at `startRun`
+  (a timed run's clip starts with the run; the clip of a run longer than 90 s = its last 90 s). Written in `frame()` after the physics steps, only in phase running / finished and never while replaying.
+- **Replay** (`createReplay`): `openReplay(seconds)` = HUD button `#hReplay` (⏪, the last 30 s), pause menu button, finish card button `#finishReplay` (the whole 90 s buffer; not in an online race).
+  The game is paused (`game.paused`, input off) and `frame()` takes `replay.state` as `st` (skier.pose / spray / first person get the replayed state like a live one). Cameras: Hannendrun
+  (own `createChaseCamera`), TV (tripod on the downhill side 30+ m ahead, pans, zooms to keep the size, re-planted when he has passed), Niddreg (0.6 m over the snow beside the skis),
+  Vun uewen (26 m, yaw eased), Helm (main.js asks firstperson.js with the replayed state). Play / pause (Space, K), scrub (range, arrows +-1 s), 0.25x / 0.5x / 1x, 1-5 = cameras, Esc / Zou closes.
+  CSS: while `html[data-ski-replay]` / `[data-ski-photo]` everything in `#ui` except the bar is hidden (cards come back untouched). Other skiers keep moving (npcFrame unchanged), the ghost is hidden.
+- **Photo mode** (`createPhoto`): `P` / HUD 📷 (`#hPhoto`): game paused, `game.camPose` = the orbit camera (so the body is drawn, free look / chase off), drag turns, wheel / pinch zooms (spread = closer),
+  two fingers up / down lift the view point, arrows + / -. The boom stops at walls / roofs / snow (`camBlocked`). Looks: none / warm / black-and-white = a CSS filter on the canvas on screen and the same look as a pixel pass in the file
+  (Safari has no 2D `ctx.filter`). `Foto späicheren`: `post.render()` then `drawImage(canvas)` in the click handler (the drawing buffer is not preserved), `toBlob` PNG; on a touch device `navigator.share({files})`,
+  else an `<a download>`; a card then shows the picture (long press saves it where share / download do not work, e.g. a sandboxed srcdoc frame). Nothing is uploaded (the flow counts POST / PUT).
+  Depth of field NOT done (not cheap without a depth pass).
+- **Flows** `ski-replay`, `ski-photo` (Chromium + WebKit; shots `~/Library/Caches/ski-work/replay/`). Debug: `__ski.replay`, `__ski.photo`, `__ski.recorder`, `__ski.openReplay(s)`, `__ski.openPhoto()`.

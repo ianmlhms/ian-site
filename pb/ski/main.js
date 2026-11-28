@@ -64,6 +64,9 @@ import { createAvalanches } from './avalanche.js';
 import { createCrowd, dayShare, corridorOf, strHash } from './npc.js';
 import { createNpcView } from './npc-view.js';
 import { createQueueView } from './queue-view.js';
+// replay + photo mode (28 Nov 2026): a rolling recorder of the skier state, playback with five cameras, a free orbit camera + saved PNG
+import { createRecorder, createReplay, FREE_CLIP_S, RECORD } from './replay.js';
+import { createPhoto } from './photo.js';
 
 const THREE = window.THREE;
 const LOAD = window.__skiLoad || { set() {}, done() {}, fail() {} };
@@ -533,6 +536,44 @@ async function boot() {
       hb.appendChild(b);
     }
   }
+  // ---- replay + photo mode (28 Nov 2026) ----
+  const recorder = createRecorder();
+  const replay = createReplay({ root: document.getElementById('ui'), surface, onClose: () => endOverlayPause() });
+  const photo = createPhoto({ root: document.getElementById('ui'), canvas, height: (x, z) => surface.height(x, z), blocked: (x, y, z) => camBlocked(x, y, z), renderNow: () => post.render(scene, camera), onClose: () => { game.camPose = photoPrevPose; photoPrevPose = null; endOverlayPause(); }, onToast: (t) => hud.toast(t, 1800) });
+  let overlayPaused = false, overlayInput = false, photoPrevPose = null;
+  function beginOverlayPause() { overlayPaused = game.paused; overlayInput = game.phase === 'running' || game.phase === 'countdown'; game.paused = true; input.setEnabled(false); }
+  function endOverlayPause() { game.paused = overlayPaused; input.setEnabled(overlayInput && game.phase === 'running'); canvas.focus({ preventScroll: true }); }
+  const overlayOk = () => game.screen === 'ski' && (game.phase === 'running' || game.phase === 'finished') && !ride && !skiCard && !replay.active && !photo.active;
+  /** Replay of the last `seconds` (free ride: FREE_CLIP_S; after a timed run the whole buffer). */
+  function openReplay(seconds = FREE_CLIP_S) {
+    if (!overlayOk() || isRace()) return false;
+    const clip = recorder.snapshot(seconds, game.state);
+    if (!clip) { hud.toast('Nach näischt opgeholl', 1400); return false; }
+    beginOverlayPause();
+    replay.open(clip, { camera: 'follow' });
+    return true;
+  }
+  function openPhoto() {
+    if (photo.active) { photo.close(); return; }
+    if (replay.active || skiCard || menuCard || !(game.screen === 'ski' && ['running', 'finished', 'lift', 'approach'].includes(game.phase))) return;
+    const st = game.state;
+    if (!st) return;
+    beginOverlayPause();
+    photoPrevPose = game.camPose;
+    const c0 = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+    photo.open({ x: st.x, y: Math.max(st.y, surface.height(st.x, st.z)), z: st.z }, c0);
+  }
+  {
+    const hb = hud.el.querySelector('.hbtns');
+    if (hb) {
+      const col = document.createElement('div');
+      col.className = 'hbtns hbtns2';
+      const mk = (id, text, title, label, fn) => { const b = Object.assign(document.createElement('button'), { type: 'button', className: 'hbtn', id, title, textContent: text }); b.setAttribute('aria-label', label); b.addEventListener('click', (e) => { e.currentTarget.blur(); fn(); }); col.appendChild(b); };
+      mk('hReplay', '⏪', 'Lescht 30 s nach eemol kucken', 'Lescht 30 s nach eemol kucken', () => openReplay());
+      mk('hPhoto', '📷', 'Foto (P)', 'Foto (P)', () => openPhoto());
+      hb.after(col);
+    }
+  }
   if (!setSki(store.get().ski || DEFAULT_SKI, false)) setSki(DEFAULT_SKI, false);
   let skiCard = null;
   function openSkiCard() {
@@ -750,6 +791,7 @@ async function boot() {
     const lat = isRace() ? (gate.lat || 0) + lateral : lateral || gate.lat || 0;
     const f0 = mode === MODES.run ? finishAt(p, s0) : null;                 // R8b: the ZIL on open snow
     game.run = createRun({ piste: p, mode, startS: s0, finishS: f0 });
+    recorder.reset();                                                        // replay: a timed run's clip starts with this run
     const a = p.at(s0, {});
     if (mode === MODES.run) {
       let lay = null;
@@ -828,6 +870,7 @@ async function boot() {
       onContinue: () => continueFree(cont),
       onMap: () => showMap(),
       onFree: () => freeFromHere(),
+      onReplay: result && !isRace() ? () => openReplay(RECORD.seconds) : null,
     });
     document.documentElement.dataset.skiScreen = 'finish';
     document.documentElement.dataset.skiLast = result ? String(result.ms) : 'free';
@@ -1199,10 +1242,14 @@ async function boot() {
       onResume: () => { menuCard = null; game.paused = false; input.setEnabled(game.phase === 'running' || game.phase === 'countdown'); },
       onAgain: () => { menuCard = null; game.paused = false; again(); },
       onMap: () => { menuCard = null; game.paused = false; showMap(); },
+      onReplay: () => { menuCard = null; game.paused = false; openReplay(); },
     });
   }
 
   function onAction(action) {
+    if (photo.active) { if (action === 'menu' || action === 'photo') photo.close(); return; }
+    if (replay.active) { if (action === 'menu') replay.close(); return; }
+    if (action === 'photo') { openPhoto(); return; }
     if (mp && mp.onAction(action)) return;
     if (action === 'weather') { const m = env.cycleWeather(); hud.toast(`Wieder: ${WEATHER_LABEL[m]}${m === 'random' ? ` (${WEATHER_LABEL[env.state.weatherId]})` : ''}`); }
     else if (action === 'time') { const m = env.cycleTime(); if (modes.clock && m !== 'random') modes.clock.set(startHourFor(m)); hud.toast(`Zäit: ${TIME_LABEL[m]}${m === 'random' ? ` (${TIME_LABEL[env.state.timeId]})` : ''}`); }
@@ -1417,13 +1464,16 @@ async function boot() {
         }
         if (course && game.phase === 'running' && game.run && game.run.timed) courseTick(dt);          // R7-C
       } else acc = 0;
+      if (!replay.active && (game.phase === 'running' || game.phase === 'finished')) recorder.push(game.state, dt * timescale);
     }
+    if (replay.active) replay.update(dt);
     if (avalanches) avalanches.update(game.screen === 'ski' ? game.state : null, dt, { freeride: game.mode === MODES.freeride && !isRace(), running: game.screen === 'ski' && game.phase === 'running' && !game.paused });
-    const st = game.state;
+    const st = replay.active ? replay.state : game.state;
     if (st) {
       skier.pose(st, standNormal, time, standHeight);
       // R7-C: first person = a camera mode of its own (firstperson.js): only the ski tips and poles, the body hidden
-      const fpNow = camMode === 'fp' && game.screen === 'ski' && !game.camPose && !game.orbit && !(mp && mp.viewState && mp.viewState());
+      const rpOn = replay.active;
+      const fpNow = (rpOn ? replay.cam === 'fp' : camMode === 'fp') && game.screen === 'ski' && !game.camPose && !game.orbit && !(mp && mp.viewState && mp.viewState());
       skier.setVisible(!(ride && rideView === 'window' && ride.carry && ride.where().onCarrier && !game.camPose) && !(fpNow && !ride));     // in a cabin, the window view is his own eyes
       if (game.orbit) {                                                // debug: a camera that circles the skier (model checks)
         const o = game.orbit, a = st.heading + o.angle * Math.PI / 180;
@@ -1434,11 +1484,12 @@ async function boot() {
       const view = (mp && mp.viewState()) || st;                     // online race: watching another skier after my finish
       const riding = !!(ride && game.phase === 'lift');
       lookDt = dt;
-      if (!game.camPose && game.screen === 'ski') look.step(dt, st.speed || 0);
+      if (photo.active) game.camPose = photo.camera();
+      if (!game.camPose && game.screen === 'ski' && !rpOn) look.step(dt, st.speed || 0);
       // round 7 (A): the free look + camera guard (the lift camera gets it through R7-B's window.__skiLook seam in rideCamera1)
-      let cam = game.camPose || (riding ? rideCamera1(dt) : fpNow ? fp.update(view, dt, time, (x, z, o) => surface.normal(x, z, o), (x, z) => surface.height(x, z)) : chase.update(view, dt, time));      // camPose: a fixed view (flows)
-      if (!game.camPose && !riding && !fpNow && game.screen === 'ski') cam = stationFrame(cam, view, dt);      // R8e: standing under a roof
-      if (!game.camPose && !riding && !fpNow && game.screen === 'ski') cam = lookCam({ ...cam }, { x: view.x, y: view.y + 1.2, z: view.z }, false);
+      let cam = game.camPose || (riding ? rideCamera1(dt) : rpOn && !fpNow ? replay.camera(dt, time) : fpNow ? fp.update(view, dt, time, (x, z, o) => surface.normal(x, z, o), (x, z) => surface.height(x, z)) : chase.update(view, dt, time));      // camPose: a fixed view (flows)
+      if (!game.camPose && !riding && !fpNow && !rpOn && game.screen === 'ski') cam = stationFrame(cam, view, dt);      // R8e: standing under a roof
+      if (!game.camPose && !riding && !fpNow && !rpOn && game.screen === 'ski') cam = lookCam({ ...cam }, { x: view.x, y: view.y + 1.2, z: view.z }, false);
       document.documentElement.dataset.skiLook = `${look.yaw.toFixed(2)},${look.pitch.toFixed(2)}`;
       camera.position.set(cam.x, cam.y, cam.z);
       camera.lookAt(cam.tx, cam.ty, cam.tz);
@@ -1450,7 +1501,7 @@ async function boot() {
       if (mp) mp.render(now, time);
       if (markers && game.screen === 'ski') { camera.updateMatrixWorld(); markers.update(camera, canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight, game.mode === MODES.freeride && game.phase === 'running' && !game.camPose); }
       // ghost of the best run
-      if (game.ghost && game.screen === 'ski' && game.run && game.run.timed && game.phase !== 'countdown') {
+      if (game.ghost && game.screen === 'ski' && game.run && game.run.timed && game.phase !== 'countdown' && !rpOn) {
         const gq = ghostAt(game.ghost, game.run.elapsed * 1000);
         const p = game.piste.at(gq.s, {});
         ghostPos.x = p.x - p.dz * gq.o; ghostPos.z = p.z + p.dx * gq.o;
@@ -1460,7 +1511,7 @@ async function boot() {
       } else ghostModel.setVisible(false);
       // spray: carving hard, braking, or skidding
       // R7-C: spray.js works out the arc / powder / tracks from the skier state itself
-      spray.update(dt, st, game.screen === 'ski' && !ride && !game.paused ? 1 : 0, pixelRatio(), camera, (canvas.clientHeight || window.innerHeight) * pixelRatio());
+      spray.update(rpOn ? replay.effectDt(dt) : dt, st, rpOn ? replay.sprayAmount : game.screen === 'ski' && !ride && !game.paused ? 1 : 0, pixelRatio(), camera, (canvas.clientHeight || window.innerHeight) * pixelRatio());
     }
     // world upkeep (time-sliced)
     const fx = st ? st.x : resort.width / 2, fz = st ? st.z : resort.depth / 2;
@@ -1528,9 +1579,9 @@ async function boot() {
         }
         if (game.mode === MODES.freeride && time - game.lastNearest > 1) { game.lastNearest = time; hud.setPiste(game.run && game.run.piste, MODES.freeride); }
         modes.hudTick(game);
-        freeTick(st);
+        if (!replay.active) freeTick(st);
         // R7-C: discovery (every place skied through, every station reached), the avalanche warning, the course HUD
-        if (game.phase === 'running' || game.phase === 'lift') explore.tick(st, HUD_EVERY);
+        if ((game.phase === 'running' || game.phase === 'lift') && !replay.active) explore.tick(st, HUD_EVERY);
         if (avalanches) avalanches.hudTick(st, { freeride: game.mode === MODES.freeride && !isRace(), running: game.phase === 'running' && !game.paused });
         if (course && lastCourse) courseHud.set(lastCourse, st, camYaw);
         if (ride) rideHud.set({ left: ride.left, share: ride.share, view: rideView, down: !!ride.down });
@@ -1685,6 +1736,7 @@ async function boot() {
     // R7-C
     npcs: { get crowd() { return crowd; }, get view() { return npcView; }, get on() { return npcOn; }, set: setNpcs, get live() { return npcLive; } },
     get explore() { return explore; }, get avalanches() { return avalanches; }, get course() { return course; }, get lastCourse() { return lastCourse; }, get spray() { return spray; },
+    replay, photo, recorder, openReplay, openPhoto,
     get camMode() { return camMode; }, setCamMode, fp, gateOf, gateAt, startLawin, teleportTo: (spot) => goFree(null, spot), firstLift: () => goFree(spawn), get pisteMap() { return pisteMap; },
   };
 

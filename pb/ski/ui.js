@@ -138,7 +138,7 @@ export function createUi(root) {
   };
 
   /* ---------------- finish card ---------------- */
-  api.showFinish = function showFinish({ piste, result, bestMs, improved, next, cont, extra = '', onAgain, onNext, onContinue, onMap, onFree = null }) {
+  api.showFinish = function showFinish({ piste, result, bestMs, improved, next, cont, extra = '', onAgain, onNext, onContinue, onMap, onFree = null, onReplay = null }) {
     const rows = [];
     if (result) {
       rows.push(['Zäit', formatTime(result.ms)]);
@@ -158,17 +158,20 @@ export function createUi(root) {
         <button type="button" class="btn${onFree ? '' : ' primary'}" data-a="again">Nach eng Kéier</button>
         ${next && !(cont && cont.id === next.id) ? `<button type="button" class="btn" data-a="next">Nächst Pist: ${esc(next.name)}</button>` : ''}
         ${cont ? `<button type="button" class="btn" data-a="cont">Weiderfueren: ${esc(cont.name)}</button>` : ''}
+        ${onReplay ? '<button type="button" class="btn" data-r="replay" id="finishReplay">Replay</button>' : ''}
         <button type="button" class="btn ghost" data-a="map">Pistekaart</button>
       </div>
     </div>`);
     root.appendChild(c);
     const on = { again: onAgain, next: onNext, cont: onContinue, map: onMap, free: onFree };
     c.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => { c.remove(); on[b.dataset.a](); }));
+    const rb = c.querySelector('[data-r="replay"]');
+    if (rb) rb.addEventListener('click', () => onReplay());      // the card stays (hidden by the replay's CSS) and is back when it closes
     return { el: c, close() { c.remove(); } };
   };
 
   /* ---------------- pause menu ---------------- */
-  api.showMenu = function showMenu({ env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, sound = null, npcs = null, againLabel = 'Nach eng Kéier', onResume, onAgain, onMap }) {
+  api.showMenu = function showMenu({ env, gfx, outfits = [], outfit = () => '', onOutfit = () => {}, outfitOpen = () => true, sound = null, npcs = null, againLabel = 'Nach eng Kéier', onResume, onAgain, onMap, onReplay = null }) {
     const c = el(`<div class="card" id="menuCard" role="dialog" aria-label="Menü">
       <h2>Paus</h2>
       <div class="setrow"><span>Wieder</span><div class="seg" id="mWeather">${['random', ...WEATHER_IDS].map((w) => `<button type="button" data-v="${w}">${WEATHER_LABEL[w]}</button>`).join('')}</div></div>
@@ -177,8 +180,8 @@ export function createUi(root) {
       ${outfitRow(outfits, 'mOutfit', outfitOpen)}
       ${sound ? '<div class="setrow"><span>Toun</span><div class="seg" id="mSound"><button type="button" data-v="on">Un</button><button type="button" data-v="off">Aus</button></div></div>' : ''}
       ${npcs ? '<div class="setrow"><span>Aner Skifuerer</span><div class="seg" id="mNpcs"><button type="button" data-v="on">Un</button><button type="button" data-v="off">Aus</button></div></div>' : ''}
-      <div class="rows"><span>Steieren</span><span>A D / ◀ ▶</span><span>Hocken</span><span>Leerzeechen</span><span>Bremsen</span><span>S / ▼</span><span>Schreiden</span><span>W / ▲</span><span>Sprangen</span><span>E</span><span>Trick (Park)</span><span>F · W / S = Flip</span><span>Astegen / Iwwersprangen</span><span>L / Enter</span><span>Vue am Lift</span><span>V</span><span>Wieder / Zäit</span><span>G / T</span><span>Toun</span><span>N</span></div>
-      <div class="acts"><button type="button" class="btn primary" data-a="resume">Weider</button>${againLabel ? `<button type="button" class="btn" data-a="again">${esc(againLabel)}</button>` : ''}<button type="button" class="btn ghost" data-a="map">Pistekaart</button></div>
+      <div class="rows"><span>Steieren</span><span>A D / ◀ ▶</span><span>Hocken</span><span>Leerzeechen</span><span>Bremsen</span><span>S / ▼</span><span>Schreiden</span><span>W / ▲</span><span>Sprangen</span><span>E</span><span>Trick (Park)</span><span>F · W / S = Flip</span><span>Astegen / Iwwersprangen</span><span>L / Enter</span><span>Vue am Lift</span><span>V</span><span>Foto</span><span>P</span><span>Wieder / Zäit</span><span>G / T</span><span>Toun</span><span>N</span></div>
+      <div class="acts"><button type="button" class="btn primary" data-a="resume">Weider</button>${onReplay ? '<button type="button" class="btn" data-a="replay">Lescht 30 s nach eemol kucken</button>' : ''}${againLabel ? `<button type="button" class="btn" data-a="again">${esc(againLabel)}</button>` : ''}<button type="button" class="btn ghost" data-a="map">Pistekaart</button></div>
     </div>`);
     root.appendChild(c);
     const setSeg = (seg, v) => seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
@@ -192,7 +195,7 @@ export function createUi(root) {
     if (S) { setSeg(S, sound.muted() ? 'off' : 'on'); S.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { sound.set(b.dataset.v === 'off'); setSeg(S, b.dataset.v); } }); }
     const P = c.querySelector('#mNpcs');
     if (P) { setSeg(P, npcs.on() ? 'on' : 'off'); P.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { npcs.set(b.dataset.v === 'on'); setSeg(P, b.dataset.v); } }); }
-    const on = { resume: onResume, again: onAgain, map: onMap };
+    const on = { resume: onResume, again: onAgain, map: onMap, replay: onReplay };
     c.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => { c.remove(); on[b.dataset.a](); }));
     return { el: c, close() { c.remove(); } };
   };
