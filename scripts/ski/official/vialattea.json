@@ -1,0 +1,137 @@
+{
+ "_source": "official Vialattea piste map + lift list 2026/27 (saved in ~/Library/Caches/ski-work/official-maps/vialattea/), Montgenevre plan 2025/26 for the French side",
+ "removePistes": [
+  "valle-dei-mandarini",
+  "92-bassa-variante",
+  "92",
+  "35-bassa",
+  "caro-sello",
+  "53",
+  "30",
+  "64",
+  "beginner",
+  "prarial",
+  "24",
+  "la-combe",
+  "itineraire-hors-piste-la-dur",
+  "10-bis",
+  "79-bis",
+  "plein-soleil",
+  "98-tris",
+  "col",
+  "47-bis",
+  "46-bassa"
+ ],
+ "colour": {
+  "8-blue": "red",
+  "32-alta": "red",
+  "olimpica-bassa-blue": "red",
+  "99-green": "blue",
+  "2-red": "black",
+  "montquitaine-2": "blue",
+  "montquitaine-black": "blue",
+  "kandahar-nasi-bis": "red",
+  "kandahar-agnelli-red": "black",
+  "90-tris": "blue",
+  "92-tris": "red"
+ },
+ "pistes": {
+  "35": {
+   "name": "35 alta"
+  },
+  "soureous": {
+   "name": "Souréou"
+  },
+  "soureous-variante": {
+   "name": "Souréou (Variante)"
+  },
+  "ch-du-rocher-rouge": {
+   "name": "Chemin du Rocher Rouge"
+  },
+  "trois-scies": {
+   "name": "3 Scies"
+  },
+  "21bis": {
+   "name": "21 bis"
+  },
+  "brousailles-basa": {
+   "name": "Broussailles bassa"
+  },
+  "broussailles": {
+   "name": "Broussailles alta"
+  },
+  "la-treversee": {
+   "name": "Traversée"
+  },
+  "29-tris": {
+   "name": "29 tris bassa"
+  },
+  "27bis": {
+   "name": "27 bis"
+  },
+  "easy-clotes": {
+   "name": "Principianti Clotes"
+  },
+  "standard-red": {
+   "name": "ST Baby"
+  },
+  "99-alta": {
+   "name": "99 Pistone alta"
+  },
+  "90-alta": {
+   "name": "90 media"
+  },
+  "32-alta": {
+   "name": "32 alta (2)"
+  },
+  "olimpica-bassa-blue": {
+   "name": "Olimpica bassa (2)"
+  },
+  "99-green": {
+   "name": "99 Blu (2)"
+  },
+  "2-red": {
+   "name": "Schwaarz 2 (2)"
+  },
+  "montquitaine-2": {
+   "name": "Montquitaine (Variante 2)"
+  },
+  "montquitaine-black": {
+   "name": "Montquitaine (Variante)"
+  },
+  "kandahar-agnelli-red": {
+   "name": "Kandahar Agnelli (Variante)"
+  },
+  "strada-comunale-di-sagna-lon": {
+   "name": "90 bassa"
+  },
+  "90-tris": {
+   "name": "90 bassa (2)"
+  },
+  "92-bassa": {
+   "name": "92 alta (2)"
+  },
+  "92-tris": {
+   "name": "92 alta (3)"
+  }
+ },
+ "removeLifts": [
+  233500950,
+  1136456696,
+  322162954,
+  438901236
+ ],
+ "liftNames": {
+  "100875567": "Ski Lodge",
+  "100875568": "Campo Scuola Sansicario",
+  "100875588": "Campo Scuola Sansicario",
+  "1123874847": "Tappeto Club Med",
+  "667720193": "Campetto Clotes",
+  "44395981": "Fournéous",
+  "44395982": "Chalvet",
+  "203990392": "Serre Thibaud",
+  "100875595": "Ski Lodge - La Sellette",
+  "44394883": "Roccia Rotonda",
+  "49369254": "Sagnalonga"
+ }
+}

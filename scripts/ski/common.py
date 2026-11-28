@@ -113,6 +113,8 @@ RESORTS = {
         "bbox": (46.668, 11.868, 46.803, 12.030),
         "dem": ["bz-dtm", "copernicus-glo30"], "far": ["copernicus-glo30"],
         "start": "Sylvester",
+        # 28 Nov 2026 official-map alignment (DSS map 2026/27, scripts/ski/official/kronplatz.json): not on the official piste list
+        "reserved_ids": ("furcia-9a-picio-jaru", "furcia-12-a", "seewiese-2", "furcia-9a", "furcia-9-b", "costa-ruis", "0"),
         "tree_line": 2250.0, "derived_forest": 2050.0,       # spruce / larch up to about 2100 m on the Kronplatz flanks, the summit dome bare
         "villages": [
             ("Reischach", 11.9530, 46.7880, 700), ("Olang", 12.0200, 46.7480, 900), ("St. Vigil", 11.9420, 46.6990, 800),
@@ -230,6 +232,10 @@ RESORTS = {
             "rossella", "40", "verbindung-40", "verbindung-40-40", "verbindung-36", "verbindung-gran-villard",
             # Pragelato east side (OSM backcountry ways, no lift within 2.9 km: the old Pragelato lifts are closed)
             "verbindung-plan", "verbindung-pattemouche", "verbindung-pattemouche-2", "verbindung", "verbindung-2",
+            # 28 Nov 2026 official-map alignment (Vialattea map 2026/27): pistes that are not on the map (scripts/ski/official/vialattea.json)
+            "valle-dei-mandarini", "92-bassa-variante", "92", "35-bassa",
+            "caro-sello", "53", "30", "64", "beginner", "prarial", "24", "la-combe", "itineraire-hors-piste-la-dur",
+            "10-bis", "79-bis", "plein-soleil", "98-tris", "col", "47-bis", "46-bassa",
         ),
         "ref_names": True,                         # 62 piste lines carry their number ("81 bassa", "72 alta") as ref, without a name
         # Bardonecchia (Melezet / Chesal / Colomion) reaches into the north-west corner of the box: another ski area, not Via Lattea

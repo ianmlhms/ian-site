@@ -1,0 +1,71 @@
+{
+ "_source": "Dolomiti Superski / Kronplatz piste map 2026/27 (legend + lift list; ~/Library/Caches/ski-work/official-maps/kronplatz/dss-kronplatz-2025-26.pdf is the 2025/26 file, the footer of the rendered map says 2026-2027) + Intermaps feed of kronplatz.com (intermaps-data.json, 28 Nov 2026)",
+ "removePistes": [
+  "furcia-9a-picio-jaru",
+  "furcia-12-a",
+  "seewiese-2",
+  "furcia-9a",
+  "furcia-9-b",
+  "costa-ruis",
+  "0"
+ ],
+ "colour": {
+  "ried-blue": "red",
+  "ried-black": "red",
+  "ried-2-blue": "red",
+  "marchner-2": "blue",
+  "arndt-blue": "red"
+ },
+ "pistes": {
+  "seewiese": {
+   "ref": "2"
+  },
+  "gassl-variante": {
+   "name": "World Record",
+   "ref": "23"
+  },
+  "rara-red": {
+   "ref": "33"
+  },
+  "rara": {
+   "ref": "31"
+  },
+  "pre-da-peres-32": {
+   "ref": "32"
+  },
+  "pre-da-peres-32r": {
+   "name": "Atomic Arena Pre da Peres",
+   "ref": "32R"
+  },
+  "2a": {
+   "name": "Trasse 2A",
+   "ref": "2A"
+  },
+  "2d-weiden": {
+   "name": "2D Weiden",
+   "ref": "2D"
+  },
+  "25-dolomiti": {
+   "ref": "25"
+  },
+  "0-lumen": {
+   "ref": "0"
+  },
+  "ried-blue": {
+   "name": "Ried (3)"
+  },
+  "ried-black": {
+   "name": "Ried (4)"
+  },
+  "ried-2-blue": {
+   "name": "Ried (2b)"
+  },
+  "arndt-blue": {
+   "name": "Arndt (2)"
+  }
+ },
+ "removeLifts": [
+  106110470
+ ],
+ "liftNames": {}
+}
