@@ -46,7 +46,7 @@ export const flow = {
       } catch (error) { /* ignore */ }
     });
     const errors = [];
-    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("pageerror", (e) => { if (!/due to access control checks/.test(e.message)) errors.push(e.message); });      // (WebKit reports a tile fetch cut off by a page load as a page error)
     page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
     const html = (k) => page.evaluate((key) => document.documentElement.dataset[key] || "", k);
     const toMap = () => page.waitForFunction(() => document.documentElement.dataset.skiScreen === "map", null, { timeout: 90000 });
