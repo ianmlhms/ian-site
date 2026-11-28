@@ -55,10 +55,16 @@ export const flow = {
       await page.evaluate(() => window.__ski.setInput({ steer: 0, tuck: 1, brake: 0, push: 1, jump: false }));
       await h.pause(2500);
       await page.waitForFunction(() => window.__ski.state.speed * 3.6 > 30, null, { timeout: 8000 }).catch(() => {});      // R8e: up to carving speed
-      const fp = await page.evaluate(() => {
+      // the eye height is the median of 10 samples over ~1 s: one sample can land in a dip / compression of the piste (28 Nov 2026:
+      // Via Lattea's picked piste changed with the official-map cleanup and a single read gave 0.87 m)
+      const eyes = [];
+      for (let i = 0; i < 10; i++) { eyes.push(await page.evaluate(() => { const k = window.__ski, c = k.camera; return c.position.y - k.surface.height(c.position.x, c.position.z); })); await h.pause(100); }
+      eyes.sort((a, b) => a - b);
+      const eyeMedian = (eyes[4] + eyes[5]) / 2;
+      const fp = await page.evaluate((eyeMedian) => {
         const k = window.__ski, s = k.state, c = k.camera;
-        return { eye: c.position.y - k.surface.height(c.position.x, c.position.z), skis: k.fp.meshes.skis().visible, poles: k.fp.meshes.poles.visible, body: k.scene.children.some((o) => o.visible && /skier/i.test(o.name || "")) , fov: c.fov, speed: s.speed * 3.6, streak: Number(getComputedStyle(document.getElementById("fpStreak")).opacity), mode: document.documentElement.dataset.skiCam };
-      });
+        return { eye: eyeMedian, skis: k.fp.meshes.skis().visible, poles: k.fp.meshes.poles.visible, body: k.scene.children.some((o) => o.visible && /skier/i.test(o.name || "")) , fov: c.fov, speed: s.speed * 3.6, streak: Number(getComputedStyle(document.getElementById("fpStreak")).opacity), mode: document.documentElement.dataset.skiCam };
+      }, eyeMedian);
       h.expect(fp.skis && fp.poles && fp.mode === "fp", `${rid}: ski tips + poles drawn (camera mode ${fp.mode})`);
       h.expect(fp.eye > 0.9 && fp.eye < 2.0, `${rid}: the eyes ${fp.eye.toFixed(2)} m over the snow (tucked lower)`);
       h.expect(fp.speed < 40 ? fp.fov >= 74 : fp.fov > 74 + 2, `${rid}: the FOV opens at ${fp.speed.toFixed(0)} km/h (${fp.fov.toFixed(1)}°)`);
